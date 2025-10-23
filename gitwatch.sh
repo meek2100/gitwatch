@@ -240,7 +240,7 @@ fi
 
 # Enable command tracing only if verbose and not using syslog (to avoid flooding syslog)
 if [ "$VERBOSE" -eq 1 ] && [ "$USE_SYSLOG" -eq 0 ]; then
-    set -x
+  set -x
 fi
 
 
@@ -276,7 +276,7 @@ fi
 for cmd in "$GIT" "$INW" "$FLOCK"; do
   is_command "$cmd" || {
     stderr "Error: Required command '$cmd' not found."
-    
+
     # Platform-specific hints
     if [ "$OS_TYPE" = "Darwin" ]; then
       # macOS hints
@@ -477,11 +477,11 @@ diff-lines() {
     elif [[ $REPLY =~ ^\+\+\+\ (b/)?([^[:blank:]$esc]+) ]]; then
       path=${BASH_REMATCH[2]}
       continue
-    # --- Match hunk header ---
+      # --- Match hunk header ---
     elif [[ $REPLY =~ ^@@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@ ]]; then
       line=${BASH_REMATCH[2]} # Set starting line number for additions
       continue
-    # --- Match diff content lines ---
+      # --- Match diff content lines ---
     elif [[ $REPLY =~ ^($esc\[[0-9;]+m)*([\ +-])(.*) ]]; then # Capture +/- and content
       local prefix=${BASH_REMATCH[2]}
       local content=${BASH_REMATCH[3]}
@@ -514,13 +514,13 @@ generate_commit_message() {
 
   # Check if DATE_FMT is set and COMMITMSG contains %d
   if [ -n "$DATE_FMT" ] && [[ "$COMMITMSG" == *%d* ]]; then
-      local formatted_date
-      formatted_date=$(date "$DATE_FMT")
-      local_commit_msg="${COMMITMSG//%d/$formatted_date}" # Replace all occurrences
+    local formatted_date
+    formatted_date=$(date "$DATE_FMT")
+    local_commit_msg="${COMMITMSG//%d/$formatted_date}" # Replace all occurrences
   else
-      # Use the pre-formatted or original COMMITMSG if no date splicing needed
-      # FORMATTED_COMMITMSG is set during initialization if %d wasn't found
-      local_commit_msg="$FORMATTED_COMMITMSG"
+    # Use the pre-formatted or original COMMITMSG if no date splicing needed
+    # FORMATTED_COMMITMSG is set during initialization if %d wasn't found
+    local_commit_msg="$FORMATTED_COMMITMSG"
   fi
 
   if [[ $LISTCHANGES -ge 0 ]]; then # allow listing diffs in the commit log message
@@ -528,17 +528,17 @@ generate_commit_message() {
     # Handle potential errors from git diff or diff-lines gracefully
     DIFF_COMMITMSG="$($GIT diff -U0 "$LISTCHANGES_COLOR" | diff-lines || { stderr 'Warning: diff-lines failed'; echo ''; })"
     local LENGTH_DIFF_COMMITMSG=0
-    
+
     # Count lines in DIFF_COMMITMSG using bash loop
     if [ -n "$DIFF_COMMITMSG" ]; then
       while IFS= read -r; do
-          ((LENGTH_DIFF_COMMITMSG++))
+        ((LENGTH_DIFF_COMMITMSG++))
       done <<< "$DIFF_COMMITMSG"
     fi
 
     if [[ $LENGTH_DIFF_COMMITMSG -eq 0 ]]; then
-        # If diff is empty (e.g., only mode changes, or diff-lines failed), use status
-        local_commit_msg="File changes detected: $($GIT status -s)"
+      # If diff is empty (e.g., only mode changes, or diff-lines failed), use status
+      local_commit_msg="File changes detected: $($GIT status -s)"
     elif [[ $LENGTH_DIFF_COMMITMSG -le $LISTCHANGES ]]; then
       # Use git diff output as the commit msg
       local_commit_msg="$DIFF_COMMITMSG"
@@ -576,7 +576,7 @@ generate_commit_message() {
       local_commit_msg="$($COMMITCMD || { stderr "ERROR: Custom commit command '$COMMITCMD' failed."; echo "Custom command failed"; } )"
     fi
   fi
-  
+
   echo "$local_commit_msg"
 }
 
@@ -585,12 +585,12 @@ generate_commit_message() {
 _perform_commit() {
   local STATUS
   STATUS=$($GIT status -s)
-  
+
   if [ -z "$STATUS" ]; then # only commit if status shows tracked changes.
     verbose_echo "No tracked changes detected."
     return
   fi
-  
+
   verbose_echo "Tracked changes detected."
   # We want GIT_ADD_ARGS and GIT_COMMIT_ARGS to be word split
   # shellcheck disable=SC2086
@@ -599,7 +599,7 @@ _perform_commit() {
     verbose_echo "Skipping commit - repo is merging"
     return
   fi
-  
+
   local FINAL_COMMIT_MSG
   FINAL_COMMIT_MSG=$(generate_commit_message)
 
@@ -613,7 +613,7 @@ _perform_commit() {
   # shellcheck disable=SC2086
   $GIT add $GIT_ADD_ARGS || { stderr "ERROR: 'git add' failed."; return 1; }
   verbose_echo "Running git add with arguments: $GIT_ADD_ARGS"
-  
+
   # shellcheck disable=SC2086
   $GIT commit $GIT_COMMIT_ARGS -m"$FINAL_COMMIT_MSG" || { stderr "ERROR: 'git commit' failed."; return 1; }
   verbose_echo "Running git commit with arguments: $GIT_COMMIT_ARGS -m\"$FINAL_COMMIT_MSG\""
@@ -652,10 +652,10 @@ perform_commit() {
   # Capture the exit status of the subshell if needed for error handling
   local commit_status=$?
   if [ $commit_status -ne 0 ]; then
-      stderr "Commit logic failed with status $commit_status"
-      # Decide if the main script should exit based on commit failure
-      # For now, we just log and continue watching
-      # Consider adding an option to exit on commit failure if desired.
+    stderr "Commit logic failed with status $commit_status"
+    # Decide if the main script should exit based on commit failure
+    # For now, we just log and continue watching
+    # Consider adding an option to exit on commit failure if desired.
   fi
 }
 
@@ -676,17 +676,17 @@ verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
 "${INW}" "${INW_ARGS[@]}" | while IFS= read -r line; do # Use IFS= to preserve leading spaces in lines
   # Check if line is empty (can happen with some fswatch modes or if the pipe closes)
   if [ -z "$line" ]; then
-      verbose_echo "Received empty line from watcher, possibly pipe closed?"
-      continue # Or maybe exit? Depends on desired behavior if watcher dies.
+    verbose_echo "Received empty line from watcher, possibly pipe closed?"
+    continue # Or maybe exit? Depends on desired behavior if watcher dies.
   fi
   verbose_echo "Change detected: $line"
-  
+
   # Drain any other events that are already in the pipe buffer.
   # This prevents "event thrashing" from thousands of events at once.
   while IFS= read -t 0.1 -r drain_line; do
     verbose_echo "Draining event: $drain_line"
   done
-  
+
   # is there already a timeout process running?
   # Check if SLEEP_PID is non-empty before trying to kill
   if [[ -n ${SLEEP_PID:-} ]] && kill -0 "$SLEEP_PID" &> /dev/null; then
@@ -699,7 +699,7 @@ verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
   (
     # Ensure SLEEP_TIME is a valid number; fallback if not?
     # For now, assume it's valid due to getopts or default.
-    sleep "$SLEEP_TIME" 
+    sleep "$SLEEP_TIME"
     perform_commit
   ) & # and send into background
 
