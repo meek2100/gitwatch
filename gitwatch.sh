@@ -318,19 +318,14 @@ if [ "$USE_SYSLOG" -eq 1 ] && ! is_command "logger"; then
   stderr "Error: Required command 'logger' not found (for -S syslog option)."
   exit 2
 fi
-# 'stdbuf' is needed for the read loop, check for it
-if ! is_command "stdbuf"; then
-  stderr "Error: Required command 'stdbuf' not found (often part of 'coreutils')."
-  stderr "  Hint: Install 'coreutils' using your package manager (e.g., 'apt install coreutils', 'brew install coreutils')."
-  exit 2
-fi
 unset cmd
 
 # Determine the appropriate read timeout based on bash version
 # Bash 4+ supports non-integer timeouts for read -t
 READ_TIMEOUT="1" # Default for older bash (e.g., macOS default)
 # BASH_VERSINFO is an array containing version info, index 0 is major version
-if [[ -v BASH_VERSINFO && ${BASH_VERSINFO[0]} -ge 4 ]]; then
+# Check if BASH_VERSINFO is declared and is an array before accessing index 0
+if declare -p BASH_VERSINFO &>/dev/null && [[ ${BASH_VERSINFO[0]} -ge 4 ]]; then
   READ_TIMEOUT="0.1" # Use faster timeout for modern bash
 fi
 verbose_echo "Using read timeout: $READ_TIMEOUT seconds (Bash version: ${BASH_VERSINFO[0]:-unknown})"
@@ -375,7 +370,8 @@ elif [ -f "$USER_PATH" ]; then # if the target is a single file
   TARGETDIR="${USER_PATH%/*}"
   TARGETFILE="${USER_PATH##*/}"
   if [ "$USER_PATH" = "$TARGETDIR" ]; then TARGETDIR="."; fi
-  if [ -z "$TARGETDIR" ]; then TARGETDIR="/"; fi
+  # Handle case where path starts with '/', e.g. /file.txt
+  if [ -z "$TARGETDIR" ] && [[ "$USER_PATH" == /* ]]; then TARGETDIR="/"; fi
 
   # Resolve potential symlinks and get absolute path *before* changing directory
   TARGETDIR_ABS=$(cd "$TARGETDIR" && pwd -P) || { stderr "Error resolving path for '$TARGETDIR'"; exit 5; }
@@ -711,9 +707,8 @@ fi
 #   running when we receive an event, we kill it and start a new one; thus we only commit if there
 #   have been no changes reported during a whole timeout period
 verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
-# Use stdbuf to ensure the watcher's output is line-buffered, helping the read loop
-# Run the watcher in a subshell to isolate its process group, helps with cleanup? Maybe not needed.
-stdbuf -i0 -o0 "${INW}" "${INW_ARGS[@]}" | while IFS= read -r line; do # Use IFS= to preserve leading spaces
+# Execute the watcher and pipe its output to the read loop
+"${INW}" "${INW_ARGS[@]}" | while IFS= read -r line; do # Use IFS= to preserve leading spaces
   # --- Add check for empty line ---
   if [ -z "$line" ]; then
     verbose_echo "Received empty line from watcher, possibly pipe closed?"
@@ -725,15 +720,13 @@ stdbuf -i0 -o0 "${INW}" "${INW_ARGS[@]}" | while IFS= read -r line; do # Use IFS
   # Drain any other events that are already in the pipe buffer.
   # This prevents "event thrashing" from thousands of events at once.
   # Use appropriate timeout based on bash version detected earlier.
-  # Need to read from the same pipe, use process substitution carefully or simpler redirection
-  # The simple redirection method used previously might be sufficient if stdbuf helps
+  # Read directly from stdin (which is the pipe from the watcher)
   while IFS= read -t "$READ_TIMEOUT" -r drain_line; do
     # Check if we actually read anything or just timed out
     # An empty drain_line means timeout occurred
     [ -z "$drain_line" ] && break
     verbose_echo "Draining event: $drain_line"
-  done < <(cat) # Read from the same stdin pipe
-
+  done
 
   # is there already a timeout process running?
   # Check if SLEEP_PID is non-empty before trying to kill
