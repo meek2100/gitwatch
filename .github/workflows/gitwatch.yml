@@ -68,7 +68,7 @@ jobs:
         shell: bash
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get -y install inotify-tools flock
+            sudo apt-get -y install inotify-tools util-linux
 
           elif [ "$RUNNER_OS" == "macOS" ]; then
             brew install fswatch flock
