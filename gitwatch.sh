@@ -155,23 +155,30 @@ verbose_echo() {
   fi
 }
 
-# clean up at end of program, killing the remaining sleep process if it still exists
 # shellcheck disable=SC2329
+# clean up at end of program, killing the remaining sleep process if it still exists
 cleanup() {
+  # shellcheck disable=SC2317
   verbose_echo "Cleanup function called. Exiting."
   # Check if SLEEP_PID is non-empty before trying to kill
+  # shellcheck disable=SC2317
   if [[ -n ${SLEEP_PID:-} ]] && kill -0 "$SLEEP_PID" &> /dev/null; then
+    # shellcheck disable=SC2317
     verbose_echo "Killing sleep process $SLEEP_PID."
+    # shellcheck disable=SC2317
     kill "$SLEEP_PID" &> /dev/null
   fi
   # The lockfile descriptors (8 and 9) will be auto-released on exit
+  # shellcheck disable=SC2317
   exit 0
 }
 
-# New signal handler function
 # shellcheck disable=SC2329
+# New signal handler function
 signal_handler() {
+  # shellcheck disable=SC2317
   stderr "Signal $1 received, shutting down."
+  # shellcheck disable=SC2317
   exit 0 # This will trigger the EXIT trap
 }
 
