@@ -331,56 +331,56 @@ TARGETFILE_ABS=""
 GIT_DIR_PATH="" # Initialize
 
 if [ -d "$USER_PATH" ]; then # if the target is a directory
-    verbose_echo "Target is a directory."
-    TARGETDIR="$USER_PATH"
-    # Resolve potential symlinks and get absolute path *before* changing directory
-    # Use standard tools, handle potential errors
-    TARGETDIR_ABS=$(cd "$TARGETDIR" && pwd -P) || { stderr "Error resolving path for '$TARGETDIR'"; exit 5; }
+  verbose_echo "Target is a directory."
+  TARGETDIR="$USER_PATH"
+  # Resolve potential symlinks and get absolute path *before* changing directory
+  # Use standard tools, handle potential errors
+  TARGETDIR_ABS=$(cd "$TARGETDIR" && pwd -P) || { stderr "Error resolving path for '$TARGETDIR'"; exit 5; }
 
-    # Get the absolute path to the .git directory using git itself
-    GIT_DIR_PATH=$(cd "$TARGETDIR_ABS" && "$GIT" rev-parse --absolute-git-dir 2>/dev/null) || { stderr "Error: Not a git repository: ${TARGETDIR_ABS}"; exit 6; }
+  # Get the absolute path to the .git directory using git itself
+  GIT_DIR_PATH=$(cd "$TARGETDIR_ABS" && "$GIT" rev-parse --absolute-git-dir 2>/dev/null) || { stderr "Error: Not a git repository: ${TARGETDIR_ABS}"; exit 6; }
 
-    # Build clean exclude regex
-    EXCLUDE_REGEX='(\.git/|\.git$)'
-    if [ -n "${EXCLUDE_PATTERN:-}" ]; then
-      EXCLUDE_REGEX="(\.git/|\.git$|$EXCLUDE_PATTERN)"
-    fi
+  # Build clean exclude regex
+  EXCLUDE_REGEX='(\.git/|\.git$)'
+  if [ -n "${EXCLUDE_PATTERN:-}" ]; then
+    EXCLUDE_REGEX="(\.git/|\.git$|$EXCLUDE_PATTERN)"
+  fi
 
-    # construct inotifywait/fswatch command-line
-    if [ "$INW" = "inotifywait" ]; then
-      INW_ARGS=("-qmr" "-e" "$EVENTS" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS")
-    else # fswatch
-      INW_ARGS=("--recursive" "--event" "$EVENTS" "-E" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS")
-    fi
-    GIT_ADD_ARGS="--all ."
-    GIT_COMMIT_ARGS=""
+  # construct inotifywait/fswatch command-line
+  if [ "$INW" = "inotifywait" ]; then
+    INW_ARGS=("-qmr" "-e" "$EVENTS" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS")
+  else # fswatch
+    INW_ARGS=("--recursive" "--event" "$EVENTS" "-E" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS")
+  fi
+  GIT_ADD_ARGS="--all ."
+  GIT_COMMIT_ARGS=""
 
 elif [ -f "$USER_PATH" ]; then # if the target is a single file
-    verbose_echo "Target is a file."
-    # Get directory from path using bash expansion
-    TARGETDIR="${USER_PATH%/*}"
-    TARGETFILE="${USER_PATH##*/}"
-    if [ "$USER_PATH" = "$TARGETDIR" ]; then TARGETDIR="."; fi
-    if [ -z "$TARGETDIR" ]; then TARGETDIR="/"; fi
+  verbose_echo "Target is a file."
+  # Get directory from path using bash expansion
+  TARGETDIR="${USER_PATH%/*}"
+  TARGETFILE="${USER_PATH##*/}"
+  if [ "$USER_PATH" = "$TARGETDIR" ]; then TARGETDIR="."; fi
+  if [ -z "$TARGETDIR" ]; then TARGETDIR="/"; fi
 
-    # Resolve potential symlinks and get absolute path *before* changing directory
-    TARGETDIR_ABS=$(cd "$TARGETDIR" && pwd -P) || { stderr "Error resolving path for '$TARGETDIR'"; exit 5; }
-    TARGETFILE_ABS="$TARGETDIR_ABS/$TARGETFILE"
+  # Resolve potential symlinks and get absolute path *before* changing directory
+  TARGETDIR_ABS=$(cd "$TARGETDIR" && pwd -P) || { stderr "Error resolving path for '$TARGETDIR'"; exit 5; }
+  TARGETFILE_ABS="$TARGETDIR_ABS/$TARGETFILE"
 
-    # Get the absolute path to the .git directory using git itself
-    GIT_DIR_PATH=$(cd "$TARGETDIR_ABS" && "$GIT" rev-parse --absolute-git-dir 2>/dev/null) || { stderr "Error: Not a git repository: ${TARGETDIR_ABS}"; exit 6; }
+  # Get the absolute path to the .git directory using git itself
+  GIT_DIR_PATH=$(cd "$TARGETDIR_ABS" && "$GIT" rev-parse --absolute-git-dir 2>/dev/null) || { stderr "Error: Not a git repository: ${TARGETDIR_ABS}"; exit 6; }
 
-    # construct inotifywait/fswatch command-line
-    if [ "$INW" = "inotifywait" ]; then
-      INW_ARGS=("-qm" "-e" "$EVENTS" "$TARGETFILE_ABS")
-    else # fswatch
-      INW_ARGS=("--event" "$EVENTS" "$TARGETFILE_ABS")
-    fi
-    GIT_ADD_ARGS="$TARGETFILE_ABS"
-    GIT_COMMIT_ARGS=""
+  # construct inotifywait/fswatch command-line
+  if [ "$INW" = "inotifywait" ]; then
+    INW_ARGS=("-qm" "-e" "$EVENTS" "$TARGETFILE_ABS")
+  else # fswatch
+    INW_ARGS=("--event" "$EVENTS" "$TARGETFILE_ABS")
+  fi
+  GIT_ADD_ARGS="$TARGETFILE_ABS"
+  GIT_COMMIT_ARGS=""
 
 else
-    stderr "Error: The target is neither a regular file nor a directory."; exit 3;
+  stderr "Error: The target is neither a regular file nor a directory."; exit 3;
 fi
 
 # If $GIT_DIR is set by user, it overrides the auto-detected path and adds relevant flags
