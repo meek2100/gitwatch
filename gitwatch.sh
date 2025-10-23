@@ -29,11 +29,8 @@
 #       original work by Lester Buck
 #       (but heavily modified by now)
 #
-#   Requires the command 'inotifywait' to be available, which is part of
-#   the inotify-tools (See https://github.com/rvoicilas/inotify-tools ),
-#   and (obviously) git.
-#   Will check the availability of both commands using the `which` command
-#   and will abort if either command (or `which`) is not found.
+#   Requires the command 'inotifywait' (Linux) or 'fswatch' (macOS),
+#   'flock', and 'git'. Checks for these and provides installation hints.
 #
 
 # --- Production Hardening ---
@@ -155,30 +152,30 @@ verbose_echo() {
   fi
 }
 
-# shellcheck disable=SC2329
+# shellcheck disable=SC2329 # Function is used via trap
 # clean up at end of program, killing the remaining sleep process if it still exists
 cleanup() {
-  # shellcheck disable=SC2317
+  # shellcheck disable=SC2317 # Code is reachable via trap
   verbose_echo "Cleanup function called. Exiting."
   # Check if SLEEP_PID is non-empty before trying to kill
-  # shellcheck disable=SC2317
+  # shellcheck disable=SC2317 # Code is reachable via trap
   if [[ -n ${SLEEP_PID:-} ]] && kill -0 "$SLEEP_PID" &> /dev/null; then
-    # shellcheck disable=SC2317
+    # shellcheck disable=SC2317 # Code is reachable via trap
     verbose_echo "Killing sleep process $SLEEP_PID."
-    # shellcheck disable=SC2317
-    kill "$SLEEP_PID" &> /dev/null
+    # shellcheck disable=SC2317 # Code is reachable via trap
+    kill "$SLEEP_PID" &> /dev/null || true # Ignore error if already dead
   fi
   # The lockfile descriptors (8 and 9) will be auto-released on exit
-  # shellcheck disable=SC2317
+  # shellcheck disable=SC2317 # Code is reachable via trap
   exit 0
 }
 
-# shellcheck disable=SC2329
+# shellcheck disable=SC2329 # Function is used via trap
 # New signal handler function
 signal_handler() {
-  # shellcheck disable=SC2317
+  # shellcheck disable=SC2317 # Code is reachable via trap
   stderr "Signal $1 received, shutting down."
-  # shellcheck disable=SC2317
+  # shellcheck disable=SC2317 # Code is reachable via trap
   exit 0 # This will trigger the EXIT trap
 }
 
@@ -190,15 +187,16 @@ is_command() {
 # Test whether or not current git directory has ongoing merge
 is_merging () {
   # Use $GIT command which respects --git-dir
+  # Check if the MERGE_HEAD file exists within the git directory
   [ -f "$($GIT rev-parse --git-dir)"/MERGE_HEAD ]
 }
 
 ###############################################################################
 
 # --- Signal Trapping ---
-trap "cleanup" EXIT # make sure the timeout is killed when exiting script
-trap "signal_handler INT" INT
-trap "signal_handler TERM" TERM
+trap "cleanup" EXIT # Ensure cleanup runs on script exit, for any reason
+trap "signal_handler INT" INT # Handle Ctrl+C
+trap "signal_handler TERM" TERM # Handle kill/systemd stop
 # ---------------------
 
 while getopts b:d:h:g:L:l:m:c:C:p:r:s:e:x:MRvSf option; do # Process command line options
@@ -294,7 +292,7 @@ for cmd in "$GIT" "$INW" "$FLOCK"; do
         "$FLOCK")
           stderr "  Hint: Install with Homebrew: 'brew install flock'"
           ;;
-        "$INW")
+        "$INW") # On macOS, INW defaults to fswatch
           stderr "  Hint: Install with Homebrew: 'brew install fswatch'"
           ;;
       esac
@@ -307,7 +305,7 @@ for cmd in "$GIT" "$INW" "$FLOCK"; do
         "$FLOCK")
           stderr "  Hint: '$FLOCK' is part of the 'util-linux' package (e.g., 'apt install util-linux')."
           ;;
-        "$INW")
+        "$INW") # On Linux, INW defaults to inotifywait
           stderr "  Hint: '$INW' is part of the 'inotify-tools' package (e.g., 'apt install inotify-tools')."
           ;;
       esac
@@ -320,7 +318,23 @@ if [ "$USE_SYSLOG" -eq 1 ] && ! is_command "logger"; then
   stderr "Error: Required command 'logger' not found (for -S syslog option)."
   exit 2
 fi
+# 'stdbuf' is needed for the read loop, check for it
+if ! is_command "stdbuf"; then
+  stderr "Error: Required command 'stdbuf' not found (often part of 'coreutils')."
+  stderr "  Hint: Install 'coreutils' using your package manager (e.g., 'apt install coreutils', 'brew install coreutils')."
+  exit 2
+fi
 unset cmd
+
+# Determine the appropriate read timeout based on bash version
+# Bash 4+ supports non-integer timeouts for read -t
+READ_TIMEOUT="1" # Default for older bash (e.g., macOS default)
+# BASH_VERSINFO is an array containing version info, index 0 is major version
+if [[ -v BASH_VERSINFO && ${BASH_VERSINFO[0]} -ge 4 ]]; then
+  READ_TIMEOUT="0.1" # Use faster timeout for modern bash
+fi
+verbose_echo "Using read timeout: $READ_TIMEOUT seconds (Bash version: ${BASH_VERSINFO[0]:-unknown})"
+
 
 ###############################################################################
 
@@ -388,8 +402,8 @@ if [ -n "${GIT_DIR:-}" ]; then
   if [ ! -d "$GIT_DIR" ]; then
     stderr ".git location specified with -g is not a directory: $GIT_DIR"; exit 4;
   fi
-  # Use the user-provided GIT_DIR for lockfiles
-  GIT_DIR_PATH="$GIT_DIR"
+  # Use the user-provided GIT_DIR for lockfiles (resolve to absolute path)
+  GIT_DIR_PATH=$(cd "$GIT_DIR" && pwd -P) || { stderr "Error resolving path for GIT_DIR '$GIT_DIR'"; exit 4; }
   # Add flags for subsequent git commands
   GIT="$GIT --no-pager --work-tree $TARGETDIR_ABS --git-dir $GIT_DIR_PATH"
 fi
@@ -401,17 +415,21 @@ LOCKFILE="$GIT_DIR_PATH/gitwatch.lock"
 COMMIT_LOCKFILE="$GIT_DIR_PATH/gitwatch.commit.lock"
 
 # Open main lockfile on FD 9. Lock is held for the script's lifetime.
+# FD 9 is chosen arbitrarily, avoid 0, 1, 2.
 exec 9>"$LOCKFILE"
 "$FLOCK" -n 9 || {
   stderr "Error: gitwatch is already running on this repository (lockfile: $LOCKFILE)."; exit 1;
 }
+verbose_echo "Acquired main instance lock (FD 9) on $LOCKFILE"
 # --- End Lockfile Setup ---
 
 # --- Change Directory AFTER Lockfile Setup ---
 # Now change to the target directory for file watching and relative git operations
 cd "$TARGETDIR_ABS" || {
-  stderr "Error: Can't change directory to '${TARGETDIR_ABS}' after lock setup."; exit 5; # Should not happen, but safety check
+  # This should not happen due to earlier check, but belts and suspenders
+  stderr "Error: Can't change directory to '${TARGETDIR_ABS}' after lock setup."; exit 5;
 }
+verbose_echo "Changed working directory to $TARGETDIR_ABS"
 # --- End Change Directory ---
 
 
@@ -421,7 +439,7 @@ if [[ "$COMMITMSG" != *%d* ]]; then # if commitmsg didn't contain %d
   DATE_FMT=""                                     # empty date format (will disable splicing in the main loop)
   FORMATTED_COMMITMSG="$COMMITMSG"                # save (unchanging) commit message
 else
-  # We need to set this so -u doesn't fail if %d is the only format
+  # FORMATTED_COMMITMSG needs to be set, otherwise 'set -u' might fail later if DATE_FMT is empty
   FORMATTED_COMMITMSG="$COMMITMSG"
 fi
 
@@ -474,9 +492,10 @@ diff-lines() {
       continue
       # --- Match hunk header ---
     elif [[ $REPLY =~ ^@@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@ ]]; then
-      line=${BASH_REMATCH[2]} # Set starting line number for additions
+      line=${BASH_REMATCH[2]:-1} # Set starting line number for additions, default to 1 if not captured
       continue
       # --- Match diff content lines ---
+      # Need to handle lines starting with color codes potentially
     elif [[ $REPLY =~ ^($esc\[[0-9;]+m)*([\ +-])(.*) ]]; then # Capture +/- and content
       local prefix=${BASH_REMATCH[2]}
       local content=${BASH_REMATCH[3]}
@@ -484,20 +503,26 @@ diff-lines() {
 
       if [[ $path == "/dev/null" ]]; then # File deleted
         echo "File $previous_path deleted or moved."
+        # --- Add check: Ensure path and line are set ---
       elif [[ -n "$path" ]] && [[ -n "$line" ]]; then # Ensure path and line are set
         # Reconstruct the line with color codes if present, using prefix and limited content
-        local color_codes=${BASH_REMATCH[1]}
+        local color_codes=${BASH_REMATCH[1]:-} # Default to empty if no match
         echo "$path:$line: $color_codes$prefix$display_content"
       else
         # This case should ideally not happen if diff format is standard
+        # Log to stderr to avoid polluting commit message if LISTCHANGES is used
         stderr "Warning: Could not parse line number or path in diff-lines for: $REPLY"
-        echo "?:?: $REPLY" # Fallback output
+        # Output something simple to stdout as a fallback
+        echo "?:?: $prefix$display_content"
       fi
+      # --- End check ---
 
       # Increment line number only for added or context lines shown in the diff
+      # --- Add check: Ensure line is set before incrementing ---
       if [[ $prefix != - ]] && [[ -n "$line" ]]; then
         ((line++))
       fi
+      # --- End check ---
     fi
   done
 }
@@ -505,25 +530,36 @@ diff-lines() {
 
 # Generates the commit message based on user flags
 generate_commit_message() {
-  local local_commit_msg="" # Initialize to prevent potential unset variable error
+  local local_commit_msg="" # Initialize
 
   # Check if DATE_FMT is set and COMMITMSG contains %d
   if [ -n "$DATE_FMT" ] && [[ "$COMMITMSG" == *%d* ]]; then
     local formatted_date
-    formatted_date=$(date "$DATE_FMT")
+    # Handle potential date errors during generation
+    if ! formatted_date=$(date "$DATE_FMT"); then
+      stderr "Warning: Invalid date format '$DATE_FMT'. Using default commit message."
+      formatted_date="<date format error>" # Provide fallback text
+    fi
     local_commit_msg="${COMMITMSG//%d/$formatted_date}" # Replace all occurrences
   else
     # Use the pre-formatted or original COMMITMSG if no date splicing needed
-    # FORMATTED_COMMITMSG is set during initialization if %d wasn't found
     local_commit_msg="$FORMATTED_COMMITMSG"
   fi
 
   if [[ $LISTCHANGES -ge 0 ]]; then # allow listing diffs in the commit log message
     local DIFF_COMMITMSG
     # Handle potential errors from git diff or diff-lines gracefully
-    DIFF_COMMITMSG="$($GIT diff -U0 "$LISTCHANGES_COLOR" | diff-lines || { stderr 'Warning: diff-lines failed'; echo ''; })"
-    local LENGTH_DIFF_COMMITMSG=0
+    # set +e temporarily if we don't want the script to exit on diff-lines failure
+    set +e # Temporarily disable exit on error
+    DIFF_COMMITMSG="$($GIT diff -U0 "$LISTCHANGES_COLOR" | diff-lines)"
+    local diff_lines_status=$?
+    set -e # Re-enable exit on error
+    if [ $diff_lines_status -ne 0 ]; then
+      stderr 'Warning: diff-lines pipeline failed. Commit message may be incomplete.'
+      DIFF_COMMITMSG="" # Ensure it's empty on failure
+    fi
 
+    local LENGTH_DIFF_COMMITMSG=0
     # Count lines in DIFF_COMMITMSG using bash loop
     if [ -n "$DIFF_COMMITMSG" ]; then
       while IFS= read -r; do
@@ -534,10 +570,10 @@ generate_commit_message() {
     if [[ $LENGTH_DIFF_COMMITMSG -eq 0 ]]; then
       # If diff is empty (e.g., only mode changes, or diff-lines failed), use status
       local_commit_msg="File changes detected: $($GIT status -s)"
-    elif [[ $LENGTH_DIFF_COMMITMSG -le $LISTCHANGES ]]; then
+    elif [[ $LISTCHANGES -eq 0 || $LENGTH_DIFF_COMMITMSG -le $LISTCHANGES ]]; then # LISTCHANGES=0 means no limit
       # Use git diff output as the commit msg
       local_commit_msg="$DIFF_COMMITMSG"
-    else
+    else # Diff is longer than the limit
       # --- Replacement for 'grep |' ---
       local stat_summary=""
       # Process 'git diff --stat' output line by line
@@ -554,9 +590,9 @@ generate_commit_message() {
       done <<< "$($GIT diff --stat)" # Feed 'git diff --stat' output to the loop
       # Use the summary if it's not empty, otherwise fallback
       if [ -n "$stat_summary" ]; then
-        local_commit_msg="$stat_summary"
+        local_commit_msg="Too many lines changed ($LENGTH_DIFF_COMMITMSG > $LISTCHANGES). Summary:\n$stat_summary"
       else
-        local_commit_msg="Many lines changed (diff --stat failed or had no summary)"
+        local_commit_msg="Too many lines changed ($LENGTH_DIFF_COMMITMSG > $LISTCHANGES) (diff --stat failed or had no summary)"
       fi
       # --- End Replacement ---
     fi
@@ -583,16 +619,16 @@ _perform_commit() {
 
   if [ -z "$STATUS" ]; then # only commit if status shows tracked changes.
     verbose_echo "No tracked changes detected."
-    return
+    return 0 # Indicate success (no action needed)
   fi
 
   verbose_echo "Tracked changes detected."
-  # We want GIT_ADD_ARGS and GIT_COMMIT_ARGS to be word split
+  # We want GIT_ADD_ARGS and GIT_COMMIT_ARGS to be word split for cases like '--all .'
   # shellcheck disable=SC2086
 
   if [ "$SKIP_IF_MERGING" -eq 1 ] && is_merging; then
     verbose_echo "Skipping commit - repo is merging"
-    return
+    return 0 # Indicate success (action skipped intentionally)
   fi
 
   local FINAL_COMMIT_MSG
@@ -605,6 +641,7 @@ _perform_commit() {
   fi
   # -----------------------------------
 
+  # Use explicit commands and check return status with ||
   # shellcheck disable=SC2086
   $GIT add $GIT_ADD_ARGS || { stderr "ERROR: 'git add' failed."; return 1; }
   verbose_echo "Running git add with arguments: $GIT_ADD_ARGS"
@@ -617,7 +654,7 @@ _perform_commit() {
     verbose_echo "Executing pull command: ${PULL_CMD_ARRAY[*]}"
     if ! "${PULL_CMD_ARRAY[@]}"; then
       stderr "ERROR: 'git pull' failed. Skipping push."
-      return 1 # Abort this commit/push
+      return 1 # Indicate pull failure
     fi
   fi
 
@@ -625,9 +662,12 @@ _perform_commit() {
     verbose_echo "Executing push command: ${PUSH_CMD_ARRAY[*]}"
     if ! "${PUSH_CMD_ARRAY[@]}"; then
       stderr "ERROR: 'git push' failed."
-      return 1 # Report failure
+      return 1 # Indicate push failure
     fi
   fi
+
+  # If we reached here, all git operations succeeded
+  return 0
 }
 
 # Wrapper for perform_commit that uses a lock to prevent concurrent runs
@@ -636,22 +676,25 @@ perform_commit() {
   # This prevents a new commit from starting if one is already in progress.
   # The lock is released automatically when this subshell exits.
   (
+    # Open FD 8 for the subshell, associating it with the lock file
+    exec 8>"$COMMIT_LOCKFILE"
     "$FLOCK" -n 8 || {
-      verbose_echo "Commit already in progress, skipping this trigger."
+      verbose_echo "Commit already in progress (commit lock busy), skipping this trigger."
       exit 0 # Exit subshell gracefully, not the whole script
     }
     verbose_echo "Acquired commit lock (FD 8), running commit logic."
     _perform_commit
     # Lock on FD 8 is released when this subshell exits
-  ) 8>"$COMMIT_LOCKFILE" # Lock is tied to this file descriptor (FD 8)
-  # Capture the exit status of the subshell if needed for error handling
+  )
+  # Capture the exit status of the subshell
   local commit_status=$?
   if [ $commit_status -ne 0 ]; then
-    stderr "Commit logic failed with status $commit_status"
-    # Decide if the main script should exit based on commit failure
-    # For now, we just log and continue watching
-    # Consider adding an option to exit on commit failure if desired.
+    stderr "Commit logic failed with status $commit_status."
+    # Option: Exit the main script upon commit failure, if desired.
+    # exit 1 # Uncomment this line to exit gitwatch on commit failure
   fi
+  # Return the status from the commit logic
+  return $commit_status
 }
 
 ###############################################################################
@@ -668,19 +711,29 @@ fi
 #   running when we receive an event, we kill it and start a new one; thus we only commit if there
 #   have been no changes reported during a whole timeout period
 verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
-"${INW}" "${INW_ARGS[@]}" | while IFS= read -r line; do # Use IFS= to preserve leading spaces in lines
-  # Check if line is empty (can happen with some fswatch modes or if the pipe closes)
+# Use stdbuf to ensure the watcher's output is line-buffered, helping the read loop
+# Run the watcher in a subshell to isolate its process group, helps with cleanup? Maybe not needed.
+stdbuf -i0 -o0 "${INW}" "${INW_ARGS[@]}" | while IFS= read -r line; do # Use IFS= to preserve leading spaces
+  # --- Add check for empty line ---
   if [ -z "$line" ]; then
     verbose_echo "Received empty line from watcher, possibly pipe closed?"
-    continue # Or maybe exit? Depends on desired behavior if watcher dies.
+    continue # Skip processing empty lines
   fi
+  # --- End check ---
   verbose_echo "Change detected: $line"
 
   # Drain any other events that are already in the pipe buffer.
   # This prevents "event thrashing" from thousands of events at once.
-  while IFS= read -t 0.1 -r drain_line; do
+  # Use appropriate timeout based on bash version detected earlier.
+  # Need to read from the same pipe, use process substitution carefully or simpler redirection
+  # The simple redirection method used previously might be sufficient if stdbuf helps
+  while IFS= read -t "$READ_TIMEOUT" -r drain_line; do
+    # Check if we actually read anything or just timed out
+    # An empty drain_line means timeout occurred
+    [ -z "$drain_line" ] && break
     verbose_echo "Draining event: $drain_line"
-  done
+  done < <(cat) # Read from the same stdin pipe
+
 
   # is there already a timeout process running?
   # Check if SLEEP_PID is non-empty before trying to kill
