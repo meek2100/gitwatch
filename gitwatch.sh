@@ -324,97 +324,77 @@ unset cmd
 
 ###############################################################################
 
+# --- Determine Absolute Paths ---
 USER_PATH="$1"
 TARGETDIR_ABS=""
 TARGETFILE_ABS=""
+GIT_DIR_PATH="" # Initialize
 
 if [ -d "$USER_PATH" ]; then # if the target is a directory
-  verbose_echo "Target is a directory."
+    verbose_echo "Target is a directory."
+    TARGETDIR="$USER_PATH"
+    # Resolve potential symlinks and get absolute path *before* changing directory
+    # Use standard tools, handle potential errors
+    TARGETDIR_ABS=$(cd "$TARGETDIR" && pwd -P) || { stderr "Error resolving path for '$TARGETDIR'"; exit 5; }
 
-  TARGETDIR="$USER_PATH"
-  # Remove trailing slashes, except if it's just "/"
-  while [ "$TARGETDIR" != "/" ] && [ "${TARGETDIR##*/}" = "" ]; do
-    TARGETDIR="${TARGETDIR%/*}"
-  done
-  # If path was all slashes (became empty), set back to /
-  [ -z "$TARGETDIR" ] && TARGETDIR="/"
+    # Get the absolute path to the .git directory using git itself
+    GIT_DIR_PATH=$(cd "$TARGETDIR_ABS" && "$GIT" rev-parse --absolute-git-dir 2>/dev/null) || { stderr "Error: Not a git repository: ${TARGETDIR_ABS}"; exit 6; }
 
-  # Change directory and get the absolute, symlink-resolved path
-  cd "$TARGETDIR" || {
-    stderr "Error: Can't change directory to '${TARGETDIR}'."; exit 5;
-  }
-  TARGETDIR_ABS=$(pwd -P)
+    # Build clean exclude regex
+    EXCLUDE_REGEX='(\.git/|\.git$)'
+    if [ -n "${EXCLUDE_PATTERN:-}" ]; then
+      EXCLUDE_REGEX="(\.git/|\.git$|$EXCLUDE_PATTERN)"
+    fi
 
-  # Build clean exclude regex
-  EXCLUDE_REGEX='(\.git/|\.git$)'
-  if [ -n "${EXCLUDE_PATTERN:-}" ]; then
-    EXCLUDE_REGEX="(\.git/|\.git$|$EXCLUDE_PATTERN)"
-  fi
-
-  # construct inotifywait/fswatch command-line
-  if [ "$INW" = "inotifywait" ]; then
-    INW_ARGS=("-qmr" "-e" "$EVENTS" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS")
-  else # fswatch
-    INW_ARGS=("--recursive" "--event" "$EVENTS" "-E" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS")
-  fi
-  GIT_ADD_ARGS="--all ." # add "." (CWD) recursively to index
-  GIT_COMMIT_ARGS=""     # add -a switch to "commit" call just to be sure
+    # construct inotifywait/fswatch command-line
+    if [ "$INW" = "inotifywait" ]; then
+      INW_ARGS=("-qmr" "-e" "$EVENTS" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS")
+    else # fswatch
+      INW_ARGS=("--recursive" "--event" "$EVENTS" "-E" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS")
+    fi
+    GIT_ADD_ARGS="--all ."
+    GIT_COMMIT_ARGS=""
 
 elif [ -f "$USER_PATH" ]; then # if the target is a single file
-  verbose_echo "Target is a file."
+    verbose_echo "Target is a file."
+    # Get directory from path using bash expansion
+    TARGETDIR="${USER_PATH%/*}"
+    TARGETFILE="${USER_PATH##*/}"
+    if [ "$USER_PATH" = "$TARGETDIR" ]; then TARGETDIR="."; fi
+    if [ -z "$TARGETDIR" ]; then TARGETDIR="/"; fi
 
-  # Get directory from path using bash expansion
-  TARGETDIR="${USER_PATH%/*}"
-  TARGETFILE="${USER_PATH##*/}"
-  if [ "$USER_PATH" = "$TARGETDIR" ]; then # No slash found, e.g. "file.txt"
-    TARGETDIR="."
-  elif [ -z "$TARGETDIR" ]; then # Slash at start, e.g. "/file.txt"
-    TARGETDIR="/"
-  fi
+    # Resolve potential symlinks and get absolute path *before* changing directory
+    TARGETDIR_ABS=$(cd "$TARGETDIR" && pwd -P) || { stderr "Error resolving path for '$TARGETDIR'"; exit 5; }
+    TARGETFILE_ABS="$TARGETDIR_ABS/$TARGETFILE"
 
-  # Change directory and get the absolute, symlink-resolved path
-  cd "$TARGETDIR" || {
-    stderr "Error: Can't change directory to '${TARGETDIR}'."; exit 5;
-  }
-  TARGETDIR_ABS=$(pwd -P)
-  TARGETFILE_ABS="$TARGETDIR_ABS/$TARGETFILE"
+    # Get the absolute path to the .git directory using git itself
+    GIT_DIR_PATH=$(cd "$TARGETDIR_ABS" && "$GIT" rev-parse --absolute-git-dir 2>/dev/null) || { stderr "Error: Not a git repository: ${TARGETDIR_ABS}"; exit 6; }
 
-  # construct inotifywait/fswatch command-line
-  if [ "$INW" = "inotifywait" ]; then
-    INW_ARGS=("-qm" "-e" "$EVENTS" "$TARGETFILE_ABS")
-  else # fswatch
-    INW_ARGS=("--event" "$EVENTS" "$TARGETFILE_ABS")
-  fi
+    # construct inotifywait/fswatch command-line
+    if [ "$INW" = "inotifywait" ]; then
+      INW_ARGS=("-qm" "-e" "$EVENTS" "$TARGETFILE_ABS")
+    else # fswatch
+      INW_ARGS=("--event" "$EVENTS" "$TARGETFILE_ABS")
+    fi
+    GIT_ADD_ARGS="$TARGETFILE_ABS"
+    GIT_COMMIT_ARGS=""
 
-  GIT_ADD_ARGS="$TARGETFILE_ABS" # add only the selected file to index
-  GIT_COMMIT_ARGS="" # no need to add anything more to "commit" call
 else
-  stderr "Error: The target is neither a regular file nor a directory."; exit 3;
+    stderr "Error: The target is neither a regular file nor a directory."; exit 3;
 fi
 
-# If $GIT_DIR is set, verify that it is a directory, and then add parameters to
-# git command as need be
+# If $GIT_DIR is set by user, it overrides the auto-detected path and adds relevant flags
 if [ -n "${GIT_DIR:-}" ]; then
-
   if [ ! -d "$GIT_DIR" ]; then
-    stderr ".git location is not a directory: $GIT_DIR"; exit 4;
+    stderr ".git location specified with -g is not a directory: $GIT_DIR"; exit 4;
   fi
-
-  GIT="$GIT --no-pager --work-tree $TARGETDIR_ABS --git-dir $GIT_DIR"
+  # Use the user-provided GIT_DIR for lockfiles
+  GIT_DIR_PATH="$GIT_DIR"
+  # Add flags for subsequent git commands
+  GIT="$GIT --no-pager --work-tree $TARGETDIR_ABS --git-dir $GIT_DIR_PATH"
 fi
 
-# Set up lockfile to prevent multiple instances
-# Get the path to the .git dir (respecting --git-dir)
-GIT_DIR_PATH=$($GIT rev-parse --git-dir 2>/dev/null)
-if [ -z "$GIT_DIR_PATH" ]; then
-  stderr "Error: Not a git repository: ${TARGETDIR_ABS}"; exit 6;
-fi
-
-# If it's a relative path, make it absolute (e.g., ../.git)
-if [[ "$GIT_DIR_PATH" != /* ]]; then
-  GIT_DIR_PATH=$($GIT rev-parse --git-path "$GIT_DIR_PATH")
-fi
-
+# --- Lockfile Setup ---
 # Set up lockfile to prevent multiple script instances running on the same repo.
 LOCKFILE="$GIT_DIR_PATH/gitwatch.lock"
 # Set up a separate lockfile to prevent concurrent commit operations within this instance.
@@ -425,6 +405,14 @@ exec 9>"$LOCKFILE"
 "$FLOCK" -n 9 || {
   stderr "Error: gitwatch is already running on this repository (lockfile: $LOCKFILE)."; exit 1;
 }
+# --- End Lockfile Setup ---
+
+# --- Change Directory AFTER Lockfile Setup ---
+# Now change to the target directory for file watching and relative git operations
+cd "$TARGETDIR_ABS" || {
+  stderr "Error: Can't change directory to '${TARGETDIR_ABS}' after lock setup."; exit 5; # Should not happen, but safety check
+}
+# --- End Change Directory ---
 
 
 # Check if commit message needs any formatting (date splicing)
