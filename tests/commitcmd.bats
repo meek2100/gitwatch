@@ -8,9 +8,9 @@
 load startup-shutdown
 
 function commit_command_single { #@test
-    
+
     # Start up gitwatch with custom commit command, see if works
-    "${BATS_TEST_DIRNAME}"/../gitwatch.sh -c "uname" "$testdir/local/remote" 3>&- &
+    "${BATS_TEST_DIRNAME}"/../gitwatch.sh -v -c "uname" "$testdir/local/remote" 3>&- &
     GITWATCH_PID=$!
 
     # Keeps kill message from printing to screen
