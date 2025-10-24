@@ -30,7 +30,8 @@
 #       (but heavily modified by now)
 #
 #   Requires the command 'inotifywait' (Linux) or 'fswatch' (macOS),
-#   'flock', and 'git'. Checks for these and provides installation hints.
+#   and 'git'. Checks for these and provides installation hints.
+#   'flock' is highly recommended for robustness and is checked for.
 #
 
 # --- Production Hardening ---
@@ -59,6 +60,7 @@ COMMIT_ON_START=0
 EVENTS="" # User-defined events
 USE_SYSLOG=0
 SLEEP_PID="" # Define SLEEP_PID early for set -u safety
+USE_FLOCK=1 # Default to on, check for command availability below
 
 # Print a message about how to use this script
 shelp() {
@@ -343,7 +345,7 @@ fi
 # Check availability of selected binaries (uses final $GIT, $INW, $FLOCK values)
 # Check the base git command before potential modification by -g
 BASE_GIT_CMD=$(echo "$GIT" | awk '{print $1}')
-for cmd in "$BASE_GIT_CMD" "$INW" "$FLOCK"; do
+for cmd in "$BASE_GIT_CMD" "$INW"; do
   is_command "$cmd" || {
     stderr "Error: Required command '$cmd' not found."
     # ... (Platform-specific hints remain the same) ...
@@ -351,14 +353,12 @@ for cmd in "$BASE_GIT_CMD" "$INW" "$FLOCK"; do
       # macOS hints
       case "$cmd" in
         "$BASE_GIT_CMD") stderr "  Hint: Install Apple Command Line Tools ('xcode-select --install') or Homebrew ('brew install git')" ;;
-        "$FLOCK") stderr "  Hint: Install with Homebrew: 'brew install flock'" ;;
         "$INW") stderr "  Hint: Install with Homebrew: 'brew install fswatch'" ;;
       esac
     else
       # Linux hints
       case "$cmd" in
         "$BASE_GIT_CMD") stderr "  Hint: Install 'git' (e.g., 'apt install git')." ;;
-        "$FLOCK") stderr "  Hint: '$FLOCK' is part of 'util-linux' (e.g., 'apt install util-linux')." ;;
         "$INW") stderr "  Hint: '$INW' is part of 'inotify-tools' (e.g., 'apt install inotify-tools')." ;;
       esac
     fi
@@ -371,6 +371,29 @@ if [ "$USE_SYSLOG" -eq 1 ] && ! is_command "logger"; then
   exit 2
 fi
 unset cmd BASE_GIT_CMD # Clean up
+
+# --- Check for optional 'flock' dependency ---
+if ! is_command "$FLOCK"; then
+  USE_FLOCK=0
+
+  # --- Platform-specific hint ---
+  flock_hint=""
+  if [ "$OS_TYPE" = "Darwin" ]; then
+    flock_hint="  Hint: Install with Homebrew: 'brew install flock'"
+  else
+    # Assume Linux/other Unix-like
+    flock_hint="  Hint: Install 'flock' (e.g., 'apt install util-linux' or 'dnf install util-linux')."
+  fi
+  # --- End platform-specific hint ---
+
+  stderr "Warning: 'flock' command not found.
+$flock_hint
+Proceeding without file locking. This may lead to commit race conditions during rapid file changes
+or allow multiple gitwatch instances to run on the same repository, potentially causing
+errors or duplicate commits."
+fi
+# --- End flock check ---
+
 
 # Determine the appropriate read timeout based on bash version
 READ_TIMEOUT="1" # Default for older bash
@@ -452,13 +475,16 @@ fi
 # Set up lockfile using the now guaranteed absolute GIT_DIR_PATH
 LOCKFILE="$GIT_DIR_PATH/gitwatch.lock"
 COMMIT_LOCKFILE="$GIT_DIR_PATH/gitwatch.commit.lock"
-# Open main lockfile on FD 9. Lock is held for the script's lifetime.
-# FD 9 is chosen arbitrarily, avoid 0, 1, 2.
-exec 9>"$LOCKFILE"
-"$FLOCK" -n 9 || {
-  stderr "Error: gitwatch is already running on this repository (lockfile: $LOCKFILE)."; exit 1;
-}
-verbose_echo "Acquired main instance lock (FD 9) on $LOCKFILE"
+
+if [ "$USE_FLOCK" -eq 1 ]; then
+  # Open main lockfile on FD 9. Lock is held for the script's lifetime.
+  # FD 9 is chosen arbitrarily, avoid 0, 1, 2.
+  exec 9>"$LOCKFILE"
+  "$FLOCK" -n 9 || {
+    stderr "Error: gitwatch is already running on this repository (lockfile: $LOCKFILE)."; exit 1;
+  }
+  verbose_echo "Acquired main instance lock (FD 9) on $LOCKFILE"
+fi
 # --- End Lockfile Setup ---
 
 # --- Change Directory AFTER Lockfile Setup ---
@@ -589,8 +615,8 @@ generate_commit_message() {
       stderr "Warning: Invalid date format '$DATE_FMT'. Using default commit message."
       formatted_date="<date format error>"
     fi
-    # Use sed for substitution to handle multiple %d and special chars in COMMITMSG
-    local_commit_msg=$(echo "$COMMITMSG" | sed "s/%d/$formatted_date/g")
+    # Use simple parameter expansion, more robust than sed for this case
+    local_commit_msg="${COMMITMSG//%d/$formatted_date}"
   else
     local_commit_msg="$FORMATTED_COMMITMSG"
   fi
@@ -727,6 +753,15 @@ _perform_commit() {
 
 # Wrapper for perform_commit that uses a lock to prevent concurrent runs
 perform_commit() {
+  if [ "$USE_FLOCK" -eq 0 ]; then
+    _perform_commit # Run without lock
+    local nocommit_status=$?
+    if [ $nocommit_status -ne 0 ]; then
+        stderr "Commit logic failed with status $nocommit_status."
+    fi
+    return $nocommit_status
+  fi
+
   # Try to acquire a non-blocking lock on file descriptor 8 using COMMIT_LOCKFILE.
   (
     # Open FD 8 for the subshell, associating it with the lock file
