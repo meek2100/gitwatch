@@ -13,9 +13,16 @@ function pulling_and_rebasing_correctly { #@test
     # then commit and push
     cd remote
 
+    # --- Add initial commit and push ---
+    echo "initial" > initial_file.txt
+    git add initial_file.txt
+    git commit -q -m "Initial commit" # Use -q for quiet
+    git push -q origin master # Push quietly to establish origin/master BEFORE gitwatch starts
+    # --- End initial commit ---
+
     # Start up gitwatch and see if commit and push happen automatically
     # after waiting two seconds
-    ${BATS_TEST_DIRNAME}/../gitwatch.sh -r origin -R "$testdir/local/remote" 3>- &
+    ${BATS_TEST_DIRNAME}/../gitwatch.sh -v -r origin -R "$testdir/local/remote" 3>- &
     GITWATCH_PID=$!
 
     # Keeps kill message from printing to screen
@@ -63,6 +70,19 @@ function pulling_and_rebasing_correctly { #@test
     # Verify that new file is here
     sleep $WAITTIME
     [ -f file2.txt ]
+
+    # Verify that line3.txt is also present
+    [ -f file3.txt ]
+
+    # Check git log to ensure commits are ordered correctly after rebase
+    run git log --oneline -n 3 # Check the last 3 commits
+    # Output should contain "file 2 added" commit BEFORE the commit containing "line3"
+    # Ensure the commit message check is robust against variations
+    [[ "$output" == *"file 2 added"* ]] # Check if "file 2 added" exists in the log output
+
+    # Check that line1 commit message exists too (it might be the 3rd or 4th commit now)
+    run git log --oneline -n 4
+    [[ "$output" == *"line1"* ]] # Check if "line1" commit message fragment exists
 
     # Remove testing directories
     cd /tmp
