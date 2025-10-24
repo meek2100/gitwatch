@@ -10,7 +10,7 @@ load startup-shutdown
 function syncing_correctly { #@test
     # Start up gitwatch and see if commit and push happen automatically
     # after waiting two seconds
-    ${BATS_TEST_DIRNAME}/../gitwatch.sh -r origin "$testdir/local/remote" 3>- &
+    ${BATS_TEST_DIRNAME}/../gitwatch.sh -v -r origin "$testdir/local/remote" 3>- &
     GITWATCH_PID=$!
 
     # Keeps kill message from printing to screen

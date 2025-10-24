@@ -10,7 +10,7 @@ load startup-shutdown
 function commit_only_when_git_status_change { #@test
 
     # Start up gitwatch and capture its output
-    ${BATS_TEST_DIRNAME}/../gitwatch.sh "$testdir/local/remote" > "$testdir/output.txt" 3>&- &
+    ${BATS_TEST_DIRNAME}/../gitwatch.sh -v "$testdir/local/remote" > "$testdir/output.txt" 3>&- &
     GITWATCH_PID=$!
 
     # Keeps kill message from printing to screen
@@ -39,7 +39,7 @@ function commit_only_when_git_status_change { #@test
     #run bash -c "grep \"nothing to commit\" $testdir/output.txt | wc -l"
     run grep "nothing to commit" $testdir/output.txt
     [ $status -ne 0 ]
-    
+
 }
 
 

@@ -13,7 +13,7 @@ function remote_git_dirs_working_with_commit_logging { #@test
     mv "$testdir/local/remote/.git" "$dotgittestdir"
 
     # Start up gitwatch, intentionally in wrong directory, with remote dir specified
-    ${BATS_TEST_DIRNAME}/../gitwatch.sh -l 10 -g "$dotgittestdir/.git" "$testdir/local/remote" 3>&- &
+    ${BATS_TEST_DIRNAME}/../gitwatch.sh -v -l 10 -g "$dotgittestdir/.git" "$testdir/local/remote" 3>&- &
     GITWATCH_PID=$!
 
     # Keeps kill message from printing to screen
@@ -37,7 +37,7 @@ function remote_git_dirs_working_with_commit_logging { #@test
     # Make a new change
     echo "line2" >> file1.txt
     sleep $WAITTIME
-    
+
     # Verify that new commit has happened
     currentcommit=$(git --git-dir $dotgittestdir/.git rev-parse master)
     [ "$lastcommit" != "$currentcommit" ]

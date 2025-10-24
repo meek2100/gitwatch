@@ -13,7 +13,7 @@ load startup-shutdown
 function notify_ignore { #@test
 
     # Start up gitwatch and capture its output
-    ${BATS_TEST_DIRNAME}/../gitwatch.sh -x test_subdir "$testdir/local/remote" > "$testdir/output.txt" 3>&- &
+    ${BATS_TEST_DIRNAME}/../gitwatch.sh -v -x test_subdir "$testdir/local/remote" > "$testdir/output.txt" 3>&- &
     GITWATCH_PID=$!
 
     # Keeps kill message from printing to screen

@@ -35,7 +35,7 @@ function commit_command_format { #@test
     # tests nested commit command
 
     # Start up gitwatch with custom commit command, see if works
-    "${BATS_TEST_DIRNAME}"/../gitwatch.sh -c "echo '$(uname) is the uname of this device, the time is $(date)' " "$testdir/local/remote" 3>&- &
+    "${BATS_TEST_DIRNAME}"/../gitwatch.sh -v -c "echo '$(uname) is the uname of this device, the time is $(date)' " "$testdir/local/remote" 3>&- &
     GITWATCH_PID=$!
 
     # Keeps kill message from printing to screen
@@ -59,7 +59,7 @@ function commit_command_format { #@test
 
 function commit_command_overwrite { #@test
     # Start up gitwatch with custom commit command, see if works
-    "${BATS_TEST_DIRNAME}"/../gitwatch.sh -c "uname" -l 123 -L 0 -d "+%Y" "$testdir/local/remote" 3>&- &
+    "${BATS_TEST_DIRNAME}"/../gitwatch.sh -v -c "uname" -l 123 -L 0 -d "+%Y" "$testdir/local/remote" 3>&- &
     GITWATCH_PID=$!
 
     # Keeps kill message from printing to screen
