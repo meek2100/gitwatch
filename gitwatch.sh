@@ -125,7 +125,7 @@ shelp() {
   echo "config and restarting it afterwards."
   echo ""
   echo 'By default, gitwatch tries to use the binaries "git", "inotifywait" (or "fswatch" on macOS),'
-  echo "and \"flock\", expecting to find them in the PATH (it uses 'which' to check this"
+  echo "and \"flock\", expecting to find them in the PATH (it uses 'command -v' to check this"
   echo "and will abort with an error if they cannot be found). If you want to use"
   echo "binaries that are named differently and/or located outside of your PATH, you can"
   echo "define replacements in the environment variables GW_GIT_BIN, GW_INW_BIN, and"
@@ -181,14 +181,16 @@ signal_handler() {
 
 # Tests for the availability of a command
 is_command() {
-  hash "$1" 2> /dev/null
+  # Use command -v for better POSIX compliance and alias handling than hash
+  command -v "$1" &> /dev/null
 }
 
 # Test whether or not current git directory has ongoing merge
+# Uses the globally defined $GIT command string which might include --git-dir/--work-tree
 is_merging () {
-  # Use $GIT command which respects --git-dir
-  # Check if the MERGE_HEAD file exists within the git directory
-  [ -f "$($GIT rev-parse --git-dir)"/MERGE_HEAD ]
+  # Execute in subshell to handle potential errors from rev-parse if not a repo yet
+  # Use bash -c to correctly interpret the $GIT string with its arguments
+  ( bash -c "$GIT rev-parse --git-dir" &>/dev/null && [ -f "$(bash -c "$GIT rev-parse --git-dir")"/MERGE_HEAD ] ) || return 1
 }
 
 ###############################################################################
@@ -199,6 +201,48 @@ trap "signal_handler INT" INT # Handle Ctrl+C
 trap "signal_handler TERM" TERM # Handle kill/systemd stop
 # ---------------------
 
+# --- Initialize GIT command string ---
+# Use GW_GIT_BIN if set, otherwise default to "git"
+# Use ${VAR:-} expansion for safety with set -u
+if [ -z "${GW_GIT_BIN:-}" ]; then GIT="git"; else GIT="$GW_GIT_BIN"; fi
+# --- End Initialize GIT ---
+
+# --- Determine Target Directory Path *preliminarily* for -g flag ---
+# This is needed because -g flag processing modifies the $GIT command string,
+# which requires knowing the work-tree path early.
+# Get the last argument properly, ignoring options and "--"
+PRELIM_USER_PATH=""
+for arg in "$@"; do
+  # Skip options starting with '-' unless it's just '-' (stdin) or './-'
+  if [[ "$arg" == -* ]] && [[ "$arg" != "-" ]] && [[ "$arg" != -./* ]]; then
+    continue
+  fi
+  PRELIM_USER_PATH="$arg" # Keep track of the last non-option argument
+done
+
+PRELIM_TARGETDIR_ABS=""
+# Use subshell to avoid changing main script directory yet and capture output
+# Also suppress errors here as path validity checked later
+if [ -n "$PRELIM_USER_PATH" ]; then # Only attempt if we found a potential path
+  PRELIM_TARGETDIR_ABS=$(
+    cd_result=""
+    if [ -d "$PRELIM_USER_PATH" ]; then
+      # Try cd, capture output, check exit status
+      if cd_result=$(cd "$PRELIM_USER_PATH" && pwd -P 2>/dev/null); then echo "$cd_result"; fi
+    elif [ -f "$PRELIM_USER_PATH" ]; then
+      PRELIM_TARGETDIR="${PRELIM_USER_PATH%/*}"
+      # Handle case where file is in root directory (dirname is '/')
+      if [ -z "$PRELIM_TARGETDIR" ] && [[ "$PRELIM_USER_PATH" == /* ]]; then PRELIM_TARGETDIR="/"; fi
+      # Handle case where file is in current directory (dirname is '.')
+      if [ "$PRELIM_USER_PATH" = "$PRELIM_TARGETDIR" ] || [ -z "$PRELIM_TARGETDIR" ]; then PRELIM_TARGETDIR="."; fi
+      # Try cd, capture output, check exit status
+      if cd_result=$(cd "$PRELIM_TARGETDIR" && pwd -P 2>/dev/null); then echo "$cd_result"; fi
+    fi
+  ) || PRELIM_TARGETDIR_ABS="" # If subshell fails or path invalid, ensure it's empty
+fi
+# --- End Preliminary Path ---
+
+
 while getopts b:d:h:g:L:l:m:c:C:p:r:s:e:x:MRvSf option; do # Process command line options
   case "${option}" in
     b) BRANCH=${OPTARG} ;;
@@ -207,7 +251,31 @@ while getopts b:d:h:g:L:l:m:c:C:p:r:s:e:x:MRvSf option; do # Process command lin
       shelp
       exit
       ;;
-    g) GIT_DIR=${OPTARG} ;;
+    g)
+      GIT_DIR=${OPTARG}
+      # --- Apply -g modification to GIT command string EARLY ---
+      if [ -n "$PRELIM_TARGETDIR_ABS" ]; then
+        # Basic check if GIT_DIR looks like a directory path
+        if [[ "$GIT_DIR" != */* ]] && [[ "$GIT_DIR" != "." ]] && [[ "$GIT_DIR" != ".." ]] && [[ "$GIT_DIR" != /* ]]; then
+          stderr "Warning: GIT_DIR '$GIT_DIR' specified with -g looks like a relative name, not a full path. Proceeding..."
+        elif [ ! -d "$GIT_DIR" ]; then
+          stderr "Warning: GIT_DIR '$GIT_DIR' specified with -g does not seem to be a directory. Proceeding..."
+        fi
+        # Resolve the user-provided path for GIT_DIR robustly
+        RESOLVED_GIT_DIR=$(cd "$GIT_DIR" && pwd -P) || { stderr "Error resolving path for GIT_DIR '$GIT_DIR'"; exit 4; }
+        # Modify the *global* GIT variable string, quoting paths
+        GIT_CMD_BASE=$(echo "$GIT" | awk '{print $1}') # Get base git command
+        # Reconstruct the GIT command string safely using printf %q
+        GIT=$(printf "%s --no-pager --work-tree %q --git-dir %q" "$GIT_CMD_BASE" "$PRELIM_TARGETDIR_ABS" "$RESOLVED_GIT_DIR")
+
+        verbose_echo "Using specified git directory: $RESOLVED_GIT_DIR (applied early to GIT command string)"
+      else
+        # If PRELIM_TARGETDIR_ABS is empty, we couldn't resolve the work tree path early
+        stderr "Error: Cannot determine target directory path ('$PRELIM_USER_PATH') needed to apply -g option."
+        exit 5
+      fi
+      # --- End Early -g Handling ---
+      ;;
     l) LISTCHANGES=${OPTARG} ;;
     L)
       LISTCHANGES=${OPTARG}
@@ -224,7 +292,7 @@ while getopts b:d:h:g:L:l:m:c:C:p:r:s:e:x:MRvSf option; do # Process command lin
     S) USE_SYSLOG=1 ;;
     v)
       VERBOSE=1
-      # set -x # We enable set -x only if verbose *and* not syslog
+      # set -x is enabled below, after option parsing
       ;;
     x) EXCLUDE_PATTERN=${OPTARG} ;;
     e) EVENTS=${OPTARG} ;;
@@ -242,6 +310,7 @@ if [ $# -ne 1 ]; then # If no command line arguments are left (that's bad: no ta
   shelp               # print usage help
   exit                # and exit
 fi
+USER_PATH="$1" # Final user path after shifting options
 
 # Enable command tracing only if verbose and not using syslog (to avoid flooding syslog)
 if [ "$VERBOSE" -eq 1 ] && [ "$USE_SYSLOG" -eq 0 ]; then
@@ -249,20 +318,14 @@ if [ "$VERBOSE" -eq 1 ] && [ "$USE_SYSLOG" -eq 0 ]; then
 fi
 
 
-# if custom bin names are given, use them; otherwise fall back to defaults
+# Determine Watcher Command (INW) and default events (moved after getopts)
 # Use ${VAR:-} expansion for safety with set -u
-if [ -z "${GW_GIT_BIN:-}" ]; then GIT="git"; else GIT="$GW_GIT_BIN"; fi
 if [ -z "${GW_FLOCK_BIN:-}" ]; then FLOCK="flock"; else FLOCK="$GW_FLOCK_BIN"; fi
-
 OS_TYPE=$(uname)
-
 if [ -z "${GW_INW_BIN:-}" ]; then
-  # if Mac, use fswatch
   if [ "$OS_TYPE" != "Darwin" ]; then
     INW="inotifywait"
-    if [ -z "${EVENTS:-}" ]; then
-      EVENTS="close_write,move,move_self,delete,create,modify"
-    fi
+    if [ -z "${EVENTS:-}" ]; then EVENTS="close_write,move,move_self,delete,create,modify"; fi
   else
     INW="fswatch"
     if [ -z "${EVENTS:-}" ]; then
@@ -270,44 +333,33 @@ if [ -z "${GW_INW_BIN:-}" ]; then
       # https://emcrisostomo.github.io/fswatch/doc/1.14.0/fswatch.html/Invoking-fswatch.html#Numeric-Event-Flags
       # default of 414 = MovedTo + MovedFrom + Renamed + Removed + Updated + Created
       #                = 256 + 128+ 16 + 8 + 4 + 2
-      EVENTS="414"
+      EVENTS="414";
     fi
   fi
 else
   INW="$GW_INW_BIN"
 fi
 
-# Check availability of selected binaries and die if not met
-for cmd in "$GIT" "$INW" "$FLOCK"; do
+# Check availability of selected binaries (uses final $GIT, $INW, $FLOCK values)
+# Check the base git command before potential modification by -g
+BASE_GIT_CMD=$(echo "$GIT" | awk '{print $1}')
+for cmd in "$BASE_GIT_CMD" "$INW" "$FLOCK"; do
   is_command "$cmd" || {
     stderr "Error: Required command '$cmd' not found."
-
-    # Platform-specific hints
+    # ... (Platform-specific hints remain the same) ...
     if [ "$OS_TYPE" = "Darwin" ]; then
       # macOS hints
       case "$cmd" in
-        "$GIT")
-          stderr "  Hint: Install the Apple Command Line Tools by running 'xcode-select --install' or install with Homebrew: 'brew install git'"
-          ;;
-        "$FLOCK")
-          stderr "  Hint: Install with Homebrew: 'brew install flock'"
-          ;;
-        "$INW") # On macOS, INW defaults to fswatch
-          stderr "  Hint: Install with Homebrew: 'brew install fswatch'"
-          ;;
+        "$BASE_GIT_CMD") stderr "  Hint: Install Apple Command Line Tools ('xcode-select --install') or Homebrew ('brew install git')" ;;
+        "$FLOCK") stderr "  Hint: Install with Homebrew: 'brew install flock'" ;;
+        "$INW") stderr "  Hint: Install with Homebrew: 'brew install fswatch'" ;;
       esac
     else
       # Linux hints
       case "$cmd" in
-        "$GIT")
-          stderr "  Hint: Install 'git' using your package manager (e.g., 'apt install git' or 'yum install git')."
-          ;;
-        "$FLOCK")
-          stderr "  Hint: '$FLOCK' is part of the 'util-linux' package (e.g., 'apt install util-linux')."
-          ;;
-        "$INW") # On Linux, INW defaults to inotifywait
-          stderr "  Hint: '$INW' is part of the 'inotify-tools' package (e.g., 'apt install inotify-tools')."
-          ;;
+        "$BASE_GIT_CMD") stderr "  Hint: Install 'git' (e.g., 'apt install git')." ;;
+        "$FLOCK") stderr "  Hint: '$FLOCK' is part of 'util-linux' (e.g., 'apt install util-linux')." ;;
+        "$INW") stderr "  Hint: '$INW' is part of 'inotify-tools' (e.g., 'apt install inotify-tools')." ;;
       esac
     fi
     exit 2
@@ -318,98 +370,88 @@ if [ "$USE_SYSLOG" -eq 1 ] && ! is_command "logger"; then
   stderr "Error: Required command 'logger' not found (for -S syslog option)."
   exit 2
 fi
-unset cmd
+unset cmd BASE_GIT_CMD # Clean up
 
 # Determine the appropriate read timeout based on bash version
-# Bash 4+ supports non-integer timeouts for read -t
-READ_TIMEOUT="1" # Default for older bash (e.g., macOS default)
-# BASH_VERSINFO is an array containing version info, index 0 is major version
+READ_TIMEOUT="1" # Default for older bash
 # Check if BASH_VERSINFO is declared and is an array before accessing index 0
-if declare -p BASH_VERSINFO &>/dev/null && [[ ${BASH_VERSINFO[0]} -ge 4 ]]; then
+# Use parameter expansion ${VAR[0]:-} to provide a default (e.g., '0') if not set/empty
+bash_major_version="${BASH_VERSINFO[0]:-0}"
+if [[ "$bash_major_version" -ge 4 ]]; then
   READ_TIMEOUT="0.1" # Use faster timeout for modern bash
 fi
-verbose_echo "Using read timeout: $READ_TIMEOUT seconds (Bash version: ${BASH_VERSINFO[0]:-unknown})"
+verbose_echo "Using read timeout: $READ_TIMEOUT seconds (Bash version: ${bash_major_version})"
 
 
 ###############################################################################
 
-# --- Determine Absolute Paths ---
-USER_PATH="$1"
+# --- Determine Absolute Paths (Final) ---
+# Resolve the user path now that options are processed
 TARGETDIR_ABS=""
 TARGETFILE_ABS=""
 GIT_DIR_PATH="" # Initialize
 
-if [ -d "$USER_PATH" ]; then # if the target is a directory
+if [ -d "$USER_PATH" ]; then
   verbose_echo "Target is a directory."
   TARGETDIR="$USER_PATH"
-  # Resolve potential symlinks and get absolute path *before* changing directory
-  # Use standard tools, handle potential errors
   TARGETDIR_ABS=$(cd "$TARGETDIR" && pwd -P) || { stderr "Error resolving path for '$TARGETDIR'"; exit 5; }
 
-  # Get the absolute path to the .git directory using git itself
-  GIT_DIR_PATH=$(cd "$TARGETDIR_ABS" && "$GIT" rev-parse --absolute-git-dir 2>/dev/null) || { stderr "Error: Not a git repository: ${TARGETDIR_ABS}"; exit 6; }
-
-  # Build clean exclude regex
+  # GIT_DIR_PATH logic moved AFTER getopts, handled below
   EXCLUDE_REGEX='(\.git/|\.git$)'
-  if [ -n "${EXCLUDE_PATTERN:-}" ]; then
-    EXCLUDE_REGEX="(\.git/|\.git$|$EXCLUDE_PATTERN)"
-  fi
-
-  # construct inotifywait/fswatch command-line
-  if [ "$INW" = "inotifywait" ]; then
-    INW_ARGS=("-qmr" "-e" "$EVENTS" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS")
-  else # fswatch
-    INW_ARGS=("--recursive" "--event" "$EVENTS" "-E" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS")
-  fi
-  GIT_ADD_ARGS="--all ."
+  if [ -n "${EXCLUDE_PATTERN:-}" ]; then EXCLUDE_REGEX="(\.git/|\.git$|$EXCLUDE_PATTERN)"; fi
+  if [ "$INW" = "inotifywait" ]; then INW_ARGS=("-qmr" "-e" "$EVENTS" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS"); else INW_ARGS=("--recursive" "--event" "$EVENTS" "-E" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS"); fi
+  GIT_ADD_ARGS="--all ." # This needs word splitting later
   GIT_COMMIT_ARGS=""
 
-elif [ -f "$USER_PATH" ]; then # if the target is a single file
+elif [ -f "$USER_PATH" ]; then
   verbose_echo "Target is a file."
-  # Get directory from path using bash expansion
   TARGETDIR="${USER_PATH%/*}"
   TARGETFILE="${USER_PATH##*/}"
-  if [ "$USER_PATH" = "$TARGETDIR" ]; then TARGETDIR="."; fi
-  # Handle case where path starts with '/', e.g. /file.txt
+  # Handle case where file is in current directory (dirname is '.')
+  if [ "$USER_PATH" = "$TARGETDIR" ] || [ -z "$TARGETDIR" ] && [[ "$USER_PATH" != /* ]]; then TARGETDIR="."; fi
+  # Handle case where file is in root directory (dirname is '/')
   if [ -z "$TARGETDIR" ] && [[ "$USER_PATH" == /* ]]; then TARGETDIR="/"; fi
-
-  # Resolve potential symlinks and get absolute path *before* changing directory
   TARGETDIR_ABS=$(cd "$TARGETDIR" && pwd -P) || { stderr "Error resolving path for '$TARGETDIR'"; exit 5; }
   TARGETFILE_ABS="$TARGETDIR_ABS/$TARGETFILE"
 
-  # Get the absolute path to the .git directory using git itself
-  GIT_DIR_PATH=$(cd "$TARGETDIR_ABS" && "$GIT" rev-parse --absolute-git-dir 2>/dev/null) || { stderr "Error: Not a git repository: ${TARGETDIR_ABS}"; exit 6; }
-
-  # construct inotifywait/fswatch command-line
-  if [ "$INW" = "inotifywait" ]; then
-    INW_ARGS=("-qm" "-e" "$EVENTS" "$TARGETFILE_ABS")
-  else # fswatch
-    INW_ARGS=("--event" "$EVENTS" "$TARGETFILE_ABS")
-  fi
-  GIT_ADD_ARGS="$TARGETFILE_ABS"
+  # GIT_DIR_PATH logic moved AFTER getopts, handled below
+  if [ "$INW" = "inotifywait" ]; then INW_ARGS=("-qm" "-e" "$EVENTS" "$TARGETFILE_ABS"); else INW_ARGS=("--event" "$EVENTS" "$TARGETFILE_ABS"); fi
+  GIT_ADD_ARGS="$TARGETFILE_ABS" # This should be treated as a single arg
   GIT_COMMIT_ARGS=""
-
 else
   stderr "Error: The target is neither a regular file nor a directory."; exit 3;
 fi
 
-# If $GIT_DIR is set by user, it overrides the auto-detected path and adds relevant flags
-if [ -n "${GIT_DIR:-}" ]; then
-  if [ ! -d "$GIT_DIR" ]; then
-    stderr ".git location specified with -g is not a directory: $GIT_DIR"; exit 4;
+# --- Determine Git Directory Path (Final) ---
+# This now uses the potentially modified $GIT command string from getopts -g handling
+# Run rev-parse from within the target directory context to correctly find .git
+# Use bash -c to correctly interpret the $GIT string
+GIT_DIR_PATH=$(cd "$TARGETDIR_ABS" && bash -c "$GIT rev-parse --absolute-git-dir" 2>/dev/null) || {
+  # If the primary detection fails (e.g., maybe $TARGETDIR_ABS is inside .git?)
+  # And if -g was used, trust the resolved path from earlier getopts
+  if [ -n "${GIT_DIR:-}" ]; then
+    # Re-resolve GIT_DIR just to be absolutely sure GIT_DIR_PATH is set correctly
+    GIT_DIR_PATH=$(cd "$GIT_DIR" && pwd -P) || { stderr "Error: Could not resolve specified GIT_DIR '$GIT_DIR' and could not find repository from '$TARGETDIR_ABS'."; exit 6; }
+    verbose_echo "Using specified git directory (final resolution): $GIT_DIR_PATH"
+  else
+    # If -g wasn't used and rev-parse failed, it's not a git repo
+    stderr "Error: Not a git repository (or cannot find .git): ${TARGETDIR_ABS}"; exit 6;
   fi
-  # Use the user-provided GIT_DIR for lockfiles (resolve to absolute path)
-  GIT_DIR_PATH=$(cd "$GIT_DIR" && pwd -P) || { stderr "Error resolving path for GIT_DIR '$GIT_DIR'"; exit 4; }
-  # Add flags for subsequent git commands
-  GIT="$GIT --no-pager --work-tree $TARGETDIR_ABS --git-dir $GIT_DIR_PATH"
+}
+verbose_echo "Determined git directory for lockfiles: $GIT_DIR_PATH"
+
+# Ensure GIT_DIR_PATH is absolute (belt-and-suspenders)
+if [[ "$GIT_DIR_PATH" != /* ]]; then
+  # This might happen if rev-parse somehow failed to give absolute path or -g was relative
+  GIT_DIR_PATH=$(bash -c "$GIT rev-parse --git-path '$GIT_DIR_PATH'") || { stderr "Error finalizing git directory path."; exit 6; }
 fi
+# --- End Git Directory Path ---
+
 
 # --- Lockfile Setup ---
-# Set up lockfile to prevent multiple script instances running on the same repo.
+# Set up lockfile using the now guaranteed absolute GIT_DIR_PATH
 LOCKFILE="$GIT_DIR_PATH/gitwatch.lock"
-# Set up a separate lockfile to prevent concurrent commit operations within this instance.
 COMMIT_LOCKFILE="$GIT_DIR_PATH/gitwatch.commit.lock"
-
 # Open main lockfile on FD 9. Lock is held for the script's lifetime.
 # FD 9 is chosen arbitrarily, avoid 0, 1, 2.
 exec 9>"$LOCKFILE"
@@ -430,7 +472,7 @@ verbose_echo "Changed working directory to $TARGETDIR_ABS"
 
 
 # Check if commit message needs any formatting (date splicing)
-# Replace grep with bash string comparison
+# Use bash check for %d, avoiding grep dependency here
 if [[ "$COMMITMSG" != *%d* ]]; then # if commitmsg didn't contain %d
   DATE_FMT=""                                     # empty date format (will disable splicing in the main loop)
   FORMATTED_COMMITMSG="$COMMITMSG"                # save (unchanging) commit message
@@ -440,8 +482,9 @@ else
 fi
 
 # We have already cd'd into the target directory
-verbose_echo "Watching from directory: $TARGETDIR_ABS"
+# Note: $GIT variable now correctly includes --git-dir/--work-tree if -g was used
 
+# --- Prepare Pull/Push Command Arrays (No eval needed here) ---
 PULL_CMD_ARRAY=()
 PUSH_CMD_ARRAY=()
 
@@ -449,25 +492,35 @@ if [ -n "${REMOTE:-}" ]; then        # are we pushing to a remote?
   verbose_echo "Push remote selected: $REMOTE"
   if [ -z "${BRANCH:-}" ]; then      # Do we have a branch set to push to ?
     verbose_echo "No push branch selected, using default."
-    PUSH_CMD_ARRAY=("$GIT" "push" "$REMOTE") # Branch not set, push to remote without a branch
+    PUSH_CMD="$GIT push '$REMOTE'" # Build command string, quoting remote
   else
     # check if we are on a detached HEAD
-    if HEADREF=$($GIT symbolic-ref HEAD 2> /dev/null); then # HEAD is not detached
+    # Use bash -c "$GIT ..." to run commands with correct context
+    if HEADREF=$(bash -c "$GIT symbolic-ref HEAD" 2> /dev/null); then # HEAD is not detached
       verbose_echo "Push branch selected: $BRANCH, current branch: ${HEADREF#refs/heads/}"
-      PUSH_CMD_ARRAY=("$GIT" "push" "$REMOTE" "${HEADREF#refs/heads/}:$BRANCH")
+      PUSH_CMD=$(printf "%s push %q %s:%q" "$GIT" "$REMOTE" "${HEADREF#refs/heads/}" "$BRANCH")
     else # HEAD is detached
       verbose_echo "Push branch selected: $BRANCH, HEAD is detached."
-      PUSH_CMD_ARRAY=("$GIT" "push" "$REMOTE" "$BRANCH")
+      PUSH_CMD=$(printf "%s push %q %q" "$GIT" "$REMOTE" "$BRANCH")
     fi
   fi
   if [[ $PULL_BEFORE_PUSH -eq 1 ]]; then
     verbose_echo "Pull before push is enabled."
-    PULL_CMD_ARRAY=("$GIT" "pull" "--rebase" "$REMOTE") # Branch not set, pull to remote without a branch
+    # Get current branch name for pull, handle detached HEAD
+    CURRENT_BRANCH_FOR_PULL=$(bash -c "$GIT symbolic-ref --short HEAD" 2>/dev/null || echo "")
+    if [ -n "$CURRENT_BRANCH_FOR_PULL" ]; then
+      PULL_CMD=$(printf "%s pull --rebase %q %q" "$GIT" "$REMOTE" "$CURRENT_BRANCH_FOR_PULL")
+    else
+      stderr "Warning: Cannot determine current branch for pull (detached HEAD?). Using default pull."
+      PULL_CMD=$(printf "%s pull --rebase %q" "$GIT" "$REMOTE")
+    fi
   fi
-
 else
   verbose_echo "No push remote selected."
+  PUSH_CMD="" # Ensure empty if no remote
+  PULL_CMD="" # Ensure empty if no remote
 fi
+# --- End Pull/Push Command Setup ---
 
 # A function to reduce git diff output to the actual changed content, and insert file line numbers.
 # Based on "https://stackoverflow.com/a/12179492/199142" by John Mellor
@@ -516,7 +569,8 @@ diff-lines() {
       # Increment line number only for added or context lines shown in the diff
       # --- Add check: Ensure line is set before incrementing ---
       if [[ $prefix != - ]] && [[ -n "$line" ]]; then
-        ((line++))
+        # Check if line is a number before incrementing
+        [[ "$line" =~ ^[0-9]+$ ]] && ((line++))
       fi
       # --- End check ---
     fi
@@ -531,36 +585,32 @@ generate_commit_message() {
   # Check if DATE_FMT is set and COMMITMSG contains %d
   if [ -n "$DATE_FMT" ] && [[ "$COMMITMSG" == *%d* ]]; then
     local formatted_date
-    # Handle potential date errors during generation
     if ! formatted_date=$(date "$DATE_FMT"); then
       stderr "Warning: Invalid date format '$DATE_FMT'. Using default commit message."
-      formatted_date="<date format error>" # Provide fallback text
+      formatted_date="<date format error>"
     fi
-    local_commit_msg="${COMMITMSG//%d/$formatted_date}" # Replace all occurrences
+    # Use sed for substitution to handle multiple %d and special chars in COMMITMSG
+    local_commit_msg=$(echo "$COMMITMSG" | sed "s/%d/$formatted_date/g")
   else
-    # Use the pre-formatted or original COMMITMSG if no date splicing needed
     local_commit_msg="$FORMATTED_COMMITMSG"
   fi
 
-  if [[ $LISTCHANGES -ge 0 ]]; then # allow listing diffs in the commit log message
+  if [[ $LISTCHANGES -ge 0 ]]; then
     local DIFF_COMMITMSG
-    # Handle potential errors from git diff or diff-lines gracefully
-    # set +e temporarily if we don't want the script to exit on diff-lines failure
-    set +e # Temporarily disable exit on error
-    DIFF_COMMITMSG="$($GIT diff -U0 "$LISTCHANGES_COLOR" | diff-lines)"
+    set +e # Temporarily disable exit on error for this pipeline
+    DIFF_COMMITMSG=$(bash -c "$GIT diff -U0 '$LISTCHANGES_COLOR'" | diff-lines)
     local diff_lines_status=$?
     set -e # Re-enable exit on error
     if [ $diff_lines_status -ne 0 ]; then
       stderr 'Warning: diff-lines pipeline failed. Commit message may be incomplete.'
-      DIFF_COMMITMSG="" # Ensure it's empty on failure
+      DIFF_COMMITMSG=""
     fi
 
     local LENGTH_DIFF_COMMITMSG=0
-    # Count lines in DIFF_COMMITMSG using bash loop
+    # Count lines using wc -l (more robust than bash loop for potentially large diffs)
     if [ -n "$DIFF_COMMITMSG" ]; then
-      while IFS= read -r; do
-        ((LENGTH_DIFF_COMMITMSG++))
-      done <<< "$DIFF_COMMITMSG"
+      # Ensure wc -l handles empty input correctly (outputs 0)
+      LENGTH_DIFF_COMMITMSG=$(echo "$DIFF_COMMITMSG" | wc -l | xargs) # xargs trims whitespace
     fi
 
     if [[ $LENGTH_DIFF_COMMITMSG -eq 0 ]]; then
@@ -590,17 +640,15 @@ generate_commit_message() {
       else
         local_commit_msg="Too many lines changed ($LENGTH_DIFF_COMMITMSG > $LISTCHANGES) (diff --stat failed or had no summary)"
       fi
-      # --- End Replacement ---
     fi
   fi
 
   if [ -n "${COMMITCMD:-}" ]; then
     if [ "$PASSDIFFS" -eq 1 ]; then
-      # If -C is set, pass the list of diffed files to the commit command
-      # Capture potential errors from the custom command
-      local_commit_msg="$($COMMITCMD < <($GIT diff --name-only) || { stderr "ERROR: Custom commit command '$COMMITCMD' failed."; echo "Custom command failed"; } )"
+      # Use process substitution and pipe to custom command
+      local_commit_msg=$(bash -c "$GIT diff --name-only" | "$COMMITCMD" || { stderr "ERROR: Custom commit command '$COMMITCMD' failed."; echo "Custom command failed"; } )
     else
-      local_commit_msg="$($COMMITCMD || { stderr "ERROR: Custom commit command '$COMMITCMD' failed."; echo "Custom command failed"; } )"
+      local_commit_msg=$("$COMMITCMD" || { stderr "ERROR: Custom commit command '$COMMITCMD' failed."; echo "Custom command failed"; } )
     fi
   fi
 
@@ -611,85 +659,92 @@ generate_commit_message() {
 # The main commit and push logic
 _perform_commit() {
   local STATUS
-  STATUS=$($GIT status -s)
+  STATUS=$(bash -c "$GIT status -s")
 
-  if [ -z "$STATUS" ]; then # only commit if status shows tracked changes.
+  if [ -z "$STATUS" ]; then
     verbose_echo "No tracked changes detected."
-    return 0 # Indicate success (no action needed)
+    return 0
   fi
 
   verbose_echo "Tracked changes detected."
-  # We want GIT_ADD_ARGS and GIT_COMMIT_ARGS to be word split for cases like '--all .'
-  # shellcheck disable=SC2086
+  # shellcheck disable=SC2086 is needed for GIT_ADD_ARGS / GIT_COMMIT_ARGS word splitting if not quoted
 
   if [ "$SKIP_IF_MERGING" -eq 1 ] && is_merging; then
     verbose_echo "Skipping commit - repo is merging"
-    return 0 # Indicate success (action skipped intentionally)
+    return 0
   fi
 
   local FINAL_COMMIT_MSG
   FINAL_COMMIT_MSG=$(generate_commit_message)
 
-  # --- Prevent empty commit message ---
   if [ -z "$FINAL_COMMIT_MSG" ]; then
     stderr "Warning: Generated commit message was empty. Using default."
     FINAL_COMMIT_MSG="Auto-commit: Changes detected"
   fi
-  # -----------------------------------
 
-  # Use explicit commands and check return status with ||
-  # shellcheck disable=SC2086
-  $GIT add $GIT_ADD_ARGS || { stderr "ERROR: 'git add' failed."; return 1; }
-  verbose_echo "Running git add with arguments: $GIT_ADD_ARGS"
+  # Use bash -c "$GIT add ..." for safe execution
+  # Need to quote arguments correctly within the subshell
+  local add_cmd
+  # Handle the --all . case explicitly
+  if [[ "$GIT_ADD_ARGS" == "--all ." ]]; then
+    add_cmd=$(printf "%s add --all ." "$GIT")
+  else
+    # Quote the single file path argument
+    add_cmd=$(printf "%s add %q" "$GIT" "$GIT_ADD_ARGS")
+  fi
+  bash -c "$add_cmd" || { stderr "ERROR: 'git add' failed."; return 1; }
+  verbose_echo "Running git add command: $add_cmd"
 
-  # shellcheck disable=SC2086
-  $GIT commit $GIT_COMMIT_ARGS -m"$FINAL_COMMIT_MSG" || { stderr "ERROR: 'git commit' failed."; return 1; }
-  verbose_echo "Running git commit with arguments: $GIT_COMMIT_ARGS -m\"$FINAL_COMMIT_MSG\""
 
-  if [ ${#PULL_CMD_ARRAY[@]} -gt 0 ]; then
-    verbose_echo "Executing pull command: ${PULL_CMD_ARRAY[*]}"
-    if ! "${PULL_CMD_ARRAY[@]}"; then
+  # Use bash -c "$GIT commit ..."
+  local commit_cmd
+  # GIT_COMMIT_ARGS is usually empty, add if needed
+  # Ensure FINAL_COMMIT_MSG is quoted correctly for the subshell
+  commit_cmd=$(printf "%s commit %s -m %q" "$GIT" "$GIT_COMMIT_ARGS" "$FINAL_COMMIT_MSG")
+  bash -c "$commit_cmd" || { stderr "ERROR: 'git commit' failed."; return 1; }
+  verbose_echo "Running git commit command: $commit_cmd"
+
+
+  if [ -n "$PULL_CMD" ]; then
+    verbose_echo "Executing pull command: $PULL_CMD"
+    # --- Keep STRICT error checking ---
+    if ! bash -c "$PULL_CMD"; then
       stderr "ERROR: 'git pull' failed. Skipping push."
-      return 1 # Indicate pull failure
+      return 1 # Abort this commit/push
     fi
+    # --- End STRICT error checking ---
   fi
 
-  if [ ${#PUSH_CMD_ARRAY[@]} -gt 0 ]; then
-    verbose_echo "Executing push command: ${PUSH_CMD_ARRAY[*]}"
-    if ! "${PUSH_CMD_ARRAY[@]}"; then
+  if [ -n "$PUSH_CMD" ]; then
+    verbose_echo "Executing push command: $PUSH_CMD"
+    if ! bash -c "$PUSH_CMD"; then
       stderr "ERROR: 'git push' failed."
-      return 1 # Indicate push failure
+      return 1 # Report push failure
     fi
   fi
-
-  # If we reached here, all git operations succeeded
   return 0
 }
 
 # Wrapper for perform_commit that uses a lock to prevent concurrent runs
 perform_commit() {
   # Try to acquire a non-blocking lock on file descriptor 8 using COMMIT_LOCKFILE.
-  # This prevents a new commit from starting if one is already in progress.
-  # The lock is released automatically when this subshell exits.
   (
     # Open FD 8 for the subshell, associating it with the lock file
     exec 8>"$COMMIT_LOCKFILE"
     "$FLOCK" -n 8 || {
       verbose_echo "Commit already in progress (commit lock busy), skipping this trigger."
-      exit 0 # Exit subshell gracefully, not the whole script
+      exit 0 # Exit subshell gracefully
     }
     verbose_echo "Acquired commit lock (FD 8), running commit logic."
     _perform_commit
-    # Lock on FD 8 is released when this subshell exits
+    # Lock on FD 8 is released automatically when this subshell exits
   )
-  # Capture the exit status of the subshell
   local commit_status=$?
   if [ $commit_status -ne 0 ]; then
     stderr "Commit logic failed with status $commit_status."
-    # Option: Exit the main script upon commit failure, if desired.
-    # exit 1 # Uncomment this line to exit gitwatch on commit failure
+    # Option: Exit the main script upon commit failure
+    # exit 1
   fi
-  # Return the status from the commit logic
   return $commit_status
 }
 
@@ -709,47 +764,31 @@ fi
 verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
 # Execute the watcher and pipe its output to the read loop
 "${INW}" "${INW_ARGS[@]}" | while IFS= read -r line; do # Use IFS= to preserve leading spaces
-  # --- Add check for empty line ---
   if [ -z "$line" ]; then
     verbose_echo "Received empty line from watcher, possibly pipe closed?"
-    continue # Skip processing empty lines
+    continue
   fi
-  # --- End check ---
   verbose_echo "Change detected: $line"
 
   # Drain any other events that are already in the pipe buffer.
-  # This prevents "event thrashing" from thousands of events at once.
-  # Use appropriate timeout based on bash version detected earlier.
-  # Read directly from stdin (which is the pipe from the watcher)
   while IFS= read -t "$READ_TIMEOUT" -r drain_line; do
-    # Check if we actually read anything or just timed out
-    # An empty drain_line means timeout occurred
-    [ -z "$drain_line" ] && break
+    [ -z "$drain_line" ] && break # Timeout means buffer is clear
     verbose_echo "Draining event: $drain_line"
   done
 
-  # is there already a timeout process running?
-  # Check if SLEEP_PID is non-empty before trying to kill
   if [[ -n ${SLEEP_PID:-} ]] && kill -0 "$SLEEP_PID" &> /dev/null; then
-    # kill it and wait for completion
-    kill "$SLEEP_PID" &> /dev/null || true # Ignore error if already dead
-    wait "$SLEEP_PID" &> /dev/null || true # Ignore error if already waited for
+    kill "$SLEEP_PID" &> /dev/null || true
+    wait "$SLEEP_PID" &> /dev/null || true
   fi
 
-  # start timeout process
   (
-    # Ensure SLEEP_TIME is a valid number; fallback if not?
-    # For now, assume it's valid due to getopts or default.
+    # Add error handling for sleep? No, should be reliable.
     sleep "$SLEEP_TIME"
     perform_commit
-  ) & # and send into background
-
-  SLEEP_PID=$! # and remember its PID
+  ) &
+  SLEEP_PID=$!
 
 done
 
-# If the watcher command fails (e.g., inotifywait limit reached), the loop exits.
-# Because of 'set -e' and 'set -o pipefail', the script should exit automatically.
-# This message is useful for debugging or if those options are removed.
 verbose_echo "File watcher process ended (or failed). Exiting via loop termination."
 exit 0 # Explicit exit to ensure cleanup trap runs
