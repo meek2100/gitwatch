@@ -32,10 +32,10 @@ jobs:
           tags: |
             # 1. Tag with the git SHA (e.g., f4be4d7) on all builds
             type=sha
-            
+
             # 2. Tag 'latest' IF the build is from the 'master' branch
             type=ref,event=branch,pattern=master,value=latest
-            
+
             # 3. Tag with the sanitized branch name (e.g., 'my-feature')
             #    IF the build is NOT from the 'master' branch.
             type=ref,event=branch,pattern={{sanitize}},enable_if=ne=refs/heads/master

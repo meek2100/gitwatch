@@ -106,7 +106,7 @@ shelp() {
   echo '                  "Scripted auto-commit on change (%d) by gitwatch.sh"'
   echo " -c <command>     The command to be run to generate a commit message. If empty,"
   echo "                  defaults to the standard commit message. This option overrides -m,"
-  echo "                  -d, and -l."
+  echo "                  -d, and -l. Executed via bash -c."
   echo " -C               Pass list of diffed files to <command> via pipe. Has no effect if"
   echo "                  -c is not given."
   echo " -e <events>      Events passed to inotifywait to watch (defaults to "
@@ -459,7 +459,7 @@ if [ -d "$USER_PATH" ]; then
   EXCLUDE_REGEX='(\.git/|\.git$)'
   if [ -n "${EXCLUDE_PATTERN:-}" ]; then EXCLUDE_REGEX="(\.git/|\.git$|$EXCLUDE_PATTERN)"; fi
   if [ "$INW" = "inotifywait" ]; then INW_ARGS=("-qmr" "-e" "$EVENTS" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS"); else INW_ARGS=("--recursive" "--event" "$EVENTS" "-E" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS"); fi
-  GIT_ADD_ARGS="--all ." # This needs word splitting later
+  # GIT_ADD_ARGS logic moved to _perform_commit
   GIT_COMMIT_ARGS=""
 
 elif [ -f "$USER_PATH" ]; then
@@ -475,7 +475,7 @@ elif [ -f "$USER_PATH" ]; then
 
   # GIT_DIR_PATH logic moved AFTER getopts, handled below
   if [ "$INW" = "inotifywait" ]; then INW_ARGS=("-qm" "-e" "$EVENTS" "$TARGETFILE_ABS"); else INW_ARGS=("--event" "$EVENTS" "$TARGETFILE_ABS"); fi
-  GIT_ADD_ARGS="$TARGETFILE_ABS" # This should be treated as a single arg
+  # GIT_ADD_ARGS logic moved to _perform_commit
   GIT_COMMIT_ARGS=""
 else
   stderr "Error: The target is neither a regular file nor a directory."; exit 3;
@@ -739,11 +739,13 @@ generate_commit_message() {
   if [ -n "${COMMITCMD:-}" ]; then
     if [ "$PASSDIFFS" -eq 1 ]; then
       # Use process substitution and pipe to custom command
-      # *** REINTRODUCE eval HERE for correct handling of complex user commands ***
-      local_commit_msg=$(eval "$(bash -c "$GIT diff --name-only") | $COMMITCMD" || { stderr "ERROR: Custom commit command '$COMMITCMD' with pipe failed."; echo "Custom command failed"; } )
+      # *** Use bash -c for safer execution of complex commands ***
+      local pipe_cmd
+      pipe_cmd=$(printf "%s diff --name-only | %s" "$GIT" "$COMMITCMD")
+      local_commit_msg=$(bash -c "$pipe_cmd" || { stderr "ERROR: Custom commit command '$COMMITCMD' with pipe failed."; echo "Custom command failed"; } )
     else
-      # *** REINTRODUCE eval HERE for correct handling of complex user commands ***
-      local_commit_msg=$(eval "$COMMITCMD" || { stderr "ERROR: Custom commit command '$COMMITCMD' failed."; echo "Custom command failed"; } )
+      # *** Use bash -c for safer execution of complex commands ***
+      local_commit_msg=$(bash -c "$COMMITCMD" || { stderr "ERROR: Custom commit command '$COMMITCMD' failed."; echo "Custom command failed"; } )
     fi
   fi
 
@@ -754,22 +756,49 @@ generate_commit_message() {
 # The main commit and push logic
 _perform_commit() {
   local STATUS
+  # Run status check *before* add to see if there are changes
   STATUS=$(bash -c "$GIT status -s")
 
   if [ -z "$STATUS" ]; then
-    verbose_echo "No tracked changes detected."
+    verbose_echo "No tracked changes detected by git status."
     return 0
   fi
 
-  verbose_echo "Tracked changes detected."
-  # The following disable is needed for GIT_ADD_ARGS / GIT_COMMIT_ARGS word splitting if not quoted
-  # shellcheck disable=SC2086
+  verbose_echo "Tracked changes detected by git status."
 
   if [ "$SKIP_IF_MERGING" -eq 1 ] && is_merging; then
     verbose_echo "Skipping commit - repo is merging"
     return 0
   fi
 
+  # *** MODIFIED git add LOGIC ***
+  # Stage modifications and deletions of tracked files
+  local add_update_cmd
+  add_update_cmd=$(printf "%s add -u" "$GIT")
+  bash -c "$add_update_cmd" || { stderr "ERROR: 'git add -u' failed."; return 1; }
+  verbose_echo "Running git add command: $add_update_cmd"
+
+  # Stage new files and potentially other changes (--all includes -u, but -u first is safer)
+  local add_all_cmd
+  # Check if we were watching a single file or a directory
+  if [ -n "${TARGETFILE_ABS:-}" ]; then
+    # Watching a single file: explicitly add just that file
+    add_all_cmd=$(printf "%s add %q" "$GIT" "$TARGETFILE_ABS")
+  else
+    # Watching a directory: add all changes in current dir (.)
+    add_all_cmd=$(printf "%s add ." "$GIT") # Changed from --all . to just .
+  fi
+  bash -c "$add_all_cmd" || { stderr "ERROR: 'git add .' failed."; return 1; }
+  verbose_echo "Running git add command: $add_all_cmd"
+
+  # *** Re-check status AFTER add to ensure something was actually staged ***
+  STATUS=$(bash -c "$GIT status -s")
+  if [ -z "$STATUS" ]; then
+    verbose_echo "No changes staged for commit after git add."
+    return 0
+  fi
+
+  # Generate commit message (moved after add, so diffs are correct)
   local FINAL_COMMIT_MSG
   FINAL_COMMIT_MSG=$(generate_commit_message)
 
@@ -777,20 +806,6 @@ _perform_commit() {
     stderr "Warning: Generated commit message was empty. Using default."
     FINAL_COMMIT_MSG="Auto-commit: Changes detected"
   fi
-
-  # Use bash -c "$GIT add ..." for safe execution
-  # Need to quote arguments correctly within the subshell
-  local add_cmd
-  # Handle the --all . case explicitly
-  if [[ "$GIT_ADD_ARGS" == "--all ." ]]; then
-    add_cmd=$(printf "%s add --all ." "$GIT")
-  else
-    # Quote the single file path argument
-    add_cmd=$(printf "%s add %q" "$GIT" "$GIT_ADD_ARGS")
-  fi
-  bash -c "$add_cmd" || { stderr "ERROR: 'git add' failed."; return 1; }
-  verbose_echo "Running git add command: $add_cmd"
-
 
   # Use bash -c "$GIT commit ..."
   local commit_cmd
