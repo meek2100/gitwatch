@@ -87,13 +87,29 @@ jobs:
       # - name: Setup upterm session
       #   uses: lhotari/action-upterm@v1
 
-      - name: Run tests
+      - name: Run tests individually
         shell: bash
         run: |
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
-          # Explicitly run only .bats files directly inside the tests directory, not recursively
-          bats tests/*.bats
+          # Run tests one file at a time for easier debugging
+          echo "Running commitcmd.bats..."
+          bats tests/commitcmd.bats
+          echo "Running commitlog.bats..."
+          bats tests/commitlog.bats
+          echo "Running notify-ignore.bats..."
+          bats tests/notify-ignore.bats
+          echo "Running pull-rebase.bats..."
+          bats tests/pull-rebase.bats
+          echo "Running remotedirs.bats..."
+          bats tests/remotedirs.bats
+          echo "Running spaces.bats..."
+          bats tests/spaces.bats
+          echo "Running status-change.bats..."
+          bats tests/status-change.bats
+          echo "Running sync.bats..."
+          bats tests/sync.bats
+          # Add any other .bats files here if necessary
           echo "Finished running tests"
 
       - name: Test step # Can likely remove this step if not needed
