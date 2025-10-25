@@ -195,6 +195,33 @@ is_merging () {
   ( bash -c "$GIT rev-parse --git-dir" &>/dev/null && [ -f "$(bash -c "$GIT rev-parse --git-dir")"/MERGE_HEAD ] ) || return 1
 }
 
+# *** NEW: Check for git user.name and user.email ***
+# This runs *after* $GIT is finalized, but *before* the main loop
+check_git_config() {
+  # Check global config
+  local user_name
+  user_name=$(bash -c "$GIT config --global user.name" 2>/dev/null || echo "")
+  local user_email
+  user_email=$(bash -c "$GIT config --global user.email" 2>/dev/null || echo "")
+
+  # If global is not set, check local (which overrides global)
+  if [ -z "$user_name" ]; then
+    user_name=$(bash -c "$GIT config --local user.name" 2>/dev/null || echo "")
+  fi
+  if [ -z "$user_email" ]; then
+    user_email=$(bash -c "$GIT config --local user.email" 2>/dev/null || echo "")
+  fi
+
+  # If either is *still* not set, warn the user.
+  if [ -z "$user_name" ] || [ -z "$user_email" ]; then
+    stderr "Warning: 'user.name' or 'user.email' is not set in your Git config."
+    stderr "  Commits made by gitwatch may fail. To set them globally, run:"
+    stderr "  git config --global user.name \"Your Name\""
+    stderr "  git config --global user.email \"you@example.com\""
+    # Don't exit, just warn.
+  fi
+}
+
 ###############################################################################
 
 # --- Signal Trapping ---
@@ -474,9 +501,37 @@ fi
 
 
 # --- Lockfile Setup ---
-# Set up lockfile using the now guaranteed absolute GIT_DIR_PATH
-LOCKFILE="$GIT_DIR_PATH/gitwatch.lock"
-COMMIT_LOCKFILE="$GIT_DIR_PATH/gitwatch.commit.lock"
+LOCKFILE_DIR="$GIT_DIR_PATH"
+LOCKFILE_BASENAME="gitwatch"
+
+# *** NEW: Check for write permission. If it fails, fall back to $TMPDIR ***
+if [ "$USE_FLOCK" -eq 1 ]; then
+  if ! touch "$LOCKFILE_DIR/gitwatch.lock.tmp" 2>/dev/null; then
+    verbose_echo "Warning: Cannot write lockfile to $LOCKFILE_DIR. Falling back to temporary directory."
+    # Use $TMPDIR if set, otherwise /tmp
+    LOCKFILE_DIR="${TMPDIR:-/tmp}"
+    # Create a unique, predictable lockfile name based on the repo path
+    # Use sha256sum if available, md5sum as fallback, or just path chars as last resort
+    REPO_HASH=""
+    if is_command "sha256sum"; then
+      REPO_HASH=$(echo -n "$GIT_DIR_PATH" | sha256sum | awk '{print $1}')
+    elif is_command "md5sum"; then
+      REPO_HASH=$(echo -n "$GIT_DIR_PATH" | md5sum | awk '{print $1}')
+    else
+      # Simple "hash" for POSIX compliance, replaces / with _
+      REPO_HASH="${GIT_DIR_PATH//\//_}"
+    fi
+    LOCKFILE_BASENAME="gitwatch-$REPO_HASH"
+    verbose_echo "Using temporary lockfile base: $LOCKFILE_DIR/$LOCKFILE_BASENAME"
+  else
+    # We have write permission, clean up our test file
+    rm "$LOCKFILE_DIR/gitwatch.lock.tmp"
+  fi
+fi
+
+LOCKFILE="$LOCKFILE_DIR/$LOCKFILE_BASENAME.lock"
+COMMIT_LOCKFILE="$LOCKFILE_DIR/$LOCKFILE_BASENAME.commit.lock"
+# *** End tmpdir Fallback ***
 
 if [ "$USE_FLOCK" -eq 1 ]; then
   # Open main lockfile on FD 9. Lock is held for the script's lifetime.
@@ -498,6 +553,11 @@ cd "$TARGETDIR_ABS" || {
 verbose_echo "Changed working directory to $TARGETDIR_ABS"
 # --- End Change Directory ---
 
+# *** NEW: Run Git Config Check ***
+# This is placed *after* changing directory, so repo-local config is found
+check_git_config
+# *** End Git Config Check ***
+
 
 # Check if commit message needs any formatting (date splicing)
 # Use bash check for %d, avoiding grep dependency here
@@ -513,6 +573,8 @@ fi
 # Note: $GIT variable now correctly includes --git-dir/--work-tree if -g was used
 
 # --- Prepare Pull/Push Command Strings (No eval needed here) ---
+PULL_CMD="" # Ensure PULL_CMD is initialized for set -u
+PUSH_CMD="" # Ensure PUSH_CMD is initialized for set -u
 
 if [ -n "${REMOTE:-}" ]; then        # are we pushing to a remote?
   verbose_echo "Push remote selected: $REMOTE"
@@ -543,8 +605,6 @@ if [ -n "${REMOTE:-}" ]; then        # are we pushing to a remote?
   fi
 else
   verbose_echo "No push remote selected."
-  PUSH_CMD="" # Ensure empty if no remote
-  PULL_CMD="" # Ensure empty if no remote
 fi
 # --- End Pull/Push Command Setup ---
 
@@ -641,7 +701,7 @@ generate_commit_message() {
 
     if [[ $LENGTH_DIFF_COMMITMSG -eq 0 ]]; then
       # If diff is empty (e.g., only mode changes, or diff-lines failed), use status
-      local_commit_msg="File changes detected: $($GIT status -s)"
+      local_commit_msg="File changes detected: $(bash -c "$GIT status -s")"
     elif [[ $LISTCHANGES -eq 0 || $LENGTH_DIFF_COMMITMSG -le $LISTCHANGES ]]; then # LISTCHANGES=0 means no limit
       # Use git diff output as the commit msg
       local_commit_msg="$DIFF_COMMITMSG"
@@ -659,7 +719,7 @@ generate_commit_message() {
             stat_summary+=$'\n'"$line"
           fi
         fi
-      done <<< "$($GIT diff --stat)" # Feed 'git diff --stat' output to the loop
+      done <<< "$(bash -c "$GIT diff --stat")" # Feed 'git diff --stat' output to the loop
       # Use the summary if it's not empty, otherwise fallback
       if [ -n "$stat_summary" ]; then
         local_commit_msg="Too many lines changed ($LENGTH_DIFF_COMMITMSG > $LISTCHANGES). Summary:\n$stat_summary"
@@ -771,7 +831,7 @@ perform_commit() {
       verbose_echo "Commit already in progress (commit lock busy), skipping this trigger."
       exit 0 # Exit subshell gracefully
     }
-    verbose_echo "Acquired commit lock (FD 8), running commit logic."
+    verbose_echo "Acquired commit lock (FD 8) on $COMMIT_LOCKFILE, running commit logic."
     _perform_commit
     # Lock on FD 8 is released automatically when this subshell exits
   )
