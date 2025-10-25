@@ -9,27 +9,20 @@ load startup-shutdown
 
 function pulling_and_rebasing_correctly { #@test
 
-    # Create a file, verify that it hasn't been added yet,
-    # then commit and push
-    cd remote
-
-    # --- Add initial commit and push ---
-    echo "initial" > initial_file.txt
-    git add initial_file.txt
-    git commit -q -m "Initial commit" # Use -q for quiet
-    git push -q origin master # Push quietly to establish origin/master BEFORE gitwatch starts
-    # --- End initial commit ---
 
     # Start up gitwatch and see if commit and push happen automatically
     # after waiting two seconds
     ${BATS_TEST_DIRNAME}/../gitwatch.sh -v -r origin -R "$testdir/local/remote" 3>- &
     GITWATCH_PID=$!
-
     # Keeps kill message from printing to screen
     disown
 
+    # Move into the cloned local repository
+    cd remote # This cd assumes the clone was named 'remote' inside 'local'
+
     # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created; hence, a short wait.
+    # to directory too soon after it has been created;
+    # hence, a short wait.
     sleep 1
     echo "line1" >> file1.txt
 
@@ -42,36 +35,38 @@ function pulling_and_rebasing_correctly { #@test
     remotecommit=$(git rev-parse origin/master)
     [ "$currentcommit" = "$remotecommit" ]
 
-    # Create a second local
-    cd ../..
+    # Create a second local clone to simulate another user pushing
+    cd ../.. # Back to $testdir
     mkdir local2
     cd local2
-    git clone -q ../remote
+    git clone -q ../remote # Clone the remote repo again
     cd remote
 
-    # Add a file to new repo
+    # Add a file to the new repo (local2's copy) and push it
     sleep 1
     echo "line2" >> file2.txt
     git add file2.txt
-    git commit -am "file 2 added"
-    git push
+    git commit -q -m "file 2 added" # Commit quietly
+    git push -q # Push quietly
 
-    # Change back to original repo, make a third change, then verify that
-    # second one got here
+    # Change back to original repo (local1's copy), make a third change,
+    # gitwatch should pull the change from local2 before pushing
     cd ../../local/remote
     sleep 1
     echo "line3" >> file3.txt
 
-    # Verify that push happened
+    # Wait for gitwatch to detect change, pull, rebase, commit, and push
+    sleep $WAITTIME
+
+    # Verify that push happened (local1's master should match remote's master)
     currentcommit=$(git rev-parse master)
     remotecommit=$(git rev-parse origin/master)
     [ "$currentcommit" = "$remotecommit" ]
 
-    # Verify that new file is here
-    sleep $WAITTIME
+    # Verify that the file from local2 (file2.txt) is now present due to the pull
     [ -f file2.txt ]
 
-    # Verify that line3.txt is also present
+    # Verify that the file created by local1 (file3.txt) is also present
     [ -f file3.txt ]
 
     # Check git log to ensure commits are ordered correctly after rebase
@@ -80,12 +75,12 @@ function pulling_and_rebasing_correctly { #@test
     # Ensure the commit message check is robust against variations
     [[ "$output" == *"file 2 added"* ]] # Check if "file 2 added" exists in the log output
 
-    # Check that line1 commit message exists too (it might be the 3rd or 4th commit now)
+    # Check that the line1 commit message exists too (it might be the 3rd or 4th commit now)
     run git log --oneline -n 4
-    [[ "$output" == *"line1"* ]] # Check if "line1" commit message fragment exists
+    # Check if a commit containing "line1" (likely from its auto-commit message) exists
+    [[ "$output" == *"line1"* ]]
 
-    # Remove testing directories
-    cd /tmp
-    rm -rf $testdir
+    # Teardown will remove testing directories
+    cd /tmp # Change out of test dir before teardown attempts removal
 }
 
