@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+set -x
 
 # Load bats-core helpers relative to the test file's location
 load 'test_helper/bats-support/load'
