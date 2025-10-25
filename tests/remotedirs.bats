@@ -7,19 +7,19 @@ load 'startup-shutdown'
 
 # Note: Need a custom teardown here to clean the external .git dir
 _original_teardown() {
-  # This assumes the original teardown function from startup-shutdown.bash
-  # is available globally or can be called. Adjust if needed.
   if command -v teardown >/dev/null && [[ "$(type -t teardown)" == "function" ]]; then
-     # Temporarily rename our teardown to avoid recursion if names clash
-     eval "$(declare -f teardown | sed 's/teardown/_local_teardown/')"
-     teardown # Call the original teardown from startup-shutdown
-     eval "$(declare -f _local_teardown | sed 's/_local_teardown/teardown/')" # Restore our teardown
+     # Check if the function body is different to avoid infinite recursion
+     # This is a basic check; might need refinement if function bodies are complex
+     if [[ "$(declare -f teardown)" != "$(declare -f _original_teardown)" ]]; then
+       teardown # Call the original teardown from startup-shutdown
+     fi
   fi
 }
 
 teardown() {
   # Clean up the external .git dir created in this test
   if [ -n "${dotgittestdir:-}" ] && [ -d "$dotgittestdir" ]; then
+      debug "Removing external git dir: $dotgittestdir"
       rm -rf "$dotgittestdir"
   fi
   _original_teardown # Call the original teardown function
@@ -39,19 +39,23 @@ teardown() {
     cd "$testdir/local/remote"
     sleep 1
     echo "line1" >> file1.txt
-    sleep "$WAITTIME"
+    sleep "$WAITTIME" # Wait for first commit
 
     run git --git-dir="$dotgittestdir/.git" rev-parse master
     assert_success
     local lastcommit=$output
 
     echo "line2" >> file1.txt
-    sleep "$WAITTIME"
+    sleep "$WAITTIME" # Wait for second commit event
 
+    # Add a small delay for ref update to settle, especially on macOS
+    sleep 0.5
+
+    # Verify that new commit has happened
     run git --git-dir="$dotgittestdir/.git" rev-parse master
     assert_success
     local currentcommit=$output
-    refute_equal "$lastcommit" "$currentcommit"
+    refute_equal "$lastcommit" "$currentcommit" "Commit hash should change after modification"
 
     run git --git-dir="$dotgittestdir/.git" log -1 --pretty=%B
     assert_success

@@ -44,24 +44,24 @@ load 'startup-shutdown'
     local remote_commit2=$output
     assert_equal "$commit2" "$remote_commit2" "Push after adding file2 failed"
 
-    # --- Test 3: Remove file ---
+    # --- Test 3: Remove file and directory ---
     lastcommit=$commit2
-    run rm subdir/file2.txt
+    # Remove the directory recursively; gitwatch should detect changes within
+    run rm -rf subdir
     assert_success
-    # Need to remove the now-empty subdir too if we expect git add --all to commit the removal
-    run rmdir subdir
-    assert_success
-    sleep "$WAITTIME"
+    sleep "$WAITTIME" # Wait for commit triggered by removal
 
+    # Verify new commit happened
     run git rev-parse master
     assert_success
     local commit3=$output
-    refute_equal "$lastcommit" "$commit3" "Commit after removing file2 and subdir failed"
+    refute_equal "$lastcommit" "$commit3" "Commit after removing subdir failed"
 
+    # Verify push happened
     run git rev-parse origin/master
     assert_success
     local remote_commit3=$output
-    assert_equal "$commit3" "$remote_commit3" "Push after removing file2 failed"
+    assert_equal "$commit3" "$remote_commit3" "Push after removing subdir failed"
 
     cd /tmp
 }

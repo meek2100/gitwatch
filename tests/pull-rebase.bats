@@ -51,11 +51,18 @@ load 'startup-shutdown'
     assert_file_exist "file2.txt"
     assert_file_exist "file3.txt"
 
+    # Check commit order after rebase - Check commit messages where known
     run git log --oneline -n 3
     assert_success
-    assert_line --index 0 --partial "file3.txt"
-    assert_line --index 1 --partial "Commit from local2 (file2)"
+    # Commit for file3 (rebased) is now top. Check its existence using name-status below.
+    assert_line --index 1 --partial "Commit from local2 (file2)" # This commit message is fixed
 
+    # Verify file3.txt was part of the *latest* commit using name-status
+    run git log --name-status -n 1
+    assert_success
+    assert_output --partial "file3.txt"
+
+    # Verify file1.txt is in recent history
     run git log --name-status -n 4
     assert_success
     assert_output --partial "file1.txt"
