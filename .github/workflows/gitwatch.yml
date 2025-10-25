@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -60,8 +60,9 @@ jobs:
 
     steps:
       - name: Setup node
-        uses: actions/setup-node@v3
-      - name: Setup BATS
+        uses: actions/setup-node@v4
+
+      - name: Setup BATS (bats-core via npm)
         run: sudo npm install -g bats
 
       - name: Install gitwatch dependencies
@@ -78,8 +79,10 @@ jobs:
             exit 1
           fi
 
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Checkout code (including submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: true # Ensure submodules (bats-core helpers) are checked out
 
       # - name: Setup upterm session
       #   uses: lhotari/action-upterm@v1
@@ -89,6 +92,7 @@ jobs:
         run: |
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
+          # Run tests using the bats-core executable
           bats -rt tests
           #bats -rt othertests
           echo "Finished running tests"
