@@ -390,7 +390,7 @@ if ! is_command "$FLOCK"; then
 $flock_hint
 Proceeding without file locking. This may lead to commit race conditions during rapid file changes
 or allow multiple gitwatch instances to run on the same repository, potentially causing
-errors or duplicate commits."
+  errors or duplicate commits."
 fi
 # --- End flock check ---
 
@@ -757,7 +757,7 @@ perform_commit() {
     _perform_commit # Run without lock
     local nocommit_status=$?
     if [ $nocommit_status -ne 0 ]; then
-        stderr "Commit logic failed with status $nocommit_status."
+      stderr "Commit logic failed with status $nocommit_status."
     fi
     return $nocommit_status
   fi
