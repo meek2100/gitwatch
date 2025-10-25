@@ -195,7 +195,7 @@ is_merging () {
   ( bash -c "$GIT rev-parse --git-dir" &>/dev/null && [ -f "$(bash -c "$GIT rev-parse --git-dir")"/MERGE_HEAD ] ) || return 1
 }
 
-# *** NEW: Check for git user.name and user.email ***
+# Check for git user.name and user.email
 # This runs *after* $GIT is finalized, but *before* the main loop
 check_git_config() {
   # Check global config
@@ -396,6 +396,13 @@ if [ "$USE_SYSLOG" -eq 1 ] && ! is_command "logger"; then
   stderr "Error: Required command 'logger' not found (for -S syslog option)."
   exit 2
 fi
+# Add check for hash command needed for tmpdir fallback
+if ! is_command "sha256sum" && ! is_command "md5sum"; then
+  # Only warn if flock *is* available, as the hash is only needed for the fallback logic
+  if is_command "$FLOCK"; then
+    stderr "Warning: Neither 'sha256sum' nor 'md5sum' found. Lockfile fallback to /tmp might use less unique names."
+  fi
+fi
 unset cmd BASE_GIT_CMD # Clean up
 
 # --- Check for optional 'flock' dependency ---
@@ -504,7 +511,7 @@ fi
 LOCKFILE_DIR="$GIT_DIR_PATH"
 LOCKFILE_BASENAME="gitwatch"
 
-# *** NEW: Check for write permission. If it fails, fall back to $TMPDIR ***
+# Check for write permission. If it fails, fall back to $TMPDIR
 if [ "$USE_FLOCK" -eq 1 ]; then
   if ! touch "$LOCKFILE_DIR/gitwatch.lock.tmp" 2>/dev/null; then
     verbose_echo "Warning: Cannot write lockfile to $LOCKFILE_DIR. Falling back to temporary directory."
@@ -531,7 +538,7 @@ fi
 
 LOCKFILE="$LOCKFILE_DIR/$LOCKFILE_BASENAME.lock"
 COMMIT_LOCKFILE="$LOCKFILE_DIR/$LOCKFILE_BASENAME.commit.lock"
-# *** End tmpdir Fallback ***
+# --- End tmpdir Fallback ---
 
 if [ "$USE_FLOCK" -eq 1 ]; then
   # Open main lockfile on FD 9. Lock is held for the script's lifetime.
@@ -553,10 +560,10 @@ cd "$TARGETDIR_ABS" || {
 verbose_echo "Changed working directory to $TARGETDIR_ABS"
 # --- End Change Directory ---
 
-# *** NEW: Run Git Config Check ***
+# Run Git Config Check
 # This is placed *after* changing directory, so repo-local config is found
 check_git_config
-# *** End Git Config Check ***
+# --- End Git Config Check ---
 
 
 # Check if commit message needs any formatting (date splicing)
@@ -732,9 +739,11 @@ generate_commit_message() {
   if [ -n "${COMMITCMD:-}" ]; then
     if [ "$PASSDIFFS" -eq 1 ]; then
       # Use process substitution and pipe to custom command
-      local_commit_msg=$(bash -c "$GIT diff --name-only" | "$COMMITCMD" || { stderr "ERROR: Custom commit command '$COMMITCMD' failed."; echo "Custom command failed"; } )
+      # *** REINTRODUCE eval HERE for correct handling of complex user commands ***
+      local_commit_msg=$(eval "$(bash -c "$GIT diff --name-only") | $COMMITCMD" || { stderr "ERROR: Custom commit command '$COMMITCMD' with pipe failed."; echo "Custom command failed"; } )
     else
-      local_commit_msg=$("$COMMITCMD" || { stderr "ERROR: Custom commit command '$COMMITCMD' failed."; echo "Custom command failed"; } )
+      # *** REINTRODUCE eval HERE for correct handling of complex user commands ***
+      local_commit_msg=$(eval "$COMMITCMD" || { stderr "ERROR: Custom commit command '$COMMITCMD' failed."; echo "Custom command failed"; } )
     fi
   fi
 
