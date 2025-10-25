@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
 
-# This is a testscript using the bats testing framework:
-# https://github.com/sstephenson/bats
-# To run it, at a command prompt:
-# bats testscript.bats
+# Load bats-core helpers relative to the test file's location
+load 'test_helper/bats-support/load'
+load 'test_helper/bats-assert/load'
+load 'test_helper/bats-file/load'
 
 load startup-shutdown
 
@@ -35,3 +35,4 @@ function commit_log_messages_working { #@test
     run git log -1 --oneline
     [[ $output == *"file1.txt"* ]]
 }
+

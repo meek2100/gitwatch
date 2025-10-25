@@ -1,5 +1,10 @@
 #!/usr/bin/env bats
 
+# Load bats-core helpers relative to the test file's location
+load 'test_helper/bats-support/load'
+load 'test_helper/bats-assert/load'
+load 'test_helper/bats-file/load'
+
 # This inserts customs setup and teardown because of spaces in the file name
 
 load startup-shutdown-spaces
