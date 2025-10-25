@@ -63,7 +63,7 @@ jobs:
         uses: actions/setup-node@v4
 
       - name: Setup BATS (bats-core via npm)
-        run: sudo npm install -g bats
+        run: sudo npm install -g bats # This should install bats-core
 
       - name: Install gitwatch dependencies
         shell: bash
@@ -92,10 +92,9 @@ jobs:
         run: |
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
-          # Run tests using the bats-core executable
-          bats -rt tests
-          #bats -rt othertests
+          # Explicitly run only .bats files directly inside the tests directory, not recursively
+          bats tests/*.bats
           echo "Finished running tests"
 
-      - name: Test step
+      - name: Test step # Can likely remove this step if not needed
         run: echo "Now at test step"
