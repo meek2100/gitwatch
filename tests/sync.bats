@@ -16,57 +16,59 @@ load 'startup-shutdown'
     # --- Test 1: Add initial file ---
     sleep 1
     echo "line1" >> file1.txt
-    sleep "$WAITTIME"
+    sleep "$WAITTIME" # Wait for commit+push
 
     run git rev-parse master
-    assert_success
+    assert_success "Git rev-parse master failed after file1 add"
     local commit1=$output
     run git rev-parse origin/master
-    assert_success
+    assert_success "Git rev-parse origin/master failed after file1 add"
     local remote_commit1=$output
     assert_equal "$commit1" "$remote_commit1" "Push after adding file1 failed"
 
     # --- Test 2: Add file in subdirectory ---
     local lastcommit=$commit1
     mkdir subdir
-    # Add small delay after mkdir before writing file
-    sleep 0.5
+    sleep 0.5 # Small delay
     cd subdir
     echo "line2" >> file2.txt
-    cd .. # Go back to repo root
+    cd .. # Back to repo root
     sleep "$WAITTIME" # Wait for commit+push
 
     run git rev-parse master
-    assert_success
+    assert_success "Git rev-parse master failed after file2 add"
     local commit2=$output
     refute_equal "$lastcommit" "$commit2" "Commit after adding file2 in subdir failed"
 
     run git rev-parse origin/master
-    assert_success
+    assert_success "Git rev-parse origin/master failed after file2 add"
     local remote_commit2=$output
     assert_equal "$commit2" "$remote_commit2" "Push after adding file2 failed"
 
     # --- Test 3: Remove file and directory ---
     lastcommit=$commit2
     run rm subdir/file2.txt
-    assert_success
-    # Add small delay between removing file and removing dir
-    sleep 0.5
+    assert_success "rm subdir/file2.txt failed"
+    sleep 0.5 # Delay between rm and rmdir
     run rmdir subdir
-    assert_success
-    sleep "$WAITTIME" # Wait for commit+push for removal
+    assert_success "rmdir subdir failed"
+    sleep "$WAITTIME" # Wait for potential commit+push for removal
 
+    # Debug: Check git status right before hash comparison
+    run git status -s
+    debug "Git status after removal wait: $output"
+
+    # Verify push happened reflecting the removal, implying a commit occurred.
     run git rev-parse master
-    assert_success
+    assert_success "Git rev-parse master failed after removal"
     local commit3=$output
-    # Check that a new commit happened after the removal
-    refute_equal "$lastcommit" "$commit3" "Commit after removing file2 and subdir failed"
-
-    # Verify push happened after removal
     run git rev-parse origin/master
-    assert_success
+    assert_success "Git rev-parse origin/master failed after removal"
     local remote_commit3=$output
-    assert_equal "$commit3" "$remote_commit3" "Push after removing file2 failed"
+    assert_equal "$commit3" "$remote_commit3" "Push after removing file/subdir failed - commit might not have happened"
+
+    # Explicitly check that a new commit *did* happen locally
+    refute_equal "$lastcommit" "$commit3" "Local commit hash did not change after removal"
 
     # Verify the file and directory are indeed gone locally
     refute_file_exist "subdir/file2.txt"
