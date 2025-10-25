@@ -5,81 +5,75 @@ load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'
 load 'test_helper/bats-file/load'
 
-load startup-shutdown
+# Load setup/teardown
+load 'startup-shutdown' # Contains initial commit logic now
 
-function pulling_and_rebasing_correctly { #@test
+@test "pulling_and_rebasing_correctly: Handles upstream changes with -R flag" {
 
-    # --- NOTE: Initial commit is now handled by startup-shutdown.bash ---
-
-    # Start up gitwatch and see if commit and push happen automatically
-    # after waiting two seconds
-    ${BATS_TEST_DIRNAME}/../gitwatch.sh -v -r origin -R "$testdir/local/remote" 3>- &
+    # Start gitwatch with remote push and pull --rebase enabled
+    run "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -R "$testdir/local/remote"
+    assert_success
     GITWATCH_PID=$!
-    # Keeps kill message from printing to screen
     disown
 
-    # Move into the cloned local repository
-    cd remote # This cd assumes the clone was named 'remote' inside 'local'
+    cd "$testdir/local/remote" # cd into the primary local clone
 
-    # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created;
-    # hence, a short wait.
+    # Make initial change (line1)
     sleep 1
     echo "line1" >> file1.txt
+    sleep "$WAITTIME" # Wait for commit and push
 
-    # Wait a bit for inotify to figure out the file has changed, and do its add,
-    # commit, and push.
-    sleep $WAITTIME
+    # Verify push happened
+    run git rev-parse master
+    assert_success
+    local commit1=$output
+    run git rev-parse origin/master
+    assert_success
+    local remote_commit1=$output
+    assert_equal "$commit1" "$remote_commit1"
 
-    # Verify that push happened
-    currentcommit=$(git rev-parse master)
-    remotecommit=$(git rev-parse origin/master)
-    [ "$currentcommit" = "$remotecommit" ]
-
-    # Create a second local clone to simulate another user pushing
-    cd ../.. # Back to $testdir
-    mkdir local2
+    # Simulate another user cloning and pushing (line2)
+    cd "$testdir" # Go up to create sibling clone
+    run git clone -q remote local2
+    assert_success
     cd local2
-    git clone -q ../remote # Clone the remote repo again
-    cd remote
-
-    # Add a file to the new repo (local2's copy) and push it
-    sleep 1
     echo "line2" >> file2.txt
     git add file2.txt
-    git commit -q -m "file 2 added" # Commit quietly
-    git push -q # Push quietly
+    git commit -q -m "Commit from local2 (file2)"
+    run git push -q origin master
+    assert_success
 
-    # Change back to original repo (local1's copy), make a third change,
-    # gitwatch should pull the change from local2 before pushing
-    cd ../../local/remote
-    sleep 1
+    # Go back to the first local repo and make another change (line3)
+    cd "$testdir/local/remote"
+    sleep 1 # Short delay
     echo "line3" >> file3.txt
+    sleep "$WAITTIME" # Wait for gitwatch to pull, rebase, commit, push
 
-    # Wait for gitwatch to detect change, pull, rebase, commit, and push
-    sleep $WAITTIME
+    # Verify push happened (local should match remote again)
+    run git rev-parse master
+    assert_success
+    local commit3=$output
+    run git rev-parse origin/master
+    assert_success
+    local remote_commit3=$output
+    assert_equal "$commit3" "$remote_commit3"
 
-    # Verify that push happened (local1's master should match remote's master)
-    currentcommit=$(git rev-parse master)
-    remotecommit=$(git rev-parse origin/master)
-    [ "$currentcommit" = "$remotecommit" ]
+    # Verify files from both changes are present
+    assert_file_exist "file1.txt"
+    assert_file_exist "file2.txt" # Pulled from remote
+    assert_file_exist "file3.txt" # Added locally
 
-    # Verify that the file from local2 (file2.txt) is now present due to the pull
-    [ -f file2.txt ]
-
-    # Verify that the file created by local1 (file3.txt) is also present
-    [ -f file3.txt ]
-
-    # Check git log to ensure commits are ordered correctly after rebase
-    run git log --oneline -n 3 # Check the last 3 commits
-    # Output should contain "file 2 added" commit BEFORE the commit containing "line3"
-    # Ensure the commit message check is robust against variations
-    [[ "$output" == *"file 2 added"* ]] # Check if "file 2 added" exists in the log output
-
-    # Check that file1.txt appears in the recent history (associated with its commit)
+    # Check commit order after rebase
+    run git log --oneline -n 3
+    assert_success
+    # Expected order (most recent first):
+    # 1. Commit for file3 (rebased)
+    # 2. Commit from local2 (file2)
+    # 3. Commit for file1
+    assert_line --index 0 --partial "file3.txt" # Commit message likely includes filename due to diffstat/auto-msg
+    assert_line --index 1 --partial "Commit from local2 (file2)"
+    # Check that file1.txt appears in history (robust check)
     run git log --name-status -n 4
-    [[ "$output" == *"file1.txt"* ]]
-
-    # Teardown will remove testing directories
-    cd /tmp # Change out of test dir before teardown attempts removal
+    assert_success
+    assert_output --partial "file1.txt"
 }

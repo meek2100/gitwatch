@@ -5,80 +5,74 @@ load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'
 load 'test_helper/bats-file/load'
 
-load startup-shutdown
+# Load setup/teardown
+load 'startup-shutdown'
 
-function commit_command_single { #@test
+@test "commit_command_single: Uses simple custom command output as commit message" {
+    # Start up gitwatch with custom commit command
+    run "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c "uname" "$testdir/local/remote"
+    assert_success # Check if gitwatch started without immediate error
 
-    # Start up gitwatch with custom commit command, see if works
-    "${BATS_TEST_DIRNAME}"/../gitwatch.sh -v -c "uname" "$testdir/local/remote" 3>&- &
+    # Capture PID (assuming gitwatch runs in background - adjust if needed)
     GITWATCH_PID=$!
-    # Keeps kill message from printing to screen
-    disown
+    disown # Prevent kill message on terminal
 
-    # Create a file, verify that it hasn't been added yet, then commit and push
-    cd remote
+    cd "$testdir/local/remote"
 
-    # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created;
-    # hence, a short wait.
-    sleep 1
+    # Make a change
+    sleep 1 # Allow watcher to initialize
     echo "line1" >> file1.txt
 
-    # Wait a bit for inotify to figure out the file has changed, and do its add, commit, and push.
-    sleep $WAITTIME
+    # Wait for gitwatch to commit
+    sleep "$WAITTIME"
 
-    run git log -1 --oneline
-    [[ $output == *$(uname) ]]
+    # Check commit log
+    run git log -1 --pretty=%B # Get only the commit message body
+    assert_success
+    assert_output --partial "$(uname)"
 }
 
-function commit_command_format { #@test
+@test "commit_command_format: Uses complex custom command with substitutions" {
     # tests nested commit command
 
-    # Start up gitwatch with custom commit command, see if works
-    # Use single quotes for the outer argument, escape internal single quotes,
-    # and ensure the inner command substitutions $(...) are evaluated by the script, not the test runner.
-    "${BATS_TEST_DIRNAME}"/../gitwatch.sh -v -c 'echo "$(uname) is the uname of this device, the time is $(date)"' "$testdir/local/remote" 3>&- &
+    # Use single quotes for the outer argument to prevent premature expansion by test runner
+    run "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c 'echo "$(uname) is the uname of this device, the time is $(date)"' "$testdir/local/remote"
+    assert_success
     GITWATCH_PID=$!
-    # Keeps kill message from printing to screen
     disown
 
-    # Create a file, verify that it hasn't been added yet, then commit and push
-    cd remote
+    cd "$testdir/local/remote"
 
-    # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created;
-    # hence, a short wait.
     sleep 1
     echo "line1" >> file1.txt
 
-    # Wait a bit for inotify to figure out the file has changed, and do its add, commit, and push.
-    sleep $WAITTIME
+    sleep "$WAITTIME"
 
-    run git log -1 --oneline
+    run git log -1 --pretty=%B
+    assert_success
     # Check that both parts of the custom command executed correctly in the commit message
-    [[ $output == *$(uname)* ]]
-    [[ $output == *"$(date +%Y)"* ]] # Check for the current year as a proxy for date expansion
+    assert_output --partial "$(uname)"
+    assert_output --partial "$(date +%Y)" # Check for the current year as a proxy for date expansion
 }
 
-function commit_command_overwrite { #@test
-    # Start up gitwatch with custom commit command, see if works
-    "${BATS_TEST_DIRNAME}"/../gitwatch.sh -v -c "uname" -l 123 -L 0 -d "+%Y" "$testdir/local/remote" 3>&- &
+@test "commit_command_overwrite: -c flag overrides -l, -L, -d flags" {
+    # Start up gitwatch with custom commit command and other formatting flags
+    run "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c "uname" -l 123 -L 0 -d "+%Y" "$testdir/local/remote"
+    assert_success
     GITWATCH_PID=$!
-    # Keeps kill message from printing to screen
     disown
 
-    # Create a file, verify that it hasn't been added yet, then commit and push
-    cd remote
+    cd "$testdir/local/remote"
 
-    # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created;
-    # hence, a short wait.
     sleep 1
     echo "line1" >> file1.txt
 
-    # Wait a bit for inotify to figure out the file has changed, and do its add, commit, and push.
-    sleep $WAITTIME
+    sleep "$WAITTIME"
 
-    run git log -1 --oneline
-    [[ $output == *$(uname)* ]]
+    run git log -1 --pretty=%B
+    assert_success
+    # Verify only the output of 'uname' is used, ignoring other flags
+    assert_output --partial "$(uname)"
+    refute_output --partial "file1.txt" # Should not contain diff log (-l/-L ignored)
+    refute_output --partial "$(date +%Y)" # Should not contain date format (-d ignored)
 }

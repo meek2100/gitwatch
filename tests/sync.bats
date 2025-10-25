@@ -5,71 +5,70 @@ load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'
 load 'test_helper/bats-file/load'
 
-load startup-shutdown
+# Load setup/teardown
+load 'startup-shutdown'
 
-function syncing_correctly { #@test
-    # Start up gitwatch and see if commit and push happen automatically
-    # after waiting two seconds
-    ${BATS_TEST_DIRNAME}/../gitwatch.sh -v -r origin "$testdir/local/remote" 3>- &
+@test "syncing_correctly: Commits and pushes adds, subdir adds, and removals" {
+    # Start gitwatch with remote push enabled
+    run "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin "$testdir/local/remote"
+    assert_success
     GITWATCH_PID=$!
-    # Keeps kill message from printing to screen
     disown
 
-    # Create a file, verify that it hasn't been added yet,
-    # then commit and push
-    cd remote
+    cd "$testdir/local/remote"
 
-    # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created;
-    # hence, a short wait.
+    # --- Test 1: Add initial file ---
     sleep 1
     echo "line1" >> file1.txt
+    sleep "$WAITTIME"
 
-    # Wait a bit for inotify to figure out the file has changed, and do its add,
-    # commit, and push.
-    sleep $WAITTIME
+    # Verify push happened
+    run git rev-parse master
+    assert_success
+    local commit1=$output
+    run git rev-parse origin/master
+    assert_success
+    local remote_commit1=$output
+    assert_equal "$commit1" "$remote_commit1" "Push after adding file1 failed"
 
-    # Verify that push happened
-    currentcommit=$(git rev-parse master)
-    remotecommit=$(git rev-parse origin/master)
-    [ "$currentcommit" = "$remotecommit" ]
-
-    # Try making subdirectory with file
-    lastcommit=$(git rev-parse master)
+    # --- Test 2: Add file in subdirectory ---
+    local lastcommit=$commit1
     mkdir subdir
     cd subdir
     echo "line2" >> file2.txt
+    cd .. # Go back to repo root for git operations
+    sleep "$WAITTIME"
 
-    # Wait for the second commit triggered by file2.txt to complete
-    sleep $WAITTIME
+    # Verify new commit happened
+    run git rev-parse master
+    assert_success
+    local commit2=$output
+    refute_equal "$lastcommit" "$commit2" "Commit after adding file2 in subdir failed"
 
-    # Verify that new commit has happened
-    currentcommit=$(git rev-parse master)
-    [ "$lastcommit" != "$currentcommit" ]
+    # Verify push happened
+    run git rev-parse origin/master
+    assert_success
+    local remote_commit2=$output
+    assert_equal "$commit2" "$remote_commit2" "Push after adding file2 failed"
 
-    # Verify that push happened
-    currentcommit=$(git rev-parse master)
-    remotecommit=$(git rev-parse origin/master)
-    [ "$currentcommit" = "$remotecommit" ]
+    # --- Test 3: Remove file ---
+    lastcommit=$commit2
+    run rm subdir/file2.txt
+    assert_success
+    sleep "$WAITTIME"
 
+    # Verify new commit happened
+    run git rev-parse master
+    assert_success
+    local commit3=$output
+    refute_equal "$lastcommit" "$commit3" "Commit after removing file2 failed"
 
-    # Try removing file to see if can work
-    # Store commit before removal
-    lastcommit=$(git rev-parse master)
-    rm file2.txt
+    # Verify push happened
+    run git rev-parse origin/master
+    assert_success
+    local remote_commit3=$output
+    assert_equal "$commit3" "$remote_commit3" "Push after removing file2 failed"
 
-    # Wait for the commit triggered by the removal to complete
-    sleep $WAITTIME
-
-    # Verify that new commit has happened
-    currentcommit=$(git rev-parse master)
-    [ "$lastcommit" != "$currentcommit" ]
-
-    # Verify that push happened
-    currentcommit=$(git rev-parse master)
-    remotecommit=$(git rev-parse origin/master)
-    [ "$currentcommit" = "$remotecommit" ]
-
-    # Teardown removes testing directories
-    cd /tmp # Change out of test dir before teardown attempts removal
+    # Teardown handles cleanup
+    cd /tmp # Move out of test dir before teardown
 }

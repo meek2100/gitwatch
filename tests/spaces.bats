@@ -5,36 +5,30 @@ load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'
 load 'test_helper/bats-file/load'
 
-# This inserts customs setup and teardown because of spaces in the file name
+# Load setup/teardown for paths with spaces
+load 'startup-shutdown-spaces'
 
-load startup-shutdown-spaces
-
-function spaces_in_target_dir { #@test
-    # Start up gitwatch with logging, see if works
-    "${BATS_TEST_DIRNAME}"/../gitwatch.sh -v -l 10 "$testdir/local/rem with spaces" 3>&- &
-    echo "Testdir: $testdir" >&3
+@test "spaces_in_target_dir: Handles paths with spaces correctly" {
+    # Directory to watch has spaces: "$testdir/local/rem with spaces"
+    run "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 "$testdir/local/rem with spaces"
+    assert_success "gitwatch should start successfully with space in path"
+    debug "Testdir with spaces: $testdir" # Use debug helper from bats-support
     GITWATCH_PID=$!
-
-    # Keeps kill message from printing to screen
     disown
 
-    # Create a file, verify that it hasn't been added yet, then commit
-    cd "rem with spaces"
+    # cd into the directory with spaces
+    cd "$testdir/local/rem with spaces"
 
-    # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created; hence, a short wait.
     sleep 1
-    echo "line1" >> file1.txt
-
-    # Wait a bit for inotify to figure out the file has changed, and do its add,
-    # and commit
+    echo "line1" >> "file with space.txt" # Use a filename with spaces too
     sleep "$WAITTIME"
 
     # Make a new change
-    echo "line2" >> file1.txt
+    echo "line2" >> "file with space.txt"
     sleep "$WAITTIME"
 
     # Check commit log that the diff is in there
-    run git log -1 --oneline
-    [[ $output == *"file1.txt"* ]]
+    run git log -1 --pretty=%B
+    assert_success
+    assert_output --partial "file with space.txt" # Check if filename appears correctly
 }
