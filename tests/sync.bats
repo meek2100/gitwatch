@@ -29,10 +29,12 @@ load 'startup-shutdown'
     # --- Test 2: Add file in subdirectory ---
     local lastcommit=$commit1
     mkdir subdir
+    # Add small delay after mkdir before writing file
+    sleep 0.5
     cd subdir
     echo "line2" >> file2.txt
-    cd ..
-    sleep "$WAITTIME"
+    cd .. # Go back to repo root
+    sleep "$WAITTIME" # Wait for commit+push
 
     run git rev-parse master
     assert_success
@@ -46,22 +48,29 @@ load 'startup-shutdown'
 
     # --- Test 3: Remove file and directory ---
     lastcommit=$commit2
-    # Remove the directory recursively; gitwatch should detect changes within
-    run rm -rf subdir
+    run rm subdir/file2.txt
     assert_success
-    sleep "$WAITTIME" # Wait for commit triggered by removal
+    # Add small delay between removing file and removing dir
+    sleep 0.5
+    run rmdir subdir
+    assert_success
+    sleep "$WAITTIME" # Wait for commit+push for removal
 
-    # Verify new commit happened
     run git rev-parse master
     assert_success
     local commit3=$output
-    refute_equal "$lastcommit" "$commit3" "Commit after removing subdir failed"
+    # Check that a new commit happened after the removal
+    refute_equal "$lastcommit" "$commit3" "Commit after removing file2 and subdir failed"
 
-    # Verify push happened
+    # Verify push happened after removal
     run git rev-parse origin/master
     assert_success
     local remote_commit3=$output
-    assert_equal "$commit3" "$remote_commit3" "Push after removing subdir failed"
+    assert_equal "$commit3" "$remote_commit3" "Push after removing file2 failed"
+
+    # Verify the file and directory are indeed gone locally
+    refute_file_exist "subdir/file2.txt"
+    refute_file_exist "subdir"
 
     cd /tmp
 }
