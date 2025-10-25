@@ -41,5 +41,3 @@ function commit_only_when_git_status_change { #@test
     [ $status -ne 0 ]
 
 }
-
-

@@ -12,7 +12,6 @@ function syncing_correctly { #@test
     # after waiting two seconds
     ${BATS_TEST_DIRNAME}/../gitwatch.sh -v -r origin "$testdir/local/remote" 3>- &
     GITWATCH_PID=$!
-
     # Keeps kill message from printing to screen
     disown
 
@@ -21,7 +20,8 @@ function syncing_correctly { #@test
     cd remote
 
     # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created; hence, a short wait.
+    # to directory too soon after it has been created;
+    # hence, a short wait.
     sleep 1
     echo "line1" >> file1.txt
 
@@ -40,6 +40,7 @@ function syncing_correctly { #@test
     cd subdir
     echo "line2" >> file2.txt
 
+    # Wait for the second commit triggered by file2.txt to complete
     sleep $WAITTIME
 
     # Verify that new commit has happened
@@ -53,7 +54,11 @@ function syncing_correctly { #@test
 
 
     # Try removing file to see if can work
+    # Store commit before removal
+    lastcommit=$(git rev-parse master)
     rm file2.txt
+
+    # Wait for the commit triggered by the removal to complete
     sleep $WAITTIME
 
     # Verify that new commit has happened
@@ -65,8 +70,6 @@ function syncing_correctly { #@test
     remotecommit=$(git rev-parse origin/master)
     [ "$currentcommit" = "$remotecommit" ]
 
-    # Remove testing directories
-    cd /tmp
-    rm -rf $testdir
+    # Teardown removes testing directories
+    cd /tmp # Change out of test dir before teardown attempts removal
 }
-

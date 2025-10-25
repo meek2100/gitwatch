@@ -33,4 +33,3 @@ function spaces_in_target_dir { #@test
     run git log -1 --oneline
     [[ $output == *"file1.txt"* ]]
 }
-

@@ -35,4 +35,3 @@ function commit_log_messages_working { #@test
     run git log -1 --oneline
     [[ $output == *"file1.txt"* ]]
 }
-

@@ -51,5 +51,3 @@ function notify_ignore { #@test
     run grep "file2.txt" $testdir/output.txt
     [ $status -ne 0 ]
 }
-
-

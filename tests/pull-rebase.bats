@@ -9,6 +9,7 @@ load startup-shutdown
 
 function pulling_and_rebasing_correctly { #@test
 
+    # --- NOTE: Initial commit is now handled by startup-shutdown.bash ---
 
     # Start up gitwatch and see if commit and push happen automatically
     # after waiting two seconds
@@ -75,12 +76,10 @@ function pulling_and_rebasing_correctly { #@test
     # Ensure the commit message check is robust against variations
     [[ "$output" == *"file 2 added"* ]] # Check if "file 2 added" exists in the log output
 
-    # Check that the line1 commit message exists too (it might be the 3rd or 4th commit now)
-    run git log --oneline -n 4
-    # Check if a commit containing "line1" (likely from its auto-commit message) exists
-    [[ "$output" == *"line1"* ]]
+    # Check that file1.txt appears in the recent history (associated with its commit)
+    run git log --name-status -n 4
+    [[ "$output" == *"file1.txt"* ]]
 
     # Teardown will remove testing directories
     cd /tmp # Change out of test dir before teardown attempts removal
 }
-

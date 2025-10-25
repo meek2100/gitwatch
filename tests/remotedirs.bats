@@ -48,4 +48,3 @@ function remote_git_dirs_working_with_commit_logging { #@test
 
     rm -rf $dotgittestdir
 }
-

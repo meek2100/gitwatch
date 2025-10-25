@@ -12,7 +12,6 @@ function commit_command_single { #@test
     # Start up gitwatch with custom commit command, see if works
     "${BATS_TEST_DIRNAME}"/../gitwatch.sh -v -c "uname" "$testdir/local/remote" 3>&- &
     GITWATCH_PID=$!
-
     # Keeps kill message from printing to screen
     disown
 
@@ -20,7 +19,8 @@ function commit_command_single { #@test
     cd remote
 
     # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created; hence, a short wait.
+    # to directory too soon after it has been created;
+    # hence, a short wait.
     sleep 1
     echo "line1" >> file1.txt
 
@@ -35,9 +35,10 @@ function commit_command_format { #@test
     # tests nested commit command
 
     # Start up gitwatch with custom commit command, see if works
-    "${BATS_TEST_DIRNAME}"/../gitwatch.sh -v -c "echo '$(uname) is the uname of this device, the time is $(date)' " "$testdir/local/remote" 3>&- &
+    # Use single quotes for the outer argument, escape internal single quotes,
+    # and ensure the inner command substitutions $(...) are evaluated by the script, not the test runner.
+    "${BATS_TEST_DIRNAME}"/../gitwatch.sh -v -c 'echo "$(uname) is the uname of this device, the time is $(date)"' "$testdir/local/remote" 3>&- &
     GITWATCH_PID=$!
-
     # Keeps kill message from printing to screen
     disown
 
@@ -45,7 +46,8 @@ function commit_command_format { #@test
     cd remote
 
     # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created; hence, a short wait.
+    # to directory too soon after it has been created;
+    # hence, a short wait.
     sleep 1
     echo "line1" >> file1.txt
 
@@ -53,15 +55,15 @@ function commit_command_format { #@test
     sleep $WAITTIME
 
     run git log -1 --oneline
+    # Check that both parts of the custom command executed correctly in the commit message
     [[ $output == *$(uname)* ]]
-    [[ $output == *$(date +%Y)* ]]
+    [[ $output == *"$(date +%Y)"* ]] # Check for the current year as a proxy for date expansion
 }
 
 function commit_command_overwrite { #@test
     # Start up gitwatch with custom commit command, see if works
     "${BATS_TEST_DIRNAME}"/../gitwatch.sh -v -c "uname" -l 123 -L 0 -d "+%Y" "$testdir/local/remote" 3>&- &
     GITWATCH_PID=$!
-
     # Keeps kill message from printing to screen
     disown
 
@@ -69,7 +71,8 @@ function commit_command_overwrite { #@test
     cd remote
 
     # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created; hence, a short wait.
+    # to directory too soon after it has been created;
+    # hence, a short wait.
     sleep 1
     echo "line1" >> file1.txt
 
@@ -79,4 +82,3 @@ function commit_command_overwrite { #@test
     run git log -1 --oneline
     [[ $output == *$(uname)* ]]
 }
-
