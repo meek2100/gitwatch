@@ -512,9 +512,7 @@ fi
 # We have already cd'd into the target directory
 # Note: $GIT variable now correctly includes --git-dir/--work-tree if -g was used
 
-# --- Prepare Pull/Push Command Arrays (No eval needed here) ---
-PULL_CMD_ARRAY=()
-PUSH_CMD_ARRAY=()
+# --- Prepare Pull/Push Command Strings (No eval needed here) ---
 
 if [ -n "${REMOTE:-}" ]; then        # are we pushing to a remote?
   verbose_echo "Push remote selected: $REMOTE"
