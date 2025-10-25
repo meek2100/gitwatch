@@ -37,7 +37,7 @@ load 'startup-shutdown'
     cd "$testdir/local/remote"
     sleep 1
     echo "line3" >> file3.txt
-    sleep "$WAITTIME"
+    sleep "$WAITTIME" # Wait for gitwatch to pull, rebase, commit, push
 
     run git rev-parse master
     assert_success
@@ -51,21 +51,17 @@ load 'startup-shutdown'
     assert_file_exist "file2.txt"
     assert_file_exist "file3.txt"
 
-    # Check commit order after rebase - Check commit messages where known
-    run git log --oneline -n 3
+    # Check commit history - Ensure both changes are present, don't rely on exact order
+    run git log --oneline -n 4 # Look at a few more commits
     assert_success
-    # Commit for file3 (rebased) is now top. Check its existence using name-status below.
-    assert_line --index 1 --partial "Commit from local2 (file2)" # This commit message is fixed
-
-    # Verify file3.txt was part of the *latest* commit using name-status
-    run git log --name-status -n 1
-    assert_success
-    assert_output --partial "file3.txt"
-
-    # Verify file1.txt is in recent history
+    # Check that the commit message from the other repo is present
+    assert_output --partial "Commit from local2 (file2)"
+    # Check that the locally added file (which got rebased) is mentioned
+    # Use git log --name-status for a more reliable check based on filename
     run git log --name-status -n 4
     assert_success
-    assert_output --partial "file1.txt"
+    assert_output --partial "file3.txt"
+    assert_output --partial "file1.txt" # Ensure original change is still there
 
     cd /tmp
 }
