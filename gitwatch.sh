@@ -322,7 +322,6 @@ fi
 
 # Determine Watcher Command (INW) and default events (moved after getopts)
 # Use ${VAR:-} expansion for safety with set -u
-if [ -z "${GW_FLOCK_BIN:-}" ]; then FLOCK="flock"; else FLOCK="$GW_FLOCK_BIN"; fi
 OS_TYPE=$(uname)
 if [ -z "${GW_INW_BIN:-}" ]; then
   if [ "$OS_TYPE" != "Darwin" ]; then
@@ -373,6 +372,9 @@ fi
 unset cmd BASE_GIT_CMD # Clean up
 
 # --- Check for optional 'flock' dependency ---
+# Use GW_FLOCK_BIN if set, otherwise default to "flock"
+if [ -z "${GW_FLOCK_BIN:-}" ]; then FLOCK="flock"; else FLOCK="$GW_FLOCK_BIN"; fi
+
 if ! is_command "$FLOCK"; then
   USE_FLOCK=0
 
@@ -693,7 +695,8 @@ _perform_commit() {
   fi
 
   verbose_echo "Tracked changes detected."
-  # shellcheck disable=SC2086 is needed for GIT_ADD_ARGS / GIT_COMMIT_ARGS word splitting if not quoted
+  # The following disable is needed for GIT_ADD_ARGS / GIT_COMMIT_ARGS word splitting if not quoted
+  # shellcheck disable=SC2086
 
   if [ "$SKIP_IF_MERGING" -eq 1 ] && is_merging; then
     verbose_echo "Skipping commit - repo is merging"
