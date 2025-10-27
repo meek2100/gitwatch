@@ -1,55 +1,35 @@
 #!/usr/bin/env bats
 
-# This is a testscript using the bats testing framework:
-# https://github.com/sstephenson/bats
-# To run it, at a command prompt:
-# bats testscript.bats
+load 'test_helper/bats-support/load'
+load 'test_helper/bats-assert/load'
+load 'test_helper/bats-file/load'
+load 'startup-shutdown'
 
-load startup-shutdown
-
-
-# Test for exclude from notifications. Verify that a subdirectory is ignored from notification.
-
-function notify_ignore { #@test
-
-    # Start up gitwatch and capture its output
-    ${BATS_TEST_DIRNAME}/../gitwatch.sh -x test_subdir "$testdir/local/remote" > "$testdir/output.txt" 3>&- &
+@test "notify_ignore: -x ignores changes in specified subdirectory" {
+    local output_file
+    output_file=$(mktemp "$testdir/output.XXXXX")
+    # Start gitwatch directly in the background
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -x "test_subdir/" "$testdir/local/remote" > "$output_file" 2>&1 &
     GITWATCH_PID=$!
-
-    # Keeps kill message from printing to screen
     disown
 
-    # Create a file, verify that it hasn't been added yet, then commit
-    cd remote
+    cd "$testdir/local/remote"
     mkdir test_subdir
-
-    # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created; hence, a short wait.
     sleep 1
+
     echo "line1" >> file1.txt
+    sleep "$WAITTIME"
 
-    # Wait a bit for inotify to figure out the file has changed, and do its add,
-    # and commit
-    sleep $WAITTIME
+    echo "line2" >> test_subdir/file2.txt
+    sleep "$WAITTIME"
 
-    # Add second file that we plan to ignore
-    cd test_subdir
-    echo "line2" >> file2.txt
-
-    # Wait a bit for inotify to figure out the file has changed, and do its add,
-    # and commit
-    sleep $WAITTIME
-
-    cat "$testdir/output.txt"
     run git log --name-status --oneline
-    echo $output
+    assert_success
+    assert_output --partial "file1.txt"
+    refute_output --partial "file2.txt"
 
-    # Look for files in log: file1 should be there, file2 should not be
-    run grep "file1.txt" $testdir/output.txt
-    [ $status -eq 0 ]
-
-    run grep "file2.txt" $testdir/output.txt
-    [ $status -ne 0 ]
+    run cat "$output_file"
+    assert_output --partial "Change detected"
+    assert_output --partial "file1.txt"
+    refute_output --partial "file2.txt"
 }
-
-

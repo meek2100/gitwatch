@@ -1,72 +1,78 @@
 #!/usr/bin/env bats
 
-# This is a testscript using the bats testing framework:
-# https://github.com/sstephenson/bats
-# To run it, at a command prompt:
-# bats testscript.bats
+load 'test_helper/bats-support/load'
+load 'test_helper/bats-assert/load'
+load 'test_helper/bats-file/load'
+load 'startup-shutdown'
 
-load startup-shutdown
-
-function syncing_correctly { #@test
-    # Start up gitwatch and see if commit and push happen automatically
-    # after waiting two seconds
-    ${BATS_TEST_DIRNAME}/../gitwatch.sh -r origin "$testdir/local/remote" 3>- &
+@test "syncing_correctly: Commits and pushes adds, subdir adds, and removals" {
+    # Start gitwatch directly in the background
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin "$testdir/local/remote" &
     GITWATCH_PID=$!
-
-    # Keeps kill message from printing to screen
     disown
 
-    # Create a file, verify that it hasn't been added yet,
-    # then commit and push
-    cd remote
+    cd "$testdir/local/remote"
 
-    # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created; hence, a short wait.
+    # --- Test 1: Add initial file ---
     sleep 1
     echo "line1" >> file1.txt
+    sleep "$WAITTIME" # Wait for commit+push
 
-    # Wait a bit for inotify to figure out the file has changed, and do its add,
-    # commit, and push.
-    sleep $WAITTIME
+    run git rev-parse master
+    assert_success "Git rev-parse master failed after file1 add"
+    local commit1=$output
+    run git rev-parse origin/master
+    assert_success "Git rev-parse origin/master failed after file1 add"
+    local remote_commit1=$output
+    assert_equal "$commit1" "$remote_commit1" "Push after adding file1 failed"
 
-    # Verify that push happened
-    currentcommit=$(git rev-parse master)
-    remotecommit=$(git rev-parse origin/master)
-    [ "$currentcommit" = "$remotecommit" ]
-
-    # Try making subdirectory with file
-    lastcommit=$(git rev-parse master)
+    # --- Test 2: Add file in subdirectory ---
+    local lastcommit=$commit1
     mkdir subdir
+    sleep 0.5 # Small delay
     cd subdir
     echo "line2" >> file2.txt
+    cd .. # Back to repo root
+    sleep "$WAITTIME" # Wait for commit+push
 
-    sleep $WAITTIME
+    run git rev-parse master
+    assert_success "Git rev-parse master failed after file2 add"
+    local commit2=$output
+    refute_equal "$lastcommit" "$commit2" "Commit after adding file2 in subdir failed"
 
-    # Verify that new commit has happened
-    currentcommit=$(git rev-parse master)
-    [ "$lastcommit" != "$currentcommit" ]
+    run git rev-parse origin/master
+    assert_success "Git rev-parse origin/master failed after file2 add"
+    local remote_commit2=$output
+    assert_equal "$commit2" "$remote_commit2" "Push after adding file2 failed"
 
-    # Verify that push happened
-    currentcommit=$(git rev-parse master)
-    remotecommit=$(git rev-parse origin/master)
-    [ "$currentcommit" = "$remotecommit" ]
+    # --- Test 3: Remove file and directory ---
+    lastcommit=$commit2
+    run rm subdir/file2.txt
+    assert_success "rm subdir/file2.txt failed"
+    sleep 0.5 # Delay between rm and rmdir
+    run rmdir subdir
+    assert_success "rmdir subdir failed"
+    sleep "$WAITTIME" # Wait for potential commit+push for removal
 
+    # Debug: Check git status right before hash comparison
+    run git status -s
+    debug "Git status after removal wait: $output"
 
-    # Try removing file to see if can work
-    rm file2.txt
-    sleep $WAITTIME
+    # Verify push happened reflecting the removal, implying a commit occurred.
+    run git rev-parse master
+    assert_success "Git rev-parse master failed after removal"
+    local commit3=$output
+    run git rev-parse origin/master
+    assert_success "Git rev-parse origin/master failed after removal"
+    local remote_commit3=$output
+    assert_equal "$commit3" "$remote_commit3" "Push after removing file/subdir failed - commit might not have happened"
 
-    # Verify that new commit has happened
-    currentcommit=$(git rev-parse master)
-    [ "$lastcommit" != "$currentcommit" ]
+    # Explicitly check that a new commit *did* happen locally
+    refute_equal "$lastcommit" "$commit3" "Local commit hash did not change after removal"
 
-    # Verify that push happened
-    currentcommit=$(git rev-parse master)
-    remotecommit=$(git rev-parse origin/master)
-    [ "$currentcommit" = "$remotecommit" ]
+    # Verify the file and directory are indeed gone locally
+    refute_file_exist "subdir/file2.txt"
+    refute_file_exist "subdir"
 
-    # Remove testing directories
     cd /tmp
-    rm -rf $testdir
 }
-

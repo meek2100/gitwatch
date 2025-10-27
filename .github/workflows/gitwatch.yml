@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -60,39 +60,57 @@ jobs:
 
     steps:
       - name: Setup node
-        uses: actions/setup-node@v3
-      - name: Setup BATS
-        run: sudo npm install -g bats
+        uses: actions/setup-node@v4
+
+      - name: Setup BATS (bats-core via npm)
+        run: sudo npm install -g bats # This should install bats-core
 
       - name: Install gitwatch dependencies
         shell: bash
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get -y install inotify-tools
+            sudo apt-get -y install inotify-tools util-linux
 
           elif [ "$RUNNER_OS" == "macOS" ]; then
-            brew install fswatch
-            brew install coreutils   # in order to get readlink
+            brew install fswatch flock
 
           else
             echo "Unsupported OS: $RUNNER_OS"
             exit 1
           fi
 
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Checkout code (including submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: true # Ensure submodules (bats-core helpers) are checked out
 
       # - name: Setup upterm session
       #   uses: lhotari/action-upterm@v1
 
-      - name: Run tests
+      - name: Run tests individually
         shell: bash
         run: |
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
-          bats -rt tests
-          #bats -rt othertests
+          # Run tests one file at a time for easier debugging
+          echo "Running commitcmd.bats..."
+          bats tests/commitcmd.bats
+          echo "Running commitlog.bats..."
+          bats tests/commitlog.bats
+          echo "Running notify-ignore.bats..."
+          bats tests/notify-ignore.bats
+          echo "Running pull-rebase.bats..."
+          bats tests/pull-rebase.bats
+          echo "Running remotedirs.bats..."
+          bats tests/remotedirs.bats
+          echo "Running spaces.bats..."
+          bats tests/spaces.bats
+          echo "Running status-change.bats..."
+          bats tests/status-change.bats
+          echo "Running sync.bats..."
+          bats tests/sync.bats
+          # Add any other .bats files here if necessary
           echo "Finished running tests"
 
-      - name: Test step
+      - name: Test step # Can likely remove this step if not needed
         run: echo "Now at test step"

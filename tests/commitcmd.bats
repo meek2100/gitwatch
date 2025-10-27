@@ -1,82 +1,57 @@
 #!/usr/bin/env bats
 
-# This is a testscript using the bats testing framework:
-# https://github.com/sstephenson/bats
-# To run it, at a command prompt:
-# bats testscript.bats
+load 'test_helper/bats-support/load'
+load 'test_helper/bats-assert/load'
+load 'test_helper/bats-file/load'
+load 'startup-shutdown'
 
-load startup-shutdown
-
-function commit_command_single { #@test
-    
-    # Start up gitwatch with custom commit command, see if works
-    "${BATS_TEST_DIRNAME}"/../gitwatch.sh -c "uname" "$testdir/local/remote" 3>&- &
+@test "commit_command_single: Uses simple custom command output as commit message" {
+    # Start gitwatch directly in the background
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c "uname" "$testdir/local/remote" &
     GITWATCH_PID=$!
-
-    # Keeps kill message from printing to screen
     disown
 
-    # Create a file, verify that it hasn't been added yet, then commit and push
-    cd remote
-
-    # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created; hence, a short wait.
+    cd "$testdir/local/remote"
     sleep 1
     echo "line1" >> file1.txt
+    sleep "$WAITTIME"
 
-    # Wait a bit for inotify to figure out the file has changed, and do its add, commit, and push.
-    sleep $WAITTIME
-
-    run git log -1 --oneline
-    [[ $output == *$(uname) ]]
+    run git log -1 --pretty=%B
+    assert_success
+    assert_output --partial "$(uname)"
 }
 
-function commit_command_format { #@test
-    # tests nested commit command
-
-    # Start up gitwatch with custom commit command, see if works
-    "${BATS_TEST_DIRNAME}"/../gitwatch.sh -c "echo '$(uname) is the uname of this device, the time is $(date)' " "$testdir/local/remote" 3>&- &
+@test "commit_command_format: Uses complex custom command with substitutions" {
+    # Start gitwatch directly in the background
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c 'echo "$(uname) is the uname of this device, the time is $(date)"' "$testdir/local/remote" &
     GITWATCH_PID=$!
-
-    # Keeps kill message from printing to screen
     disown
 
-    # Create a file, verify that it hasn't been added yet, then commit and push
-    cd remote
-
-    # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created; hence, a short wait.
+    cd "$testdir/local/remote"
     sleep 1
     echo "line1" >> file1.txt
+    sleep "$WAITTIME"
 
-    # Wait a bit for inotify to figure out the file has changed, and do its add, commit, and push.
-    sleep $WAITTIME
-
-    run git log -1 --oneline
-    [[ $output == *$(uname)* ]]
-    [[ $output == *$(date +%Y)* ]]
+    run git log -1 --pretty=%B
+    assert_success
+    assert_output --partial "$(uname)"
+    assert_output --partial "$(date +%Y)"
 }
 
-function commit_command_overwrite { #@test
-    # Start up gitwatch with custom commit command, see if works
-    "${BATS_TEST_DIRNAME}"/../gitwatch.sh -c "uname" -l 123 -L 0 -d "+%Y" "$testdir/local/remote" 3>&- &
+@test "commit_command_overwrite: -c flag overrides -l, -L, -d flags" {
+    # Start gitwatch directly in the background
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c "uname" -l 123 -L 0 -d "+%Y" "$testdir/local/remote" &
     GITWATCH_PID=$!
-
-    # Keeps kill message from printing to screen
     disown
 
-    # Create a file, verify that it hasn't been added yet, then commit and push
-    cd remote
-
-    # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created; hence, a short wait.
+    cd "$testdir/local/remote"
     sleep 1
     echo "line1" >> file1.txt
+    sleep "$WAITTIME"
 
-    # Wait a bit for inotify to figure out the file has changed, and do its add, commit, and push.
-    sleep $WAITTIME
-
-    run git log -1 --oneline
-    [[ $output == *$(uname)* ]]
+    run git log -1 --pretty=%B
+    assert_success
+    assert_output --partial "$(uname)"
+    refute_output --partial "file1.txt"
+    refute_output --partial "$(date +%Y)"
 }
-

@@ -1,51 +1,70 @@
 #!/usr/bin/env bats
 
-# This is a testscript using the bats testing framework:
-# https://github.com/sstephenson/bats
-# To run it, at a command prompt:
-# bats testscript.bats
+# Load helpers FIRST
+load 'test_helper/bats-support/load'
+load 'test_helper/bats-assert/load'
+load 'test_helper/bats-file/load'
 
-load startup-shutdown
-
-function remote_git_dirs_working_with_commit_logging { #@test
-    # Move .git somewhere else
-    dotgittestdir=$(mktemp -d)
-    mv "$testdir/local/remote/.git" "$dotgittestdir"
-
-    # Start up gitwatch, intentionally in wrong directory, with remote dir specified
-    ${BATS_TEST_DIRNAME}/../gitwatch.sh -l 10 -g "$dotgittestdir/.git" "$testdir/local/remote" 3>&- &
-    GITWATCH_PID=$!
-
-    # Keeps kill message from printing to screen
-    disown
-
-    # Create a file, verify that it hasn't been added yet, then commit
-    cd remote
-
-    # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created; hence, a short wait.
-    sleep 1
-    echo "line1" >> file1.txt
-
-    # Wait a bit for inotify to figure out the file has changed, and do its add,
-    # and commit
-    sleep $WAITTIME
-
-    # Store commit for later comparison
-    lastcommit=$(git --git-dir $dotgittestdir/.git rev-parse master)
-
-    # Make a new change
-    echo "line2" >> file1.txt
-    sleep $WAITTIME
-    
-    # Verify that new commit has happened
-    currentcommit=$(git --git-dir $dotgittestdir/.git rev-parse master)
-    [ "$lastcommit" != "$currentcommit" ]
-
-    # Check commit log that the diff is in there
-    run git --git-dir $dotgittestdir/.git log -1 --oneline
-    [[ $output == *"file1.txt"* ]]
-
-    rm -rf $dotgittestdir
+# Define the custom cleanup logic specific to this file
+# Use standard echo to output debug info to avoid relying on bats-support inside teardown
+_remotedirs_cleanup() {
+  echo "# Running custom cleanup for remotedirs" >&3
+  if [ -n "${dotgittestdir:-}" ] && [ -d "$dotgittestdir" ]; then
+    echo "# Removing external git dir: $dotgittestdir" >&3
+    rm -rf "$dotgittestdir"
+  fi
 }
 
+# Load the base setup/teardown AFTER defining the custom helper
+load 'startup-shutdown'
+# The original teardown() is now defined.
+
+# Copy the original teardown function to a new name
+# This must happen AFTER loading startup-shutdown and BEFORE overriding teardown again.
+eval "$(declare -f teardown | sed 's/teardown/original_teardown/')"
+
+# Define the final teardown override that calls both parts
+teardown() {
+  _remotedirs_cleanup # Call custom part first
+  original_teardown   # Then call the original part
+}
+
+
+@test "remote_git_dirs_working_with_commit_logging: -g flag works with external .git dir" {
+    dotgittestdir=$(mktemp -d)
+    run mv "$testdir/local/remote/.git" "$dotgittestdir/"
+    assert_success
+
+    # Start gitwatch directly in the background
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 -g "$dotgittestdir/.git" "$testdir/local/remote" &
+    GITWATCH_PID=$!
+    disown
+
+    cd "$testdir/local/remote"
+    sleep 1
+    echo "line1" >> file1.txt
+    sleep "$WAITTIME" # Wait for first commit
+
+    run git --git-dir="$dotgittestdir/.git" rev-parse master
+    assert_success
+    local lastcommit=$output
+
+    echo "line2" >> file1.txt
+    sleep "$WAITTIME" # Wait for second commit event
+
+    # Add a small delay for ref update to settle, especially on macOS
+    sleep 0.5
+
+    # Verify that new commit has happened
+    run git --git-dir="$dotgittestdir/.git" rev-parse master
+    assert_success
+    local currentcommit=$output
+    # This assertion should now work as refute_equal will be loaded
+    refute_equal "$lastcommit" "$currentcommit" "Commit hash should change after modification"
+
+    run git --git-dir="$dotgittestdir/.git" log -1 --pretty=%B
+    assert_success
+    assert_output --partial "file1.txt"
+
+    cd /tmp # Move out before teardown
+}

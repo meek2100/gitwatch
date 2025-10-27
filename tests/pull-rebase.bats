@@ -1,71 +1,70 @@
 #!/usr/bin/env bats
 
-# This is a testscript using the bats testing framework:
-# https://github.com/sstephenson/bats
-# To run it, at a command prompt:
-# bats testscript.bats
+load 'test_helper/bats-support/load'
+load 'test_helper/bats-assert/load'
+load 'test_helper/bats-file/load'
+load 'startup-shutdown'
 
-load startup-shutdown
-
-function pulling_and_rebasing_correctly { #@test
-
-    # Create a file, verify that it hasn't been added yet,
-    # then commit and push
-    cd remote
-
-    # Start up gitwatch and see if commit and push happen automatically
-    # after waiting two seconds
-    ${BATS_TEST_DIRNAME}/../gitwatch.sh -r origin -R "$testdir/local/remote" 3>- &
+@test "pulling_and_rebasing_correctly: Handles upstream changes with -R flag" {
+    # Start gitwatch directly in the background
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -R "$testdir/local/remote" &
     GITWATCH_PID=$!
-
-    # Keeps kill message from printing to screen
     disown
 
-    # According to inotify documentation, a race condition results if you write
-    # to directory too soon after it has been created; hence, a short wait.
+    cd "$testdir/local/remote"
     sleep 1
     echo "line1" >> file1.txt
+    sleep "$WAITTIME" # Wait for commit+push for file1
 
-    # Wait a bit for inotify to figure out the file has changed, and do its add,
-    # commit, and push.
-    sleep $WAITTIME
+    run git rev-parse master
+    assert_success "Git rev-parse master failed after file1 add"
+    local commit1=$output
+    run git rev-parse origin/master
+    assert_success "Git rev-parse origin/master failed after file1 add"
+    local remote_commit1=$output
+    assert_equal "$commit1" "$remote_commit1" "Push after adding file1 failed"
 
-    # Verify that push happened
-    currentcommit=$(git rev-parse master)
-    remotecommit=$(git rev-parse origin/master)
-    [ "$currentcommit" = "$remotecommit" ]
-
-    # Create a second local
-    cd ../..
-    mkdir local2
+    # Simulate another user cloning and pushing (file2)
+    cd "$testdir"
+    run git clone -q remote local2
+    assert_success "Cloning for local2 failed"
     cd local2
-    git clone -q ../remote
-    cd remote
-
-    # Add a file to new repo
-    sleep 1
     echo "line2" >> file2.txt
     git add file2.txt
-    git commit -am "file 2 added"
-    git push
+    git commit -q -m "Commit from local2 (file2)"
+    run git push -q origin master
+    assert_success "Push from local2 failed"
 
-    # Change back to original repo, make a third change, then verify that
-    # second one got here
-    cd ../../local/remote
-    sleep 1
+    # Go back to the first local repo and make another change (file3)
+    cd "$testdir/local/remote"
+    sleep 1 # Short delay before modifying
     echo "line3" >> file3.txt
+    # *** INCREASED WAIT TIME HERE ***
+    sleep $((WAITTIME * 2)) # Wait LONGER for gitwatch to pull, rebase, commit, push
 
-    # Verify that push happened
-    currentcommit=$(git rev-parse master)
-    remotecommit=$(git rev-parse origin/master)
-    [ "$currentcommit" = "$remotecommit" ]
+    # Verify push happened after rebase
+    run git rev-parse master
+    assert_success "Git rev-parse master failed after file3 add/rebase"
+    local commit3=$output
+    run git rev-parse origin/master
+    assert_success "Git rev-parse origin/master failed after file3 add/rebase"
+    local remote_commit3=$output
+    assert_equal "$commit3" "$remote_commit3" "Push after adding file3 and rebase failed"
 
-    # Verify that new file is here
-    sleep $WAITTIME
-    [ -f file2.txt ]
+    # Verify all files are present locally
+    assert_file_exist "file1.txt"
+    assert_file_exist "file2.txt" # Should have been pulled
+    assert_file_exist "file3.txt" # Should have been committed/rebased
 
-    # Remove testing directories
+    # Check commit history: Ensure the commit message from the other repo is present
+    run git log --oneline -n 4 # Look at recent history
+    assert_success "git log failed after rebase"
+    assert_output --partial "Commit from local2 (file2)" "Commit message from local2 not found in history"
+
+    # Check that the originally added file is mentioned
+    run git log --name-status -n 5 # Look further back
+    assert_success
+    assert_output --partial "file1.txt" # Ensure original change is still there
+
     cd /tmp
-    rm -rf $testdir
 }
-
