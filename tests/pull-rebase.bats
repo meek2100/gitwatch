@@ -19,13 +19,12 @@ load 'startup-shutdown'
     echo "line1" >> file1.txt
 
     # Wait for commit+push for file1 (wait for remote ref to update)
-    wait_for_git_change 20 0.5 git rev-parse origin/master
-    assert_success "wait_for_git_change failed unexpectedly after file1 add" # Check wait_for success
+    wait_for_git_change 20 0.5 git rev-parse origin/master || fail "wait_for_git_change timed out after file1 add"
 
-    # ---> Add a small delay here <---
-    sleep 0.2
+    # Removed the problematic assert_success check here
+    sleep 0.2 # Keep small delay for potential filesystem consistency
 
-    # Now verify the state *after* the wait and delay
+    # Now verify the state *after* the wait
     run git rev-parse origin/master
     assert_success "Git rev-parse origin/master failed after file1 add (post-wait verification)"
 
@@ -54,11 +53,10 @@ load 'startup-shutdown'
     echo "line3" >> file3.txt
 
     # Wait LONGER for gitwatch to pull, rebase, commit, push
-    wait_for_git_change 30 1 git rev-parse origin/master # Increased delay/attempts
-    assert_success "wait_for_git_change failed unexpectedly after file3 add/rebase" # Check wait_for success
+    wait_for_git_change 30 1 git rev-parse origin/master || fail "wait_for_git_change timed out after file3 add/rebase"
 
-    # ---> Add a small delay here <---
-    sleep 0.2
+    # Removed the problematic assert_success check here
+    sleep 0.2 # Keep small delay
 
     # Verify push happened after rebase
     run git rev-parse master
