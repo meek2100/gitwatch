@@ -3,26 +3,25 @@
 load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'
 load 'test_helper/bats-file/load'
-load 'startup-shutdown'
+load 'startup-shutdown' # This defines the original teardown()
 
-# Note: Need a custom teardown here to clean the external .git dir
-_original_teardown() {
-  if command -v teardown >/dev/null && [[ "$(type -t teardown)" == "function" ]]; then
-     # Check if the function body is different to avoid infinite recursion
-     # This is a basic check; might need refinement if function bodies are complex
-     if [[ "$(declare -f teardown)" != "$(declare -f _original_teardown)" ]]; then
-       teardown # Call the original teardown from startup-shutdown
-     fi
-  fi
-}
+# 1. Copy the original teardown function to a new name
+#    This must be done *after* loading startup-shutdown and *before* overriding teardown.
+eval "$(declare -f teardown | sed 's/teardown/original_teardown/')"
 
+# 2. Now, override teardown() with your custom version
 teardown() {
+  debug "Running custom teardown for remotedirs"
   # Clean up the external .git dir created in this test
-  if [ -n "${dotgittestdir:-}" ] && [ -d "$dotgittestdir" ]; then
+  if [ -n "${dotgittestdir:-}" ] && [ -d "$dotgittestdir" ];
+  then
       debug "Removing external git dir: $dotgittestdir"
       rm -rf "$dotgittestdir"
   fi
-  _original_teardown # Call the original teardown function
+
+  debug "Calling original teardown"
+  # 3. Call the saved original function
+  original_teardown
 }
 
 
