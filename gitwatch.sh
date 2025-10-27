@@ -691,7 +691,8 @@ generate_commit_message() {
   if [[ $LISTCHANGES -ge 0 ]]; then
     local DIFF_COMMITMSG
     set +e # Temporarily disable exit on error for this pipeline
-    DIFF_COMMITMSG=$(bash -c "$GIT diff -U0 '$LISTCHANGES_COLOR'" | diff-lines)
+    # Use --staged or --cached to show diff of what's about to be committed
+    DIFF_COMMITMSG=$(bash -c "$GIT diff --staged -U0 '$LISTCHANGES_COLOR'" | diff-lines)
     local diff_lines_status=$?
     set -e # Re-enable exit on error
     if [ $diff_lines_status -ne 0 ]; then
@@ -715,7 +716,7 @@ generate_commit_message() {
     else # Diff is longer than the limit
       # --- Replacement for 'grep |' ---
       local stat_summary=""
-      # Process 'git diff --stat' output line by line
+      # Process 'git diff --staged --stat' output line by line
       while IFS= read -r line; do
         # Check if the line contains '|' using bash pattern matching
         if [[ "$line" == *"|"* ]]; then
@@ -726,7 +727,7 @@ generate_commit_message() {
             stat_summary+=$'\n'"$line"
           fi
         fi
-      done <<< "$(bash -c "$GIT diff --stat")" # Feed 'git diff --stat' output to the loop
+      done <<< "$(bash -c "$GIT diff --staged --stat")" # Feed 'git diff --staged --stat' output to the loop
       # Use the summary if it's not empty, otherwise fallback
       if [ -n "$stat_summary" ]; then
         local_commit_msg="Too many lines changed ($LENGTH_DIFF_COMMITMSG > $LISTCHANGES). Summary:\n$stat_summary"
@@ -739,12 +740,13 @@ generate_commit_message() {
   if [ -n "${COMMITCMD:-}" ]; then
     if [ "$PASSDIFFS" -eq 1 ]; then
       # Use process substitution and pipe to custom command
-      # *** Use bash -c for safer execution of complex commands ***
+      # Use bash -c for safer execution of complex commands
       local pipe_cmd
-      pipe_cmd=$(printf "%s diff --name-only | %s" "$GIT" "$COMMITCMD")
+      # Pipe staged files diff
+      pipe_cmd=$(printf "%s diff --staged --name-only | %s" "$GIT" "$COMMITCMD")
       local_commit_msg=$(bash -c "$pipe_cmd" || { stderr "ERROR: Custom commit command '$COMMITCMD' with pipe failed."; echo "Custom command failed"; } )
     else
-      # *** Use bash -c for safer execution of complex commands ***
+      # Use bash -c for safer execution of complex commands
       local_commit_msg=$(bash -c "$COMMITCMD" || { stderr "ERROR: Custom commit command '$COMMITCMD' failed."; echo "Custom command failed"; } )
     fi
   fi
@@ -771,34 +773,29 @@ _perform_commit() {
     return 0
   fi
 
-  # *** MODIFIED git add LOGIC ***
-  # Stage modifications and deletions of tracked files
-  local add_update_cmd
-  add_update_cmd=$(printf "%s add -u" "$GIT")
-  bash -c "$add_update_cmd" || { stderr "ERROR: 'git add -u' failed."; return 1; }
-  verbose_echo "Running git add command: $add_update_cmd"
-
-  # Stage new files and potentially other changes (--all includes -u, but -u first is safer)
-  local add_all_cmd
-  # Check if we were watching a single file or a directory
+  # *** REVERTED git add LOGIC ***
+  local add_cmd
+  # Check if we are watching a single file or a directory
   if [ -n "${TARGETFILE_ABS:-}" ]; then
     # Watching a single file: explicitly add just that file
-    add_all_cmd=$(printf "%s add %q" "$GIT" "$TARGETFILE_ABS")
+    add_cmd=$(printf "%s add %q" "$GIT" "$TARGETFILE_ABS")
   else
-    # Watching a directory: add all changes in current dir (.)
-    add_all_cmd=$(printf "%s add ." "$GIT") # Changed from --all . to just .
+    # Watching a directory: add all changes in current dir (.) using --all
+    add_cmd=$(printf "%s add --all ." "$GIT") # <-- Reverted to --all .
   fi
-  bash -c "$add_all_cmd" || { stderr "ERROR: 'git add .' failed."; return 1; }
-  verbose_echo "Running git add command: $add_all_cmd"
+  bash -c "$add_cmd" || { stderr "ERROR: 'git add' failed."; return 1; }
+  verbose_echo "Running git add command: $add_cmd"
+  # *** End REVERTED git add LOGIC ***
 
-  # *** Re-check status AFTER add to ensure something was actually staged ***
-  STATUS=$(bash -c "$GIT status -s")
+  # Re-check status AFTER add to ensure something was actually staged
+  # Use --porcelain for stable, scriptable output. It shows staged changes.
+  STATUS=$(bash -c "$GIT status --porcelain")
   if [ -z "$STATUS" ]; then
     verbose_echo "No changes staged for commit after git add."
     return 0
   fi
 
-  # Generate commit message (moved after add, so diffs are correct)
+  # Generate commit message (moved after add, so diffs reflect staged changes)
   local FINAL_COMMIT_MSG
   FINAL_COMMIT_MSG=$(generate_commit_message)
 
@@ -835,6 +832,7 @@ _perform_commit() {
   fi
   return 0
 }
+
 
 # Wrapper for perform_commit that uses a lock to prevent concurrent runs
 perform_commit() {

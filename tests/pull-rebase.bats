@@ -39,7 +39,8 @@ load 'startup-shutdown'
     cd "$testdir/local/remote"
     sleep 1 # Short delay before modifying
     echo "line3" >> file3.txt
-    sleep "$WAITTIME" # Wait for gitwatch to pull, rebase, commit, push
+    # *** INCREASED WAIT TIME HERE ***
+    sleep $((WAITTIME * 2)) # Wait LONGER for gitwatch to pull, rebase, commit, push
 
     # Verify push happened after rebase
     run git rev-parse master
@@ -59,6 +60,11 @@ load 'startup-shutdown'
     run git log --oneline -n 4 # Look at recent history
     assert_success "git log failed after rebase"
     assert_output --partial "Commit from local2 (file2)" "Commit message from local2 not found in history"
+
+    # Check that the originally added file is mentioned
+    run git log --name-status -n 5 # Look further back
+    assert_success
+    assert_output --partial "file1.txt" # Ensure original change is still there
 
     cd /tmp
 }
