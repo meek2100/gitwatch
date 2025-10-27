@@ -82,7 +82,9 @@ jobs:
       - name: Checkout code (including submodules)
         uses: actions/checkout@v4
         with:
-          submodules: true # Ensure submodules (bats-core helpers) are checked out
+          # Use 'recursive' and a full fetch-depth to ensure submodules are cloned reliably
+          submodules: "recursive"
+          fetch-depth: 0
 
       # - name: Setup upterm session
       #   uses: lhotari/action-upterm@v1
