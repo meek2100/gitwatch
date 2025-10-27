@@ -79,12 +79,22 @@ jobs:
             exit 1
           fi
 
-      - name: Checkout code (including submodules)
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # Use 'recursive' and a full fetch-depth to ensure submodules are cloned reliably
-          submodules: "recursive"
+          # Set submodules to false. We will init them manually in the next step.
+          submodules: false
           fetch-depth: 0
+
+      - name: Initialize Submodules
+        shell: bash
+        run: |
+          echo "Initializing submodules..."
+          git submodule update --init --recursive
+          echo "Submodule status:"
+          git submodule status
+          echo "Listing helper files:"
+          ls -l tests/test_helper/bats-support/
 
       # - name: Setup upterm session
       #   uses: lhotari/action-upterm@v1
