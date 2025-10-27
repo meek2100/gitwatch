@@ -1,27 +1,32 @@
 #!/usr/bin/env bats
 
+# Load helpers FIRST
 load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'
 load 'test_helper/bats-file/load'
-load 'startup-shutdown' # This defines the original teardown()
 
-# 1. Copy the original teardown function to a new name
-#    This must be done *after* loading startup-shutdown and *before* overriding teardown.
+# Define the custom cleanup logic specific to this file
+# Use standard echo to output debug info to avoid relying on bats-support inside teardown
+_remotedirs_cleanup() {
+  echo "# Running custom cleanup for remotedirs" >&3
+  if [ -n "${dotgittestdir:-}" ] && [ -d "$dotgittestdir" ]; then
+    echo "# Removing external git dir: $dotgittestdir" >&3
+    rm -rf "$dotgittestdir"
+  fi
+}
+
+# Load the base setup/teardown AFTER defining the custom helper
+load 'startup-shutdown'
+# The original teardown() is now defined.
+
+# Copy the original teardown function to a new name
+# This must happen AFTER loading startup-shutdown and BEFORE overriding teardown again.
 eval "$(declare -f teardown | sed 's/teardown/original_teardown/')"
 
-# 2. Now, override teardown() with your custom version
+# Define the final teardown override that calls both parts
 teardown() {
-  debug "Running custom teardown for remotedirs"
-  # Clean up the external .git dir created in this test
-  if [ -n "${dotgittestdir:-}" ] && [ -d "$dotgittestdir" ];
-  then
-      debug "Removing external git dir: $dotgittestdir"
-      rm -rf "$dotgittestdir"
-  fi
-
-  debug "Calling original teardown"
-  # 3. Call the saved original function
-  original_teardown
+  _remotedirs_cleanup # Call custom part first
+  original_teardown   # Then call the original part
 }
 
 
@@ -54,6 +59,7 @@ teardown() {
     run git --git-dir="$dotgittestdir/.git" rev-parse master
     assert_success
     local currentcommit=$output
+    # This assertion should now work as refute_equal will be loaded
     refute_equal "$lastcommit" "$currentcommit" "Commit hash should change after modification"
 
     run git --git-dir="$dotgittestdir/.git" log -1 --pretty=%B
