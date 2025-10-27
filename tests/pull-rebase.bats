@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
 
-load 'test_helper/bats-support/load'
-load 'test_helper/bats-assert/load'
-load 'test_helper/bats-file/load'
-load 'startup-shutdown'
+load 'tests/test_helper/bats-support/load'
+load 'tests/test_helper/bats-assert/load'
+load 'tests/test_helper/bats-file/load'
+load 'tests/startup-shutdown'
 
 @test "pulling_and_rebasing_correctly: Handles upstream changes with -R flag" {
     # Start gitwatch directly in the background

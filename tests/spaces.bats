@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
 
-load 'test_helper/bats-support/load'
-load 'test_helper/bats-assert/load'
-load 'test_helper/bats-file/load'
-load 'startup-shutdown-spaces'
+load 'tests/test_helper/bats-support/load'
+load 'tests/test_helper/bats-assert/load'
+load 'tests/test_helper/bats-file/load'
+load 'tests/startup-shutdown'
 
 @test "spaces_in_target_dir: Handles paths with spaces correctly" {
     # Start gitwatch directly in the background

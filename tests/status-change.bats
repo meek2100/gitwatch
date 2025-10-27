@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
 
-load 'test_helper/bats-support/load'
-load 'test_helper/bats-assert/load'
-load 'test_helper/bats-file/load'
-load 'startup-shutdown'
+load 'tests/test_helper/bats-support/load'
+load 'tests/test_helper/bats-assert/load'
+load 'tests/test_helper/bats-file/load'
+load 'tests/startup-shutdown'
 
 @test "commit_only_when_git_status_change: Does not commit if only timestamp changes (touch)" {
     local output_file

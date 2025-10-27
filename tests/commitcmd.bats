@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
 
-load 'test_helper/bats-support/load'
-load 'test_helper/bats-assert/load'
-load 'test_helper/bats-file/load'
-load 'startup-shutdown'
+load 'tests/test_helper/bats-support/load'
+load 'tests/test_helper/bats-assert/load'
+load 'tests/test_helper/bats-file/load'
+load 'tests/startup-shutdown'
 
 @test "commit_command_single: Uses simple custom command output as commit message" {
     # Start gitwatch directly in the background
