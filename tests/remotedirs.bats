@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
 
-load 'tests/test_helper/bats-support/load'
-load 'tests/test_helper/bats-assert/load'
-load 'tests/test_helper/bats-file/load'
-load 'tests/startup-shutdown'
+# Load helpers FIRST
+load 'test_helper/bats-support/load'
+load 'test_helper/bats-assert/load'
+load 'test_helper/bats-file/load'
 
 # Define the custom cleanup logic specific to this file
 # Use standard echo to output debug info to avoid relying on bats-support inside teardown
