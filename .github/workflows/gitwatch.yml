@@ -71,7 +71,7 @@ jobs:
       # Use bats-action to install bats and helpers
       - name: Setup Bats and helper libraries
         id: setup-bats
-        uses: bats-core/bats-action@v3.0.1
+        uses: bats-core/bats-action@3.0.1
         # Optional: Specify exact versions if needed
         with:
           bats-version: latest
