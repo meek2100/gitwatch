@@ -1,12 +1,16 @@
 #!/usr/bin/env bats
 
+# Load standard helpers
 load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'
 load 'test_helper/bats-file/load'
+# Load custom helpers
+load 'test_helper/custom_helpers.bash'
+# Load setup/teardown
 load 'startup-shutdown'
 
 @test "pulling_and_rebasing_correctly: Handles upstream changes with -R flag" {
-    # Start gitwatch directly in the background
+    # Start gitwatch directly in the background with pull-rebase enabled
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -R "$testdir/local/remote" &
     GITWATCH_PID=$!
 
@@ -14,8 +18,8 @@ load 'startup-shutdown'
     sleep 1
     echo "line1" >> file1.txt
 
-    # Wait for commit+push for file1
-    retry 20 0.5 "run git rev-parse origin/master"
+    # Wait for commit+push for file1 (wait for remote ref to update)
+    wait_for_git_change 20 0.5 git rev-parse origin/master
     assert_success "Git rev-parse origin/master failed after file1 add"
 
     run git rev-parse master
@@ -35,6 +39,7 @@ load 'startup-shutdown'
     git commit -q -m "Commit from local2 (file2)"
     run git push -q origin master
     assert_success "Push from local2 failed"
+    local remote_commit2=$(git rev-parse HEAD) # Get the hash of the commit pushed by local2
 
     # Go back to the first local repo and make another change (file3)
     cd "$testdir/local/remote"
@@ -42,9 +47,10 @@ load 'startup-shutdown'
     echo "line3" >> file3.txt
 
     # Wait LONGER for gitwatch to pull, rebase, commit, push
-    # Use retry to wait for the new hash to appear on the remote
-    retry 30 0.5 "run test \"\$(git rev-parse origin/master)\" != \"$remote_commit1\""
-    assert_success "Push after adding file3 and rebase failed to appear on remote"
+    # Use wait_for_git_change to wait for the remote hash to change *again*
+    # It should change from remote_commit2 (local2's push) to a new one (gitwatch's push)
+    wait_for_git_change 30 1 git rev-parse origin/master # Increased delay/attempts for rebase
+    assert_success "Push after adding file3 and rebase failed to appear on remote (timeout)"
 
     # Verify push happened after rebase
     run git rev-parse master
@@ -54,6 +60,8 @@ load 'startup-shutdown'
     assert_success "Git rev-parse origin/master failed after file3 add/rebase"
     local remote_commit3=$output
     assert_equal "$commit3" "$remote_commit3" "Push after adding file3 and rebase failed"
+    refute_equal "$remote_commit2" "$remote_commit3" "Remote hash should have changed after gitwatch rebase/push"
+
 
     # Verify all files are present locally
     assert_file_exist "file1.txt"

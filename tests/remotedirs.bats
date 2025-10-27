@@ -4,6 +4,8 @@
 load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'
 load 'test_helper/bats-file/load'
+# Load custom helpers
+load 'test_helper/custom_helpers.bash'
 
 # Define the custom cleanup logic specific to this file
 # Use standard echo to output debug info to avoid relying on bats-support inside teardown
@@ -42,30 +44,27 @@ teardown() {
     sleep 1
     echo "line1" >> file1.txt
 
-    # Wait for first commit
-    retry 20 0.5 "run git --git-dir=\"$dotgittestdir/.git\" rev-parse master"
-    assert_success
-    local lastcommit=$output
+    # Wait for first commit using the external git dir
+    wait_for_git_change 20 0.5 git --git-dir="$dotgittestdir/.git" log -1 --format=%H
+    assert_success "First commit timed out"
+    local lastcommit=$(git --git-dir="$dotgittestdir/.git" log -1 --format=%H)
+
 
     echo "line2" >> file1.txt
 
-    # Wait for second commit event (by checking that the hash changes)
-    retry 20 0.5 "run test \"\$(git --git-dir=\"$dotgittestdir/.git\" rev-parse master)\" != \"$lastcommit\""
-    assert_success "Commit hash should change after modification"
+    # Wait for second commit event (by checking that the hash changes) using the external git dir
+    wait_for_git_change 20 0.5 git --git-dir="$dotgittestdir/.git" log -1 --format=%H
+    assert_success "Second commit timed out"
 
-    # Add a small delay for ref update to settle, especially on macOS
-    sleep 0.5
+    # Verify that new commit hash is different
+    local currentcommit=$(git --git-dir="$dotgittestdir/.git" log -1 --format=%H)
+    refute_equal "$lastcommit" "$currentcommit" "Commit hash should be different after second change"
 
-    # Verify that new commit has happened
-    run git --git-dir="$dotgittestdir/.git" rev-parse master
-    assert_success
-    local currentcommit=$output
-    refute_equal "$lastcommit" "$currentcommit" "Commit hash should be different"
-
+    # Verify commit message content
     run git --git-dir="$dotgittestdir/.git" log -1 --pretty=%B
     assert_success
     assert_output --partial "file1.txt"
-    assert_output --partial "line2"
+    assert_output --partial "line2" # Depends on diff-lines output
 
     cd /tmp # Move out before teardown
 }
