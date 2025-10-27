@@ -104,25 +104,26 @@ jobs:
         run: |
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
-          # Run tests one file at a time for easier debugging
+
+          # Change directory into the tests folder first
+          cd tests
+
+          # Now run bats on the test files directly
           echo "Running commitcmd.bats..."
-          bats tests/commitcmd.bats
+          bats commitcmd.bats
           echo "Running commitlog.bats..."
-          bats tests/commitlog.bats
+          bats commitlog.bats
           echo "Running notify-ignore.bats..."
-          bats tests/notify-ignore.bats
+          bats notify-ignore.bats
           echo "Running pull-rebase.bats..."
-          bats tests/pull-rebase.bats
+          bats pull-rebase.bats
           echo "Running remotedirs.bats..."
-          bats tests/remotedirs.bats
+          bats remotedirs.bats
           echo "Running spaces.bats..."
-          bats tests/spaces.bats
+          bats spaces.bats
           echo "Running status-change.bats..."
-          bats tests/status-change.bats
+          bats status-change.bats
           echo "Running sync.bats..."
-          bats tests/sync.bats
+          bats sync.bats
           # Add any other .bats files here if necessary
           echo "Finished running tests"
-
-      - name: Test step # Can likely remove this step if not needed
-        run: echo "Now at test step"
