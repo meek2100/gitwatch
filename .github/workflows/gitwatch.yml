@@ -13,19 +13,13 @@ jobs:
   #-------------------------------------------------------------------------
   super-lint:
     name: Lint Code Base
-
-    # Don't run action if commit message has #noaction in it.
     if: "! contains(github.event.head_commit.message, '#noaction')"
-
-    # I don't think running lint on multiple os' will do any good.
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
     # For the time being, I'm giving up on Super Linter. It's a great tool,
     # but it's currently broken, and it's taking more time to make it work than
     # it's worth.
@@ -45,35 +39,24 @@ jobs:
   #-------------------------------------------------------------------------
   bats:
     name: BATS Tests
-
-    # Don't run action if commit message has #noaction in it.
     if: "! contains(github.event.head_commit.message, '#noaction')"
-
     strategy:
       matrix:
         os: [ubuntu-latest, macOS-latest]
-
-    # The type of runner that the job will run on
     runs-on: ${{ matrix.os }}
-
     timeout-minutes: 5
 
     steps:
-      - name: Setup node
-        uses: actions/setup-node@v4
+      # Removed setup-node and npm install bats
 
-      - name: Setup BATS (bats-core via npm)
-        run: sudo npm install -g bats # This should install bats-core
-
-      - name: Install gitwatch dependencies
+      - name: Install OS-specific dependencies (inotify/fswatch, flock)
         shell: bash
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt-get -y update
             sudo apt-get -y install inotify-tools util-linux
-
           elif [ "$RUNNER_OS" == "macOS" ]; then
             brew install fswatch flock
-
           else
             echo "Unsupported OS: $RUNNER_OS"
             exit 1
@@ -81,34 +64,37 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
+        # Submodules no longer needed if removed from repo
+        # with:
+        #  fetch-depth: 0
+
+      # Use bats-action to install bats and helpers
+      - name: Setup Bats and helper libraries
+        id: setup-bats
+        uses: bats-core/bats-action@v3.0.1
+        # Optional: Specify exact versions if needed
         with:
-          # Set submodules to false. We will init them manually in the next step.
-          submodules: false
-          fetch-depth: 0
+          bats-version: latest
+          support-version: "0.3.0"
+          assert-version: "2.2.4"
+          file-version: "0.4.0"
 
-      - name: Initialize Submodules
-        shell: bash
-        run: |
-          echo "Initializing submodules..."
-          git submodule update --init --recursive
-          echo "Submodule status:"
-          git submodule status
-          echo "Listing helper files:"
-          ls -l tests/test_helper/bats-support/
+      # Removed manual submodule initialization step
 
-      # - name: Setup upterm session
+      # - name: Setup upterm session # Preserved commented-out step
       #   uses: lhotari/action-upterm@v1
 
       - name: Run tests individually
         shell: bash
+        env:
+          # Use the library path output from the bats-action step
+          BATS_LIB_PATH: ${{ steps.setup-bats.outputs.lib-path }}
         run: |
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
 
-          # Change directory into the tests folder first
           cd tests
 
-          # Now run bats on the test files directly
           echo "Running commitcmd.bats..."
           bats commitcmd.bats
           echo "Running commitlog.bats..."
@@ -125,5 +111,4 @@ jobs:
           bats status-change.bats
           echo "Running sync.bats..."
           bats sync.bats
-          # Add any other .bats files here if necessary
           echo "Finished running tests"
