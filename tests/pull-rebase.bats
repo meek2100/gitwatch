@@ -20,12 +20,19 @@ load 'startup-shutdown'
 
     # Wait for commit+push for file1 (wait for remote ref to update)
     wait_for_git_change 20 0.5 git rev-parse origin/master
-    assert_success "Git rev-parse origin/master failed after file1 add"
+    assert_success "wait_for_git_change failed unexpectedly after file1 add" # Check wait_for success
+
+    # ---> Add a small delay here <---
+    sleep 0.2
+
+    # Now verify the state *after* the wait and delay
+    run git rev-parse origin/master
+    assert_success "Git rev-parse origin/master failed after file1 add (post-wait verification)"
 
     run git rev-parse master
-    assert_success "Git rev-parse master failed after file1 add"
+    assert_success "Git rev-parse master failed after file1 add (post-wait verification)"
     local commit1=$output
-    run git rev-parse origin/master
+    run git rev-parse origin/master # Re-run to capture for assert_equal
     local remote_commit1=$output
     assert_equal "$commit1" "$remote_commit1" "Push after adding file1 failed"
 
@@ -47,17 +54,18 @@ load 'startup-shutdown'
     echo "line3" >> file3.txt
 
     # Wait LONGER for gitwatch to pull, rebase, commit, push
-    # Use wait_for_git_change to wait for the remote hash to change *again*
-    # It should change from remote_commit2 (local2's push) to a new one (gitwatch's push)
-    wait_for_git_change 30 1 git rev-parse origin/master # Increased delay/attempts for rebase
-    assert_success "Push after adding file3 and rebase failed to appear on remote (timeout)"
+    wait_for_git_change 30 1 git rev-parse origin/master # Increased delay/attempts
+    assert_success "wait_for_git_change failed unexpectedly after file3 add/rebase" # Check wait_for success
+
+    # ---> Add a small delay here <---
+    sleep 0.2
 
     # Verify push happened after rebase
     run git rev-parse master
-    assert_success "Git rev-parse master failed after file3 add/rebase"
+    assert_success "Git rev-parse master failed after file3 add/rebase (post-wait verification)"
     local commit3=$output
-    run git rev-parse origin/master
-    assert_success "Git rev-parse origin/master failed after file3 add/rebase"
+    run git rev-parse origin/master # Re-run to capture for assert_equal
+    assert_success "Git rev-parse origin/master failed after file3 add/rebase (post-wait verification)"
     local remote_commit3=$output
     assert_equal "$commit3" "$remote_commit3" "Push after adding file3 and rebase failed"
     refute_equal "$remote_commit2" "$remote_commit3" "Remote hash should have changed after gitwatch rebase/push"
