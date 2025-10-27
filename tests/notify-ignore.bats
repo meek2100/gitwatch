@@ -11,16 +11,17 @@ load 'startup-shutdown'
     # Start gitwatch directly in the background
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -x "test_subdir/" "$testdir/local/remote" > "$output_file" 2>&1 &
     GITWATCH_PID=$!
-    disown
 
     cd "$testdir/local/remote"
     mkdir test_subdir
     sleep 1
 
     echo "line1" >> file1.txt
-    sleep "$WAITTIME"
+    # Wait for the first (allowed) commit to appear
+    retry 20 0.5 "run git log --name-status --oneline | grep file1.txt"
 
     echo "line2" >> test_subdir/file2.txt
+    # This is a negative test: wait to ensure a commit *does not* happen
     sleep "$WAITTIME"
 
     run git log --name-status --oneline

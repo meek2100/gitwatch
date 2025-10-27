@@ -9,20 +9,21 @@ load 'startup-shutdown'
     # Start gitwatch directly in the background
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin "$testdir/local/remote" &
     GITWATCH_PID=$!
-    disown
 
     cd "$testdir/local/remote"
 
     # --- Test 1: Add initial file ---
     sleep 1
     echo "line1" >> file1.txt
-    sleep "$WAITTIME" # Wait for commit+push
+
+    # Wait for commit+push
+    retry 20 0.5 "run git rev-parse origin/master"
+    assert_success "Git rev-parse origin/master failed after file1 add"
 
     run git rev-parse master
     assert_success "Git rev-parse master failed after file1 add"
     local commit1=$output
     run git rev-parse origin/master
-    assert_success "Git rev-parse origin/master failed after file1 add"
     local remote_commit1=$output
     assert_equal "$commit1" "$remote_commit1" "Push after adding file1 failed"
 
@@ -33,7 +34,10 @@ load 'startup-shutdown'
     cd subdir
     echo "line2" >> file2.txt
     cd .. # Back to repo root
-    sleep "$WAITTIME" # Wait for commit+push
+
+    # Wait for commit+push (by checking that remote hash has changed)
+    retry 20 0.5 "run test \"\$(git rev-parse origin/master)\" != \"$lastcommit\""
+    assert_success "Push after adding file2 failed to appear on remote"
 
     run git rev-parse master
     assert_success "Git rev-parse master failed after file2 add"
@@ -52,7 +56,10 @@ load 'startup-shutdown'
     sleep 0.5 # Delay between rm and rmdir
     run rmdir subdir
     assert_success "rmdir subdir failed"
-    sleep "$WAITTIME" # Wait for potential commit+push for removal
+
+    # Wait for potential commit+push for removal (by checking that remote hash has changed)
+    retry 20 0.5 "run test \"\$(git rev-parse origin/master)\" != \"$lastcommit\""
+    assert_success "Push after removal failed to appear on remote"
 
     # Debug: Check git status right before hash comparison
     run git status -s

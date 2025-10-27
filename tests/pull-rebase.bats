@@ -9,18 +9,19 @@ load 'startup-shutdown'
     # Start gitwatch directly in the background
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -R "$testdir/local/remote" &
     GITWATCH_PID=$!
-    disown
 
     cd "$testdir/local/remote"
     sleep 1
     echo "line1" >> file1.txt
-    sleep "$WAITTIME" # Wait for commit+push for file1
+
+    # Wait for commit+push for file1
+    retry 20 0.5 "run git rev-parse origin/master"
+    assert_success "Git rev-parse origin/master failed after file1 add"
 
     run git rev-parse master
     assert_success "Git rev-parse master failed after file1 add"
     local commit1=$output
     run git rev-parse origin/master
-    assert_success "Git rev-parse origin/master failed after file1 add"
     local remote_commit1=$output
     assert_equal "$commit1" "$remote_commit1" "Push after adding file1 failed"
 
@@ -39,8 +40,11 @@ load 'startup-shutdown'
     cd "$testdir/local/remote"
     sleep 1 # Short delay before modifying
     echo "line3" >> file3.txt
-    # *** INCREASED WAIT TIME HERE ***
-    sleep $((WAITTIME * 2)) # Wait LONGER for gitwatch to pull, rebase, commit, push
+
+    # Wait LONGER for gitwatch to pull, rebase, commit, push
+    # Use retry to wait for the new hash to appear on the remote
+    retry 30 0.5 "run test \"\$(git rev-parse origin/master)\" != \"$remote_commit1\""
+    assert_success "Push after adding file3 and rebase failed to appear on remote"
 
     # Verify push happened after rebase
     run git rev-parse master

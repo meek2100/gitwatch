@@ -11,18 +11,18 @@ load 'startup-shutdown'
     # Start gitwatch directly in the background
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/remote" > "$output_file" 2>&1 &
     GITWATCH_PID=$!
-    disown
 
     cd "$testdir/local/remote"
     sleep 1
     echo "line1" >> file1.txt
-    sleep "$WAITTIME"
 
-    run git rev-parse HEAD
+    # Wait for the first (allowed) commit
+    retry 20 0.5 "run git rev-parse HEAD"
     assert_success
     local first_commit_hash=$output
 
     touch file1.txt
+    # This is a negative test: wait to ensure a commit *does not* happen
     sleep "$WAITTIME"
 
     run git rev-parse HEAD

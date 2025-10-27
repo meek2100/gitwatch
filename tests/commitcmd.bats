@@ -9,14 +9,14 @@ load 'startup-shutdown'
     # Start gitwatch directly in the background
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c "uname" "$testdir/local/remote" &
     GITWATCH_PID=$!
-    disown
 
     cd "$testdir/local/remote"
     sleep 1
     echo "line1" >> file1.txt
-    sleep "$WAITTIME"
 
-    run git log -1 --pretty=%B
+    # Wait for the commit to appear
+    retry 20 0.5 "run git log -1 --pretty=%B"
+
     assert_success
     assert_output --partial "$(uname)"
 }
@@ -25,14 +25,14 @@ load 'startup-shutdown'
     # Start gitwatch directly in the background
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c 'echo "$(uname) is the uname of this device, the time is $(date)"' "$testdir/local/remote" &
     GITWATCH_PID=$!
-    disown
 
     cd "$testdir/local/remote"
     sleep 1
     echo "line1" >> file1.txt
-    sleep "$WAITTIME"
 
-    run git log -1 --pretty=%B
+    # Wait for the commit to appear
+    retry 20 0.5 "run git log -1 --pretty=%B"
+
     assert_success
     assert_output --partial "$(uname)"
     assert_output --partial "$(date +%Y)"
@@ -42,14 +42,14 @@ load 'startup-shutdown'
     # Start gitwatch directly in the background
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c "uname" -l 123 -L 0 -d "+%Y" "$testdir/local/remote" &
     GITWATCH_PID=$!
-    disown
 
     cd "$testdir/local/remote"
     sleep 1
     echo "line1" >> file1.txt
-    sleep "$WAITTIME"
 
-    run git log -1 --pretty=%B
+    # Wait for the commit to appear
+    retry 20 0.5 "run git log -1 --pretty=%B"
+
     assert_success
     assert_output --partial "$(uname)"
     refute_output --partial "file1.txt"

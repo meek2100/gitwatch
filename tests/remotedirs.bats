@@ -18,7 +18,6 @@ _remotedirs_cleanup() {
 # Load the base setup/teardown AFTER defining the custom helper
 load 'startup-shutdown'
 # The original teardown() is now defined.
-
 # Copy the original teardown function to a new name
 # This must happen AFTER loading startup-shutdown and BEFORE overriding teardown again.
 eval "$(declare -f teardown | sed 's/teardown/original_teardown/')"
@@ -38,19 +37,21 @@ teardown() {
     # Start gitwatch directly in the background
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 -g "$dotgittestdir/.git" "$testdir/local/remote" &
     GITWATCH_PID=$!
-    disown
 
     cd "$testdir/local/remote"
     sleep 1
     echo "line1" >> file1.txt
-    sleep "$WAITTIME" # Wait for first commit
 
-    run git --git-dir="$dotgittestdir/.git" rev-parse master
+    # Wait for first commit
+    retry 20 0.5 "run git --git-dir=\"$dotgittestdir/.git\" rev-parse master"
     assert_success
     local lastcommit=$output
 
     echo "line2" >> file1.txt
-    sleep "$WAITTIME" # Wait for second commit event
+
+    # Wait for second commit event (by checking that the hash changes)
+    retry 20 0.5 "run test \"\$(git --git-dir=\"$dotgittestdir/.git\" rev-parse master)\" != \"$lastcommit\""
+    assert_success "Commit hash should change after modification"
 
     # Add a small delay for ref update to settle, especially on macOS
     sleep 0.5
@@ -59,12 +60,12 @@ teardown() {
     run git --git-dir="$dotgittestdir/.git" rev-parse master
     assert_success
     local currentcommit=$output
-    # This assertion should now work as refute_equal will be loaded
-    refute_equal "$lastcommit" "$currentcommit" "Commit hash should change after modification"
+    refute_equal "$lastcommit" "$currentcommit" "Commit hash should be different"
 
     run git --git-dir="$dotgittestdir/.git" log -1 --pretty=%B
     assert_success
     assert_output --partial "file1.txt"
+    assert_output --partial "line2"
 
     cd /tmp # Move out before teardown
 }
