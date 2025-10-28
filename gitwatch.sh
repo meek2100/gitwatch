@@ -621,51 +621,71 @@ diff-lines() {
   local path=""
   local line=""
   local previous_path=""
+  # Regex to match optional color codes at the start of a line
+  local color_regex="^($'\033'\[[0-9;]+m)*"
+
   while IFS= read -r; do # Use IFS= to preserve leading/trailing whitespace
     local esc=$'\033' # Local variable for escape character
+    local stripped_reply="${REPLY##$color_regex}" # Remove leading color codes for easier matching
+
     # --- Match diff headers ---
-    if [[ $REPLY =~ ^---\ (a/)?([^[:blank:]$esc]+) ]]; then
-      previous_path=${BASH_REMATCH[2]}
+    # Match '--- a/path' or '--- /dev/null' - Capture everything after 'a/' or '/dev/null'
+    if [[ "$stripped_reply" =~ ^---\ (a/)?(.*) ]]; then
+      previous_path="${BASH_REMATCH[2]}"
+      # Trim trailing color codes if present (like ESC[m)
+      previous_path="${previous_path%%$esc\[m*}"
+      # Trim trailing whitespace
+      previous_path="${previous_path%"${previous_path##*[![:space:]]}"}"
       path="" # Reset path for new file diff
       line="" # Reset line number
+      # Handle the /dev/null case specifically for path variable
+      if [[ "$stripped_reply" =~ ^---\ /dev/null ]]; then previous_path="/dev/null"; fi
       continue
-    elif [[ $REPLY =~ ^\+\+\+\ (b/)?([^[:blank:]$esc]+) ]]; then
-      path=${BASH_REMATCH[2]}
+    # Match '+++ b/path' - Capture everything after 'b/'
+    elif [[ "$stripped_reply" =~ ^\+\+\+\ (b/)?(.*) ]]; then
+      path="${BASH_REMATCH[2]}"
+      # Trim trailing color codes if present
+      path="${path%%$esc\[m*}"
+      # Trim trailing whitespace
+      path="${path%"${path##*[![:space:]]}"}"
       continue
       # --- Match hunk header ---
-    elif [[ $REPLY =~ ^@@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@ ]]; then
+    elif [[ "$stripped_reply" =~ ^@@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@ ]]; then
       line=${BASH_REMATCH[2]:-1} # Set starting line number for additions, default to 1 if not captured
       continue
       # --- Match diff content lines ---
-      # Need to handle lines starting with color codes potentially
-    elif [[ $REPLY =~ ^($esc\[[0-9;]+m)*([\ +-])(.*) ]]; then # Capture +/- and content
+      # Match original line with color codes to preserve them
+    elif [[ "$REPLY" =~ ^($esc\[[0-9;]+m)*([\ +-])(.*) ]]; then # Capture +/- and content
       local prefix=${BASH_REMATCH[2]}
       local content=${BASH_REMATCH[3]}
-      local display_content=${content:0:150} # limit the line width locally
+      # Apply width limit *after* capturing full content
+      local display_content=${content:0:150}
 
-      if [[ $path == "/dev/null" ]]; then # File deleted
-        echo "File $previous_path deleted or moved."
-        # --- Add check: Ensure path and line are set ---
-      elif [[ -n "$path" ]] && [[ -n "$line" ]]; then # Ensure path and line are set
+      if [[ "$path" == "/dev/null" ]] && [[ "$previous_path" != "/dev/null" ]]; then # File deleted
+         # Use previous_path when path is /dev/null
+         echo "$previous_path:?: File deleted or moved."
+      elif [[ -n "$path" ]] && [[ "$path" != "/dev/null" ]] && [[ -n "$line" ]]; then # Ensure path and line are set, and path is not /dev/null
         # Reconstruct the line with color codes if present, using prefix and limited content
         local color_codes=${BASH_REMATCH[1]:-} # Default to empty if no match
         echo "$path:$line: $color_codes$prefix$display_content"
+      elif [[ -n "$previous_path" ]] && [[ "$previous_path" != "/dev/null" ]] && [[ -n "$line" ]]; then
+         # Fallback for context lines before path is defined (e.g. mode changes)
+         # Use previous_path if path is not yet set or is /dev/null
+         local color_codes=${BASH_REMATCH[1]:-}
+         echo "$previous_path:$line: $color_codes$prefix$display_content"
       else
-        # This case should ideally not happen if diff format is standard
-        # Log to stderr to avoid polluting commit message if LISTCHANGES is used
+        # Log to stderr if still unable to determine path/line
         stderr "Warning: Could not parse line number or path in diff-lines for: $REPLY"
         # Output something simple to stdout as a fallback
-        echo "?:?: $prefix$display_content"
+        local color_codes=${BASH_REMATCH[1]:-}
+        echo "?:?: $color_codes$prefix$display_content"
       fi
-      # --- End check ---
 
       # Increment line number only for added or context lines shown in the diff
-      # --- Add check: Ensure line is set before incrementing ---
-      if [[ $prefix != - ]] && [[ -n "$line" ]]; then
+      if [[ "$prefix" != "-" ]] && [[ -n "$line" ]]; then
         # Check if line is a number before incrementing
         [[ "$line" =~ ^[0-9]+$ ]] && ((line++))
       fi
-      # --- End check ---
     fi
   done
 }
