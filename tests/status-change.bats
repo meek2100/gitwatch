@@ -40,8 +40,7 @@ load 'startup-shutdown'
 
     # Verify verbose output indicates no changes were detected by the final diff check
     run cat "$output_file"
-    # *** UPDATED ASSERTION MESSAGE ***
-    assert_output --partial "No actual changes staged for commit after git add."
+    assert_output --partial "No relevant changes detected by git status (porcelain check)."
     # Verify only one commit command was run
     local commit_count
     # Count lines containing "Running git commit command:" in the log
