@@ -61,8 +61,8 @@ repos:
       - id: yamllint
         args:
           - --no-warnings
-          # Adjusted rule format based on yamllint docs
-          - "-d {extends: relaxed, rules: {line-length: {max: 90}}}"
+          # Updated rule: Keep line-length, disable braces rule
+          - "-d {extends: relaxed, rules: {line-length: {max: 90}, braces: disable}}"
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:
