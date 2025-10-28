@@ -494,18 +494,18 @@ if ! [ -r "$TARGETDIR_ABS" ] || ! [ -w "$TARGETDIR_ABS" ] || ! [ -x "$TARGETDIR_
   resolution_message=""
   if [ -n "${GITWATCH_DOCKER_ENV:-}" ]; then
     resolution_message=$(printf "
-Resolution required:
-1. **Container User Mismatch**: The current user (UID %s) lacks the required permissions.
-2. **Recommended Fix**: Ensure the host volume mounted to the repository (e.g., %s) is owned by the container's non-root user ('appuser').
-   - You may need to run \`chown\` on the host path or use Docker's \`user\` option.
-" "$CURRENT_UID" "$TARGETDIR_ABS")
+    Resolution required:
+    1. **Container User Mismatch**: The current user (UID %s) lacks the required permissions.
+    2. **Recommended Fix**: Ensure the host volume mounted to the repository (e.g., %s) is owned by the container's non-root user ('appuser').
+    - You may need to run \`chown\` on the host path or use Docker's \`user\` option.
+    " "$CURRENT_UID" "$TARGETDIR_ABS")
   else
     resolution_message=$(printf "
-Resolution required:
-1. **Check Ownership**: The current user (UID %s) does not own or have R/W/X access to the directory.
-2. **Recommended Fix**: Ensure the watched directory is owned by the user running gitwatch.sh.
-   - Run: \`sudo chown -R \$USER:\$USER \"\$TARGETDIR_ABS\"\`
-" "$CURRENT_UID")
+    Resolution required:
+    1. **Check Ownership**: The current user (UID %s) does not own or have R/W/X access to the directory.
+    2. **Recommended Fix**: Ensure the watched directory is owned by the user running gitwatch.sh.
+    - Run: \`sudo chown -R \$USER:\$USER \"\$TARGETDIR_ABS\"\`
+    " "$CURRENT_UID")
   fi
 
   stderr "========================================================================================="
