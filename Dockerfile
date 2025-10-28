@@ -24,7 +24,7 @@ RUN chmod +x /app/gitwatch.sh /app/entrypoint.sh
 USER appuser
 
 # Add a basic healthcheck (example: check if bash is runnable)
-HEALTHCHECK --interval=5m --timeout=3s \
+HEALTHCHECK --interval=5s --timeout=3s --start-period=60s --start-interval=5s \
   CMD bash -c "exit 0" || exit 1
 
 ENTRYPOINT ["/app/entrypoint.sh"]
