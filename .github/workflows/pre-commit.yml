@@ -6,7 +6,7 @@ on:
 jobs:
   pre-commit:
     runs-on: ubuntu-latest
-    permissions: # Added permissions block (Step 4B)
+    permissions:
       contents: read
     env:
       RAW_LOG: pre-commit.log
@@ -16,7 +16,7 @@ jobs:
         if: false
       - uses: actions/checkout@v5
         with:
-          persist-credentials: false # Added persist-credentials (Step 4A)
+          persist-credentials: false
       - uses: actions/setup-python@v5
         if: false
         with:
@@ -34,11 +34,11 @@ jobs:
           set -o pipefail
           pre-commit gc
           pre-commit run --show-diff-on-failure --color=always --all-files | tee ${RAW_LOG}
-      - name: Convert Raw Log to Annotations
-        uses: mdeweerd/logToCheckStyle@v2025.1.1
-        if: ${{ failure() }}
-        with:
-          in: ${{ env.RAW_LOG }}
+      # - name: Convert Raw Log to Annotations
+      #   uses: mdeweerd/logToCheckStyle@v2025.1.1
+      #   if: ${{ failure() }}
+      #   with:
+      #     in: ${{ env.RAW_LOG }}
       - uses: actions/cache/save@v4
         if: ${{ ! cancelled() }}
         with:
@@ -51,7 +51,5 @@ jobs:
         if: ${{ ! cancelled() }}
         with:
           name: precommit-logs
-          path: | # Quoted paths (Step 5)
-            "${{ env.RAW_LOG }}"
-            "${{ env.CS_XML }}"
+          path: "${{ env.RAW_LOG }}"
           retention-days: 2
