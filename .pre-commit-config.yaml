@@ -77,7 +77,7 @@ repos:
     rev: v6.2.1
     hooks:
       - id: beautysh
-        args: ["-i", "2"]
+        args: ["-i", "2", "--encoding", "utf-8"]
         additional_dependencies:
           - setuptools
   - repo: https://github.com/shellcheck-py/shellcheck-py
