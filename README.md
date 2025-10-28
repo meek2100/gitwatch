@@ -16,9 +16,9 @@
     - [NixOS](#nixos)
       - [As Module](#as-module)
       - [As Package](#as-package)
-    - [Docker](#docker)
-      - [Docker Compose (Recommended)](#docker-compose-recommended)
-      - [Using the Dockerfile](#using-the-dockerfile)
+  - [Docker](#docker)
+    - [Docker Compose (Recommended)](#docker-compose-recommended)
+    - [Using the Dockerfile](#using-the-dockerfile)
   - [Requirements](#requirements)
     - [Notes for Mac](#notes-for-mac)
   - [What it does](#what-it-does)
@@ -38,7 +38,7 @@
 
 # gitwatch
 
-A bash script to watch a file or folder and commit changes to a git repo
+A Bash script to watch a file or folder and commit changes to a Git repository
 
 ## What to use it for?
 
@@ -47,11 +47,11 @@ That's really up to you, but here are some examples:
 - **config files**: some programs auto-write their config files, without
   waiting for you to click an 'Apply' button; or even if there is such a
   button, most programs offer you no way of going back to an earlier
-  version of your settings. If you commit your config file(s) to a git
-  repo, you can track changes and go back to older versions. This script
+  version of your settings. If you commit your config file(s) to a Git
+  repository, you can track changes and go back to older versions. This script
   makes it convenient, to have all changes recorded automatically.
-- **document files**: if you use an editor that does not have built-in git
-  support (or maybe if you don't like the git support it has), you can use
+- **document files**: if you use an editor that does not have built-in Git
+  support (or maybe if you don't like the Git support it has), you can use
   gitwatch to automatically commit your files when you save them, or
   combine it with the editor's auto-save feature to fully automatically and
   regularly track your changes
@@ -252,7 +252,7 @@ To run this script, you must have installed and globally available:
 
 ### Notes for Mac
 
-If running on OS X, you'll need to install the following Homebrew tools:
+If running on macOS, you'll need to install the following Homebrew tools:
 
 ```sh
 brew install fswatch
@@ -294,7 +294,7 @@ Notes:
 
 `gitwatch.sh [-r <remote> [-b <branch>]] <file or directory to watch>`
 
-It is expected that the watched file/directory are already in a git
+It is expected that the watched file/directory are already in a Git
 repository (the script will not create a repository). If a folder is being
 watched, this will be watched fully recursively; this also means that all
 files and sub-folders added and removed from the directory will always be
@@ -332,7 +332,7 @@ recommended way to call it is:
 <!-- markdownlint-restore -->
 
 The `<username>` bit should be replaced with your username or that of any
-other (non-root) user account; it only needs write-access to the git
+other (non-root) user account; it only needs write-access to the Git
 repository of the file/folder you want to watch. The ampersand (`&`) at the
 end sends the launched process into the background (this is important if
 you have other calls in `rc.local` after the mentioned line, because the
