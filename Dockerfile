@@ -10,6 +10,8 @@ RUN apk add --no-cache \
         git=2.45.4-r0 \
         inotify-tools=4.23.9.0-r0 \
         openssh=9.7_p1-r5 \
+        # NEW DEPENDENCY: 'procps' for the pgrep command used in HEALTHCHECK
+        procps \
     && mkdir -p /app \
     && chown appuser:appgroup /app
 
@@ -26,8 +28,14 @@ ENV GITWATCH_DOCKER_ENV=true
 # Switch to the non-root user
 USER appuser
 
-# Add a basic healthcheck (example: check if bash is runnable)
-HEALTHCHECK --interval=5s --timeout=3s --start-period=60s --start-interval=5s \
-  CMD bash -c "exit 0" || exit 1
+# Healthcheck: Checks if the PID file exists, the parent is running, AND the child watcher process is active.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+  CMD bash -c ' \
+    if ! test -f /tmp/gitwatch.pid; then exit 1; fi; \
+    PID=$(cat /tmp/gitwatch.pid); \
+    if ! kill -0 "$PID" 2>/dev/null; then exit 1; fi; \
+    # Simplified check: Only look for the 'inotifywait' child process
+    pgrep -P "$PID" | grep "inotifywait" >/dev/null \
+  '
 
 ENTRYPOINT ["/app/entrypoint.sh"]
