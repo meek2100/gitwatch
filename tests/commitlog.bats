@@ -24,8 +24,8 @@ load 'startup-shutdown'
     first_commit_hash=$(git log -1 --format=%H) # Get hash after wait succeeds
 
     echo "line2" >> file1.txt
-    # *** ADDED SMALL DELAY ***
-    sleep 0.2 # Give FS/Git a moment to settle before waiting
+    # *** INCREASED DELAY ***
+    sleep 0.5 # Give FS/Git a bit more time to settle before waiting
 
     # Wait for the second commit (checking that the log hash changes)
     run wait_for_git_change 20 0.5 git log -1 --format=%H
