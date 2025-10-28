@@ -626,14 +626,16 @@ diff-lines() {
 
   while IFS= read -r; do # Use IFS= to preserve leading/trailing whitespace
     local esc=$'\033' # Local variable for escape character
-    local stripped_reply="${REPLY##$color_regex}" # Remove leading color codes for easier matching
+    # *** SC2295 FIX: Quote the variable expansion ***
+    local stripped_reply="${REPLY##"$color_regex"}" # Remove leading color codes for easier matching
 
     # --- Match diff headers ---
     # Match '--- a/path' or '--- /dev/null' - Capture everything after 'a/' or '/dev/null'
     if [[ "$stripped_reply" =~ ^---\ (a/)?(.*) ]]; then
       previous_path="${BASH_REMATCH[2]}"
       # Trim trailing color codes if present (like ESC[m)
-      previous_path="${previous_path%%$esc\[m*}"
+      # *** SC2295 FIX: Quote the variable expansion ***
+      previous_path="${previous_path%%"$esc"\[m*}"
       # Trim trailing whitespace
       previous_path="${previous_path%"${previous_path##*[![:space:]]}"}"
       path="" # Reset path for new file diff
@@ -645,7 +647,8 @@ diff-lines() {
     elif [[ "$stripped_reply" =~ ^\+\+\+\ (b/)?(.*) ]]; then
       path="${BASH_REMATCH[2]}"
       # Trim trailing color codes if present
-      path="${path%%$esc\[m*}"
+      # *** SC2295 FIX: Quote the variable expansion ***
+      path="${path%%"$esc"\[m*}"
       # Trim trailing whitespace
       path="${path%"${path##*[![:space:]]}"}"
       continue
