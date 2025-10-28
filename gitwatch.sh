@@ -822,13 +822,6 @@ _perform_commit() {
   fi
   verbose_echo "Content changes detected after git add."
 
-  # Re-check status AFTER add (might be redundant now but harmless)
-  STATUS=$(bash -c "$GIT status --porcelain")
-  if [ -z "$STATUS" ]; then
-    verbose_echo "No changes staged for commit after git add (porcelain check)."
-    return 0
-  fi
-
   # Generate commit message (reflects staged changes)
   local FINAL_COMMIT_MSG
   FINAL_COMMIT_MSG=$(generate_commit_message)
