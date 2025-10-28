@@ -785,31 +785,39 @@ generate_commit_message() {
 
 # The main commit and push logic
 _perform_commit() {
-  local STATUS
-  # *** MODIFIED CHECK: Use git status --porcelain and grep for relevant changes ***
-  # Run status check *before* add to see if there are changes
-  # Grep for lines starting with M, A, D, R, C (space is important for M)
-  # Exclude lines starting with ?? (untracked files are handled by git add --all later)
-  STATUS=$(bash -c "$GIT status --porcelain" | grep '^ M\|^A\|^D\|^R\|^C') || true # || true prevents exit on no match
+  # *** NEW PURE BASH STATUS CHECK ***
+  local porcelain_output
+  porcelain_output=$(bash -c "$GIT status --porcelain")
+  local has_relevant_changes=0 # 0 = false, 1 = true
 
-  # If STATUS is empty, it means no *tracked* files were modified/added/deleted etc.
-  if [ -z "$STATUS" ]; then
-    # Check specifically for untracked files, as they should still be committed
-    local UNTRACKED_STATUS
-    UNTRACKED_STATUS=$(bash -c "$GIT status --porcelain" | grep '^??') || true
-    if [ -z "$UNTRACKED_STATUS" ]; then
-      verbose_echo "No relevant changes detected by git status."
-      return 0 # No relevant changes or untracked files
-    else
-      verbose_echo "Untracked files detected, proceeding with add/commit."
-      # Let it proceed to git add
-    fi
-  else
-    verbose_echo "Relevant changes detected by git status:"
-    verbose_echo "$STATUS"
-    # Let it proceed to git add
+  # Loop through each line of the porcelain output
+  while IFS= read -r line; do
+    # Check if the line starts with M, A, D, R, C (space is important for M) or ??
+    # Using parameter expansion for prefix checking
+    case "${line}" in
+        # Check first character for A, D, R, C, ?
+      A* | D* | R* | C* | \?*)
+        has_relevant_changes=1
+        break # Found a relevant change, no need to check further
+        ;;
+        # Check first two characters for M<space>
+      M\ *)
+        has_relevant_changes=1
+        break # Found a relevant change
+        ;;
+      *)
+        # Ignore other statuses (like ignored files !, unchanged space, etc.)
+        ;;
+    esac
+  done <<< "$porcelain_output" # Feed porcelain output to the loop
+
+  # If no relevant changes were found in the loop
+  if [[ "$has_relevant_changes" -eq 0 ]]; then
+    verbose_echo "No relevant changes detected by git status (porcelain check)."
+    return 0
   fi
-  # *** END MODIFIED CHECK ***
+  verbose_echo "Relevant changes detected by git status (porcelain check)."
+  # *** END NEW PURE BASH STATUS CHECK ***
 
   if [ "$SKIP_IF_MERGING" -eq 1 ] && is_merging; then
     verbose_echo "Skipping commit - repo is merging"
@@ -826,13 +834,15 @@ _perform_commit() {
   bash -c "$add_cmd" || { stderr "ERROR: 'git add' failed."; return 1; }
   verbose_echo "Running git add command: $add_cmd"
 
-  # Now check if anything *actually* got staged (covers content and metadata)
-  # This prevents commits if only ignored files changed or if `add` somehow failed silently.
+  # Final check: Only proceed if there are actual content changes staged
+  # `git diff --staged --quiet` exits 0 if NO changes, non-zero if changes exist
   if bash -c "$GIT diff --staged --quiet"; then
     verbose_echo "No actual changes staged for commit after git add."
+    # Optional: If files were only touched, reset the index to avoid committing metadata changes
+    # bash -c "$GIT reset" || stderr "Warning: 'git reset' failed after detecting no content changes."
     return 0
   fi
-  verbose_echo "Changes detected after git add (diff-index)."
+  verbose_echo "Content changes detected after git add (diff-index)."
 
   # Generate commit message (reflects staged changes)
   local FINAL_COMMIT_MSG
