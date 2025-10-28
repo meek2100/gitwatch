@@ -1,3 +1,4 @@
+---
 name: Execution tests
 on: [push, pull_request]
 
