@@ -486,12 +486,12 @@ fi
 # on the target directory itself ($TARGETDIR_ABS). This must run *before*
 # any attempt to run 'git rev-parse' which fails with the generic message.
 if ! [ -r "$TARGETDIR_ABS" ] || ! [ -w "$TARGETDIR_ABS" ] || ! [ -x "$TARGETDIR_ABS" ]; then
-  local CURRENT_UID
-  local CURRENT_USER
+  CURRENT_UID=""
+  CURRENT_USER=""
   CURRENT_UID=$(id -u 2>/dev/null || echo "Unknown UID")
   CURRENT_USER=$(id -n -u 2>/dev/null || echo "Unknown User")
 
-  local resolution_message=""
+  resolution_message=""
   if [ -n "${GITWATCH_DOCKER_ENV:-}" ]; then
     resolution_message=$(printf "
 Resolution required:
