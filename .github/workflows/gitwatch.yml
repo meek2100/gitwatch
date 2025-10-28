@@ -27,14 +27,14 @@ jobs:
           persist-credentials: false
 
       - name: Lint Code Base
-        uses: super-linter/super-linter@v8.2.1
+        uses: super-linter/super-linter@v8.2.1 # x-release-please-version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Tell Super-Linter to look for config files starting from the root (Step 1 from last turn)
+          # Tell Super-Linter to look for config files starting from the root
           LINTER_RULES_PATH: .
-          # Update exclude regex: remove symlink, keep tests/ and .editorconfig (Step 1 & 7)
+          # Update exclude regex: remove symlink, keep tests/ and .editorconfig
           FILTER_REGEX_EXCLUDE: (^|/)tests/|^\.editorconfig$
-          # Added VALIDATE_* variables to disable conflicting linters (Step 8)
+          # Disable potentially conflicting linters/formatters (only keep 'false' values)
           VALIDATE_PRETTIER: false
           VALIDATE_JAVASCRIPT_ES: false
           VALIDATE_TYPESCRIPT_ES: false
@@ -48,11 +48,11 @@ jobs:
           VALIDATE_PYTHON_ISORT: false
           VALIDATE_PYTHON_FLAKE8: false
           VALIDATE_PYTHON_PYLINT: false
-          # Explicitly keep Biome and Ruff enabled
-          VALIDATE_BIOME_LINT: true
-          VALIDATE_BIOME_FORMAT: true
-          VALIDATE_PYTHON_RUFF: true
-          VALIDATE_PYTHON_RUFF_FORMAT: true
+          # Removed VALIDATE_BIOME_LINT: true
+          # Removed VALIDATE_BIOME_FORMAT: true
+          # Removed VALIDATE_PYTHON_RUFF: true
+          # Removed VALIDATE_PYTHON_RUFF_FORMAT: true
+          # (Super-Linter will enable these by default when others are set to false)
 
   #-------------------------------------------------------------------------
   bats:
@@ -67,9 +67,11 @@ jobs:
     timeout-minutes: 5
 
     steps:
+      # Node setup
       - name: Setup node
         uses: actions/setup-node@v4
 
+      # BATS install via npm
       - name: Setup BATS (bats-core via npm)
         run: sudo npm install -g bats # This should install bats-core
 
