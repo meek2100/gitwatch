@@ -5,13 +5,14 @@ load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'
 load 'test_helper/bats-file/load'
 # Load custom helpers
-load 'test_helper/custom_helpers.bash'
+load 'test_helper/custom_helpers'
 
 # Define the custom cleanup logic specific to this file
 # Use standard echo to output debug info to avoid relying on bats-support inside teardown
 _remotedirs_cleanup() {
   echo "# Running custom cleanup for remotedirs" >&3
-  if [ -n "${dotgittestdir:-}" ] && [ -d "$dotgittestdir" ]; then
+  if [ -n "${dotgittestdir:-}" ] && [ -d "$dotgittestdir" ];
+then
     echo "# Removing external git dir: $dotgittestdir" >&3
     rm -rf "$dotgittestdir"
   fi
@@ -33,14 +34,13 @@ teardown() {
 
 @test "remote_git_dirs_working_with_commit_logging: -g flag works with external .git dir" {
     dotgittestdir=$(mktemp -d)
-    run mv "$testdir/local/remote/.git" "$dotgittestdir/"
+    run mv "$testdir/local/$TEST_SUBDIR_NAME/.git" "$dotgittestdir/"
     assert_success
 
     # Start gitwatch directly in the background
-    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 -g "$dotgittestdir/.git" "$testdir/local/remote" &
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 -g "$dotgittestdir/.git" "$testdir/local/$TEST_SUBDIR_NAME" &
     GITWATCH_PID=$!
-
-    cd "$testdir/local/remote"
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
     sleep 1
     echo "line1" >> file1.txt
 
@@ -58,7 +58,7 @@ teardown() {
 
     # Verify that new commit hash is different
     local currentcommit=$(git --git-dir="$dotgittestdir/.git" log -1 --format=%H)
-    refute_equal "$lastcommit" "$currentcommit" "Commit hash should be different after second change"
+    assert_not_equal "$lastcommit" "$currentcommit" "Commit hash should be different after second change"
 
     # Verify commit message content
     run git --git-dir="$dotgittestdir/.git" log -1 --pretty=%B

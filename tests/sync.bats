@@ -5,16 +5,15 @@ load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'
 load 'test_helper/bats-file/load'
 # Load custom helpers
-load 'test_helper/custom_helpers.bash'
+load 'test_helper/custom_helpers'
 # Load setup/teardown
 load 'startup-shutdown'
 
 @test "syncing_correctly: Commits and pushes adds, subdir adds, and removals" {
     # Start gitwatch directly in the background
-    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin "$testdir/local/remote" &
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin "$testdir/local/$TEST_SUBDIR_NAME" &
     GITWATCH_PID=$!
-
-    cd "$testdir/local/remote"
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
 
     # --- Test 1: Add initial file ---
     sleep 1
@@ -47,17 +46,18 @@ load 'startup-shutdown'
     run git rev-parse master
     assert_success "Git rev-parse master failed after file2 add"
     local commit2=$output
-    refute_equal "$lastcommit" "$commit2" "Commit after adding file2 in subdir failed"
+    assert_not_equal "$lastcommit" "$commit2" "Commit after adding file2 in subdir failed"
 
     run git rev-parse origin/master
     assert_success "Git rev-parse origin/master failed after file2 add"
     local remote_commit2=$output
     assert_equal "$commit2" "$remote_commit2" "Push after adding file2 failed"
-    refute_equal "$lastremotecommit" "$remote_commit2" "Remote commit hash did not change after file2 add"
+    assert_not_equal "$lastremotecommit" "$remote_commit2" "Remote commit hash did not change after file2 add"
 
 
     # --- Test 3: Remove file and directory ---
     lastcommit=$commit2
+
     lastremotecommit=$remote_commit2
     run rm subdir/file2.txt
     assert_success "rm subdir/file2.txt failed"
@@ -81,10 +81,10 @@ load 'startup-shutdown'
     assert_success "Git rev-parse origin/master failed after removal"
     local remote_commit3=$output
     assert_equal "$commit3" "$remote_commit3" "Push after removing file/subdir failed"
-    refute_equal "$lastremotecommit" "$remote_commit3" "Remote commit hash did not change after removal"
+    assert_not_equal "$lastremotecommit" "$remote_commit3" "Remote commit hash did not change after removal"
 
     # Explicitly check that a new commit *did* happen locally
-    refute_equal "$lastcommit" "$commit3" "Local commit hash did not change after removal"
+    assert_not_equal "$lastcommit" "$commit3" "Local commit hash did not change after removal"
 
     # Verify the file and directory are indeed gone locally
     refute_file_exist "subdir/file2.txt"
