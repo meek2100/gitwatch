@@ -664,6 +664,9 @@ diff-lines() {
       # Apply width limit *after* capturing full content
       local display_content=${content:0:150}
 
+      # *** ADDED DEBUG LINE ***
+      stderr "DEBUG: path='$path', line='$line', previous_path='$previous_path'"
+
       if [[ "$path" == "/dev/null" ]] && [[ "$previous_path" != "/dev/null" ]]; then # File deleted
         # Use previous_path when path is /dev/null
         echo "$previous_path:?: File deleted or moved."
