@@ -621,11 +621,11 @@ diff-lines() {
   local path=""
   local line=""
   local previous_path=""
+  local esc=$'\033' # Local variable for escape character, accessible in regexes
   # Regex to match optional color codes at the start of a line
-  local color_regex="^($'\033'\[[0-9;]+m)*"
+  local color_regex="^($esc\[[0-9;]+m)*"
 
   while IFS= read -r; do # Use IFS= to preserve leading/trailing whitespace
-    local esc=$'\033' # Local variable for escape character
     # *** SC2295 FIX: Quote the variable expansion ***
     local stripped_reply="${REPLY##"$color_regex"}" # Remove leading color codes for easier matching
 
@@ -656,7 +656,7 @@ diff-lines() {
       if [[ "$path" == "/dev/null" ]]; then path=""; fi
       continue
       # --- Match hunk header ---
-      # *** ADJUSTED REGEX for Hunk Header (@@ ... @@) to handle color codes ***
+      # Use REPLY to match the whole line including potential start/end color codes
     elif [[ "$REPLY" =~ ^($esc\[[0-9;]+m)*@@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@ ]]; then
       # Capture line number from BASH_REMATCH[3] (group after potential leading color code)
       line=${BASH_REMATCH[3]:-1} # Set starting line number for additions, default to 1 if not captured
@@ -668,9 +668,6 @@ diff-lines() {
       local content=${BASH_REMATCH[3]}
       # Apply width limit *after* capturing full content
       local display_content=${content:0:150}
-
-      # *** ADDED DEBUG LINE ***
-      stderr "DEBUG: path='$path', line='$line', previous_path='$previous_path'"
 
       if [[ "$path" == "/dev/null" ]] && [[ "$previous_path" != "/dev/null" ]]; then # File deleted
         # Use previous_path when path is /dev/null
@@ -804,29 +801,35 @@ _perform_commit() {
     return 0
   fi
 
-  # *** REVERTED git add LOGIC ***
+  # Add changes
   local add_cmd
-  # Check if we are watching a single file or a directory
   if [ -n "${TARGETFILE_ABS:-}" ]; then
-    # Watching a single file: explicitly add just that file
     add_cmd=$(printf "%s add %q" "$GIT" "$TARGETFILE_ABS")
   else
-    # Watching a directory: add all changes in current dir (.) using --all
-    add_cmd=$(printf "%s add --all ." "$GIT") # <-- Reverted to --all .
+    add_cmd=$(printf "%s add --all ." "$GIT")
   fi
   bash -c "$add_cmd" || { stderr "ERROR: 'git add' failed."; return 1; }
   verbose_echo "Running git add command: $add_cmd"
-  # *** End REVERTED git add LOGIC ***
 
-  # Re-check status AFTER add to ensure something was actually staged
-  # Use --porcelain for stable, scriptable output. It shows staged changes.
+  # *** ADDED CHECK: Only proceed if there are actual content changes staged ***
+  # `git diff --staged --quiet` exits 0 if NO changes, non-zero if changes exist
+  if bash -c "$GIT diff --staged --quiet"; then
+    verbose_echo "No actual content changes staged for commit after git add."
+    # Optional: If you *want* to commit mode changes etc., remove this block.
+    # If files were only touched, reset the index to avoid committing metadata changes
+    # bash -c "$GIT reset" || stderr "Warning: 'git reset' failed after detecting no content changes."
+    return 0
+  fi
+  verbose_echo "Content changes detected after git add."
+
+  # Re-check status AFTER add (might be redundant now but harmless)
   STATUS=$(bash -c "$GIT status --porcelain")
   if [ -z "$STATUS" ]; then
-    verbose_echo "No changes staged for commit after git add."
+    verbose_echo "No changes staged for commit after git add (porcelain check)."
     return 0
   fi
 
-  # Generate commit message (moved after add, so diffs reflect staged changes)
+  # Generate commit message (reflects staged changes)
   local FINAL_COMMIT_MSG
   FINAL_COMMIT_MSG=$(generate_commit_message)
 
@@ -835,30 +838,27 @@ _perform_commit() {
     FINAL_COMMIT_MSG="Auto-commit: Changes detected"
   fi
 
-  # Use bash -c "$GIT commit ..."
+  # Commit
   local commit_cmd
-  # GIT_COMMIT_ARGS is usually empty, add if needed
-  # Ensure FINAL_COMMIT_MSG is quoted correctly for the subshell
   commit_cmd=$(printf "%s commit %s -m %q" "$GIT" "$GIT_COMMIT_ARGS" "$FINAL_COMMIT_MSG")
   bash -c "$commit_cmd" || { stderr "ERROR: 'git commit' failed."; return 1; }
   verbose_echo "Running git commit command: $commit_cmd"
 
-
+  # Pull (if enabled)
   if [ -n "$PULL_CMD" ]; then
     verbose_echo "Executing pull command: $PULL_CMD"
-    # --- Keep STRICT error checking ---
     if ! bash -c "$PULL_CMD"; then
       stderr "ERROR: 'git pull' failed. Skipping push."
-      return 1 # Abort this commit/push
+      return 1 # Abort
     fi
-    # --- End STRICT error checking ---
   fi
 
+  # Push (if enabled)
   if [ -n "$PUSH_CMD" ]; then
     verbose_echo "Executing push command: $PUSH_CMD"
     if ! bash -c "$PUSH_CMD"; then
       stderr "ERROR: 'git push' failed."
-      return 1 # Report push failure
+      return 1 # Report failure
     fi
   fi
   return 0
