@@ -15,33 +15,51 @@ jobs:
     name: Lint Code Base
     if: "! contains(github.event.head_commit.message, '#noaction')"
     runs-on: ubuntu-latest
-    permissions:
+    permissions: # Added permissions block (Step 4B)
       contents: read
       packages: read
-      # Required to report GitHub Actions status checks
       statuses: write
     steps:
       - name: Checkout code
-        # Use the new Super-Linter action path and latest version
         uses: actions/checkout@v5
         with:
-          # Super-Linter needs the full git history
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: false # Added persist-credentials (Step 4A)
 
       - name: Lint Code Base
-        # Use the new Super-Linter action path and latest version
         uses: super-linter/super-linter@v8.2.1 # x-release-please-version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Exclude the tests/ directory and the problematic symlink
-          # based on your previous comments.
-          FILTER_REGEX_EXCLUDE: (^|/)tests/|^\.github/linters/\.markdown-lint\.yml$
+          # Tell Super-Linter to look for config files starting from the root (Step 1 from last turn)
+          LINTER_RULES_PATH: .
+          # Update exclude regex: remove symlink, keep tests/ and .editorconfig (Step 1 & 7)
+          FILTER_REGEX_EXCLUDE: (^|/)tests/|^\.editorconfig$
+          # Added VALIDATE_* variables to disable conflicting linters (Step 8)
+          VALIDATE_PRETTIER: false
+          VALIDATE_JAVASCRIPT_ES: false
+          VALIDATE_TYPESCRIPT_ES: false
+          VALIDATE_CSS: false
+          VALIDATE_JSON: false
+          VALIDATE_JSONC: false
+          VALIDATE_JSX: false
+          VALIDATE_TSX: false
+          VALIDATE_VUE: false
+          VALIDATE_PYTHON_BLACK: false
+          VALIDATE_PYTHON_ISORT: false
+          VALIDATE_PYTHON_FLAKE8: false
+          VALIDATE_PYTHON_PYLINT: false
+          # Explicitly keep Biome and Ruff enabled
+          VALIDATE_BIOME_LINT: true
+          VALIDATE_BIOME_FORMAT: true
+          VALIDATE_PYTHON_RUFF: true
+          VALIDATE_PYTHON_RUFF_FORMAT: true
 
   #-------------------------------------------------------------------------
   bats:
     name: BATS Tests
     if: "! contains(github.event.head_commit.message, '#noaction')"
+    permissions: # Added permissions block (Step 4B)
+      contents: read
     strategy:
       matrix:
         os: [ubuntu-latest, macOS-latest]
@@ -73,10 +91,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
-          # Explicitly set submodules: true (or recursive if needed)
-          # to ensure they are checked out along with the main repo.
           submodules: true
           fetch-depth: 0
+          persist-credentials: false # Added persist-credentials (Step 4A)
 
       # - name: Setup upterm session # Preserved commented-out step
       #   uses: lhotari/action-upterm@v1

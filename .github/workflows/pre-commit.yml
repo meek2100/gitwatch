@@ -6,6 +6,8 @@ on:
 jobs:
   pre-commit:
     runs-on: ubuntu-latest
+    permissions: # Added permissions block (Step 4B)
+      contents: read
     env:
       RAW_LOG: pre-commit.log
       SKIP: no-commit-to-branch
@@ -13,6 +15,8 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install cppcheck
         if: false
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false # Added persist-credentials (Step 4A)
       - uses: actions/setup-python@v5
         if: false
         with:
@@ -47,7 +51,7 @@ jobs:
         if: ${{ ! cancelled() }}
         with:
           name: precommit-logs
-          path: |
-            ${{ env.RAW_LOG }}
-            ${{ env.CS_XML }}
+          path: | # Quoted paths (Step 5)
+            "${{ env.RAW_LOG }}"
+            "${{ env.CS_XML }}"
           retention-days: 2

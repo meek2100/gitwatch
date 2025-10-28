@@ -626,7 +626,7 @@ diff-lines() {
   local color_regex="^($esc\[[0-9;]+m)*"
 
   while IFS= read -r; do # Use IFS= to preserve leading/trailing whitespace
-    # *** SC2295 FIX: Quote the variable expansion ***
+    # *** Insert SC Number FIX: Quote the variable expansion ***
     local stripped_reply="${REPLY##"$color_regex"}" # Remove leading color codes for easier matching
 
     # --- Match diff headers ---
