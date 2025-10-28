@@ -786,15 +786,30 @@ generate_commit_message() {
 # The main commit and push logic
 _perform_commit() {
   local STATUS
+  # *** MODIFIED CHECK: Use git status --porcelain and grep for relevant changes ***
   # Run status check *before* add to see if there are changes
-  STATUS=$(bash -c "$GIT status -s")
+  # Grep for lines starting with M, A, D, R, C (space is important for M)
+  # Exclude lines starting with ?? (untracked files are handled by git add --all later)
+  STATUS=$(bash -c "$GIT status --porcelain" | grep '^ M\|^A\|^D\|^R\|^C') || true # || true prevents exit on no match
 
+  # If STATUS is empty, it means no *tracked* files were modified/added/deleted etc.
   if [ -z "$STATUS" ]; then
-    verbose_echo "No tracked changes detected by git status."
-    return 0
+    # Check specifically for untracked files, as they should still be committed
+    local UNTRACKED_STATUS
+    UNTRACKED_STATUS=$(bash -c "$GIT status --porcelain" | grep '^??') || true
+    if [ -z "$UNTRACKED_STATUS" ]; then
+      verbose_echo "No relevant changes detected by git status."
+      return 0 # No relevant changes or untracked files
+    else
+      verbose_echo "Untracked files detected, proceeding with add/commit."
+      # Let it proceed to git add
+    fi
+  else
+    verbose_echo "Relevant changes detected by git status:"
+    verbose_echo "$STATUS"
+    # Let it proceed to git add
   fi
-
-  verbose_echo "Tracked changes detected by git status."
+  # *** END MODIFIED CHECK ***
 
   if [ "$SKIP_IF_MERGING" -eq 1 ] && is_merging; then
     verbose_echo "Skipping commit - repo is merging"
@@ -811,16 +826,13 @@ _perform_commit() {
   bash -c "$add_cmd" || { stderr "ERROR: 'git add' failed."; return 1; }
   verbose_echo "Running git add command: $add_cmd"
 
-  # *** ADDED CHECK: Only proceed if there are actual content changes staged ***
-  # `git diff --staged --quiet` exits 0 if NO changes, non-zero if changes exist
+  # Now check if anything *actually* got staged (covers content and metadata)
+  # This prevents commits if only ignored files changed or if `add` somehow failed silently.
   if bash -c "$GIT diff --staged --quiet"; then
-    verbose_echo "No actual content changes staged for commit after git add."
-    # Optional: If you *want* to commit mode changes etc., remove this block.
-    # If files were only touched, reset the index to avoid committing metadata changes
-    # bash -c "$GIT reset" || stderr "Warning: 'git reset' failed after detecting no content changes."
+    verbose_echo "No actual changes staged for commit after git add."
     return 0
   fi
-  verbose_echo "Content changes detected after git add."
+  verbose_echo "Changes detected after git add (diff-index)."
 
   # Generate commit message (reflects staged changes)
   local FINAL_COMMIT_MSG
