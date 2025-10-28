@@ -7,7 +7,7 @@
     "indentWidth": 2,
     "lineWidth": 80,
     "lineEnding": "lf",
-    "insertFinalNewline": true // Tell Biome to add a final newline
+    "insertFinalNewline": true
   },
   "linter": {
     "enabled": true
@@ -20,7 +20,7 @@
   },
   "json": {
     "formatter": {
-      "trailingCommas": "none" // Biome default, aligns with Prettier
+      "trailingCommas": "none"
     }
   }
 }
