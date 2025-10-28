@@ -20,7 +20,7 @@
   },
   "json": {
     "formatter": {
-        "trailingCommas": "none" // Biome default, aligns with Prettier
+      "trailingCommas": "none" // Biome default, aligns with Prettier
     }
   }
 }
