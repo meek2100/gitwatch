@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
 
-permissions: {} # Added top-level permissions
+permissions: {}
 
 jobs:
   pre-commit:

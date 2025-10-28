@@ -246,7 +246,7 @@ path to the Git repository you want to watch.
 
 To run this script, you must have installed and globally available:
 
-- `git` ([git/git](https://github.com/git/git) |
+- `git` (**Git**) ([git/git](https://github.com/git/git) |
   [git-scm](http://www.git-scm.com))
 - `inotifywait` (part of
   **[inotify-tools](https://github.com/rvoicilas/inotify-tools)**)
