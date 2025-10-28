@@ -4,7 +4,6 @@
 set -e
 
 # --- Environment Variable Configuration with Defaults ---
-
 # Target directory to watch
 GIT_WATCH_DIR=${GIT_WATCH_DIR:-/app/watched-repo}
 
@@ -26,7 +25,20 @@ SKIP_IF_MERGING=${SKIP_IF_MERGING:-false}
 VERBOSE=${VERBOSE:-false}
 COMMIT_ON_START=${COMMIT_ON_START:-false}
 
-# --- Command Construction ---
+# --- NEW: Cleanup Function (Called on EXIT or signal) ---
+# This ensures we remove the PID file on shutdown and gracefully stop gitwatch
+cleanup_pid() {
+  if [ -f /tmp/gitwatch.pid ]; then
+    # Try to gracefully terminate the running gitwatch process
+    if kill -0 "$(cat /tmp/gitwatch.pid)" 2>/dev/null; then
+        kill "$(cat /tmp/gitwatch.pid)" 2>/dev/null || true
+    fi
+    rm /tmp/gitwatch.pid
+  fi
+}
+trap cleanup_pid EXIT INT TERM
+
+# --- Command Construction (Same as before) ---
 
 # Use a bash array to safely build the command and its arguments
 cmd=( "/app/gitwatch.sh" )
@@ -38,7 +50,7 @@ cmd+=( -s "${SLEEP_TIME}" )
 cmd+=( -m "${COMMIT_MSG}" )
 cmd+=( -d "${DATE_FMT}" )
 
-# --- Convert User-Friendly Exclude Pattern to Regex ---
+# --- Convert User-Friendly Exclude Pattern to Regex (Same as before) ---
 if [ -n "${USER_EXCLUDE_PATTERN}" ]; then
   # 1. Replace commas with spaces to treat as separate words.
   PATTERNS_AS_WORDS=${USER_EXCLUDE_PATTERN//,/ }
@@ -81,13 +93,33 @@ fi
 # The final argument is the directory to watch
 cmd+=( "${GIT_WATCH_DIR}" )
 
-# --- Execution ---
+# --- NEW: Execution Logic for Healthcheck Compatibility ---
 
 echo "Starting gitwatch with the following arguments:"
-# Use printf with %q to safely quote the arguments for display
 printf "%q " "${cmd[@]}"
 echo # Add a newline for cleaner logging
 echo "-------------------------------------------------"
 
-# Use exec to replace the current shell process with gitwatch
-exec "${cmd[@]}"
+# 1. Run gitwatch.sh in the background.
+"${cmd[@]}" > /dev/stdout 2> /dev/stderr &
+GITWATCH_PID=$!
+
+# 2. Wait briefly for gitwatch to crash on startup (e.g., due to permission error/exit 7).
+# This gives it time to fail immediately before creating the PID file.
+sleep 1
+
+# 3. Check if the process is still running after the initial startup phase
+if kill -0 "$GITWATCH_PID" 2>/dev/null; then
+    # Application started successfully. Store PID for HEALTHCHECK.
+    echo "gitwatch.sh started successfully (PID: $GITWATCH_PID). Monitoring PID."
+    echo "$GITWATCH_PID" > /tmp/gitwatch.pid # Store PID for HEALTHCHECK
+else
+    # Application crashed immediately. The PID file is not created, causing HEALTHCHECK to fail.
+    echo "gitwatch.sh failed to start immediately (PID: $GITWATCH_PID). HEALTHCHECK will report failure."
+fi
+
+# 4. The container must stay alive for the healthcheck to run. Block indefinitely.
+echo "Container remains running for health check evaluation."
+# This is now the main foreground process, keeping the container alive.
+# This prevents the container from stopping when gitwatch.sh runs in the background.
+tail -f /dev/null
