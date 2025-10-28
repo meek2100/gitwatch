@@ -7,7 +7,7 @@ load 'test_helper/bats-file/load'
 # Load custom helpers
 load 'test_helper/custom_helpers'
 # Load setup/teardown specific for paths with spaces
-load 'startup-shutdown.bash' # Load the combined file
+load 'startup-shutdown'
 
 # Override the default setup for this test file
 setup() {
@@ -17,22 +17,27 @@ setup() {
 @test "spaces_in_target_dir: Handles paths with spaces correctly" {
     # Start gitwatch directly in the background - paths need careful quoting
     # BATS_TEST_DIRNAME should handle spaces if the script itself is in such a path
-    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 "$testdir/local/rem with spaces" &
+    # Use the TEST_SUBDIR_NAME variable defined in startup-shutdown.bash
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
     GITWATCH_PID=$!
-    debug "Testdir with spaces: $testdir"
+    # *** Replaced debug with echo >&3 ***
+    echo "# Testdir with spaces: $testdir" >&3
+    echo "# Local clone dir: $testdir/local/$TEST_SUBDIR_NAME" >&3
 
-    cd "$testdir/local/rem with spaces" # cd into the directory with spaces
+    cd "$testdir/local/$TEST_SUBDIR_NAME" # cd into the directory with spaces
     sleep 1
     echo "line1" >> "file with space.txt" # Modify file with space
 
     # Wait for first commit hash to appear/change
     wait_for_git_change 20 0.5 git log -1 --format=%H
+    assert_success "First commit timed out"
     local first_commit_hash=$(git log -1 --format=%H)
 
     echo "line2" >> "file with space.txt"
 
     # Wait for second commit (checking that the hash changes)
     wait_for_git_change 20 0.5 git log -1 --format=%H
+    assert_success "Second commit timed out"
 
     # Verify commit message content
     run git log -1 --pretty=%B
