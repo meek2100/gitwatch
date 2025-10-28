@@ -643,14 +643,18 @@ diff-lines() {
       # Handle the /dev/null case specifically for path variable
       if [[ "$stripped_reply" =~ ^---\ /dev/null ]]; then previous_path="/dev/null"; fi
       continue
-      # Match '+++ b/path' - Capture everything after 'b/'
-    elif [[ "$stripped_reply" =~ ^\+\+\+\ (b/)?(.*) ]]; then
-      path="${BASH_REMATCH[2]}"
-      # Trim trailing color codes if present
+      # *** ADJUSTED REGEX for +++ line ***
+      # Match '+++ b/path' - Capture everything after 'b/' using REPLY to handle potential leading color codes
+    elif [[ "$REPLY" =~ ^($esc\[[0-9;]+m)*\+\+\+\ (b/)?(.*) ]]; then
+      # Capture from BASH_REMATCH[3] which is after potential color codes and header
+      path="${BASH_REMATCH[3]}"
+      # Trim trailing color codes if present (like ESC[m\t)
       # *** SC2295 FIX: Quote the variable expansion ***
       path="${path%%"$esc"\[m*}"
-      # Trim trailing whitespace
+      # Trim trailing whitespace, including potential tabs
       path="${path%"${path##*[![:space:]]}"}"
+      # Ensure /dev/null isn't captured as a real path here (though unlikely for +++)
+      if [[ "$path" == "/dev/null" ]]; then path=""; fi
       continue
       # --- Match hunk header ---
     elif [[ "$stripped_reply" =~ ^@@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@ ]]; then
