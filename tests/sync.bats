@@ -87,8 +87,8 @@ load 'startup-shutdown'
     assert_not_equal "$lastcommit" "$commit3" "Local commit hash did not change after removal"
 
     # Verify the file and directory are indeed gone locally
-    refute_file_exist "subdir/file2.txt"
-    refute_file_exist "subdir"
+    assert_file_not_exists "subdir/file2.txt"
+    assert_dir_not_exists "subdir"
 
     cd /tmp
 }
