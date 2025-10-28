@@ -15,26 +15,28 @@ jobs:
     name: Lint Code Base
     if: "! contains(github.event.head_commit.message, '#noaction')"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      # Required to report GitHub Actions status checks
+      statuses: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        # Use the new Super-Linter action path and latest version
+        uses: actions/checkout@v5
         with:
+          # Super-Linter needs the full git history
           fetch-depth: 0
-    # For the time being, I'm giving up on Super Linter. It's a great tool,
-    # but it's currently broken, and it's taking more time to make it work than
-    # it's worth.
-    # - name: Lint Code Base
-    #   uses: github/super-linter@v4
-    #   env:
-    #     DEFAULT_BRANCH: master
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    #     # Linter is having errors at symbolic link, appears to be
-    #     # this bug:
-    #     # https://github.com/github/super-linter/issues/1400
-    #     # https://github.com/kucherenko/jscpd/issues/481
-    #     # Test files are bats files, which don't follow bash standards
-    #     # FILTER_REGEX_EXCLUDE: \.github/linters/\.markdown-lint.yml | tests\.*
-    #     # FILTER_REGEX_EXCLUDE: tests\.*
+          persist-credentials: false
+
+      - name: Lint Code Base
+        # Use the new Super-Linter action path and latest version
+        uses: super-linter/super-linter@v8.2.1 # x-release-please-version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Exclude the tests/ directory and the problematic symlink
+          # based on your previous comments.
+          FILTER_REGEX_EXCLUDE: (^|/)tests/|^\.github/linters/\.markdown-lint\.yml$
 
   #-------------------------------------------------------------------------
   bats:
@@ -69,7 +71,7 @@ jobs:
           fi
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Explicitly set submodules: true (or recursive if needed)
           # to ensure they are checked out along with the main repo.
