@@ -31,7 +31,7 @@ cleanup_pid() {
   if [ -f /tmp/gitwatch.pid ]; then
     # Try to gracefully terminate the running gitwatch process
     if kill -0 "$(cat /tmp/gitwatch.pid)" 2>/dev/null; then
-        kill "$(cat /tmp/gitwatch.pid)" 2>/dev/null || true
+      kill "$(cat /tmp/gitwatch.pid)" 2>/dev/null || true
     fi
     rm /tmp/gitwatch.pid
   fi
@@ -110,12 +110,12 @@ sleep 1
 
 # 3. Check if the process is still running after the initial startup phase
 if kill -0 "$GITWATCH_PID" 2>/dev/null; then
-    # Application started successfully. Store PID for HEALTHCHECK.
-    echo "gitwatch.sh started successfully (PID: $GITWATCH_PID). Monitoring PID."
-    echo "$GITWATCH_PID" > /tmp/gitwatch.pid # Store PID for HEALTHCHECK
+  # Application started successfully. Store PID for HEALTHCHECK.
+  echo "gitwatch.sh started successfully (PID: $GITWATCH_PID). Monitoring PID."
+  echo "$GITWATCH_PID" > /tmp/gitwatch.pid # Store PID for HEALTHCHECK
 else
-    # Application crashed immediately. The PID file is not created, causing HEALTHCHECK to fail.
-    echo "gitwatch.sh failed to start immediately (PID: $GITWATCH_PID). HEALTHCHECK will report failure."
+  # Application crashed immediately. The PID file is not created, causing HEALTHCHECK to fail.
+  echo "gitwatch.sh failed to start immediately (PID: $GITWATCH_PID). HEALTHCHECK will report failure."
 fi
 
 # 4. The container must stay alive for the healthcheck to run. Block indefinitely.
