@@ -38,7 +38,8 @@
 
 # gitwatch
 
-A Bash script to watch a file or folder and commit changes to a Git repository
+A Bash script to watch a file or folder and commit changes to a Git
+repository
 
 ## What to use it for?
 
@@ -48,8 +49,8 @@ That's really up to you, but here are some examples:
   waiting for you to click an 'Apply' button; or even if there is such a
   button, most programs offer you no way of going back to an earlier
   version of your settings. If you commit your config file(s) to a Git
-  repository, you can track changes and go back to older versions. This script
-  makes it convenient, to have all changes recorded automatically.
+  repository, you can track changes and go back to older versions. This
+  script makes it convenient, to have all changes recorded automatically.
 - **document files**: if you use an editor that does not have built-in Git
   support (or maybe if you don't like the Git support it has), you can use
   gitwatch to automatically commit your files when you save them, or
