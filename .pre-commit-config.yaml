@@ -61,14 +61,14 @@ repos:
       - id: yamllint
         args:
           - --no-warnings
-          # Updated rule: Keep line-length, disable braces rule
+          # Correctly quoted rule string disabling braces and setting line length
           - "-d {extends: relaxed, rules: {line-length: {max: 90}, braces: disable}}"
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:
       - id: codespell
         # exclude: (\.md|apps.yaml|translations/.*.yaml)$
-  # Disabled the docker-compose check previously
+  # Disabled docker-compose check
   # - repo: https://github.com/IamTheFij/docker-pre-commit
   #   rev: v3.0.1
   #   hooks:
