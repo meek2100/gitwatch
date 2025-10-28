@@ -19,27 +19,28 @@ then
 }
 
 # Load the base setup/teardown AFTER defining the custom helper
+# This file now contains _common_teardown() and a default teardown() wrapper
 load 'startup-shutdown'
-# The original teardown() is now defined.
-# Copy the original teardown function to a new name
-# This must happen AFTER loading startup-shutdown and BEFORE overriding teardown again.
-eval "$(declare -f teardown | sed 's/teardown/original_teardown/')"
 
-# Define the final teardown override that calls both parts
+# Define the final teardown override that calls both the custom
+# cleanup for this file and the common teardown logic.
 teardown() {
   _remotedirs_cleanup # Call custom part first
-  original_teardown   # Then call the original part
+  _common_teardown    # Then call the common part directly from the loaded file
 }
 
 
 @test "remote_git_dirs_working_with_commit_logging: -g flag works with external .git dir" {
     dotgittestdir=$(mktemp -d)
+    # Use the TEST_SUBDIR_NAME variable defined in startup-shutdown.bash
     run mv "$testdir/local/$TEST_SUBDIR_NAME/.git" "$dotgittestdir/"
     assert_success
 
     # Start gitwatch directly in the background
+    # Use the TEST_SUBDIR_NAME variable defined in startup-shutdown.bash
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 -g "$dotgittestdir/.git" "$testdir/local/$TEST_SUBDIR_NAME" &
     GITWATCH_PID=$!
+    # Use the TEST_SUBDIR_NAME variable defined in startup-shutdown.bash
     cd "$testdir/local/$TEST_SUBDIR_NAME"
     sleep 1
     echo "line1" >> file1.txt
