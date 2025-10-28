@@ -80,8 +80,6 @@ repos:
         args: ["-i", "2"]
         additional_dependencies:
           - setuptools
-        env:
-          PYTHONIOENCODING: utf-8
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.10.0.1
     hooks:
