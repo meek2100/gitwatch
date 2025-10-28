@@ -788,35 +788,12 @@ _perform_commit() {
   # *** NEW PURE BASH STATUS CHECK ***
   local porcelain_output
   porcelain_output=$(bash -c "$GIT status --porcelain")
-  local has_relevant_changes=0 # 0 = false, 1 = true
 
-  # Loop through each line of the porcelain output
-  while IFS= read -r line; do
-    # Check if the line starts with M, A, D, R, C (space is important for M) or ??
-    # Using parameter expansion for prefix checking
-    case "${line}" in
-        # Check first character for A, D, R, C, ?
-      A* | D* | R* | C* | \?*)
-        has_relevant_changes=1
-        break # Found a relevant change, no need to check further
-        ;;
-        # Check first two characters for M<space>
-      M\ *)
-        has_relevant_changes=1
-        break # Found a relevant change
-        ;;
-      *)
-        # Ignore other statuses (like ignored files !, unchanged space, etc.)
-        ;;
-    esac
-  done <<< "$porcelain_output" # Feed porcelain output to the loop
-
-  # If no relevant changes were found in the loop
-  if [[ "$has_relevant_changes" -eq 0 ]]; then
+  if [ -z "$porcelain_output" ]; then
     verbose_echo "No relevant changes detected by git status (porcelain check)."
     return 0
   fi
-  verbose_echo "Relevant changes detected by git status (porcelain check)."
+  verbose_echo "Relevant changes detected by git status (porcelain check): $porcelain_output"
   # *** END NEW PURE BASH STATUS CHECK ***
 
   if [ "$SKIP_IF_MERGING" -eq 1 ] && is_merging; then
