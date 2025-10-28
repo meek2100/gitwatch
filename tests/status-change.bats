@@ -12,23 +12,25 @@ load 'startup-shutdown'
 @test "commit_only_when_git_status_change: Does not commit if only timestamp changes (touch)" {
     local output_file
     output_file=$(mktemp "$testdir/output.XXXXX")
-    # Start gitwatch directly in the background
-    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/remote" > "$output_file" 2>&1 &
+    # Start gitwatch directly in the background, redirecting output
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
     GITWATCH_PID=$!
-
-    cd "$testdir/local/remote"
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
     sleep 1
     echo "line1" >> file1.txt
 
-    # Wait for the first (allowed) commit
-    wait_for_git_change 20 0.5 git log -1 --format=%H
+    # *** Use 'run' explicitly before wait_for_git_change ***
+    run wait_for_git_change 20 0.5 git log -1 --format=%H
     assert_success "First commit failed to appear"
-    local first_commit_hash=$(git log -1 --format=%H)
+    # Now get the hash *after* the wait succeeded
+    local first_commit_hash
+    first_commit_hash=$(git log -1 --format=%H)
 
     # Touch the file (changes timestamp but not content recognized by git status)
     touch file1.txt
     # This is a negative test: wait to ensure a commit *does not* happen
     sleep "$WAITTIME" # Use WAITTIME from setup
+
 
     # Verify commit hash has NOT changed
     run git log -1 --format=%H
@@ -38,8 +40,7 @@ load 'startup-shutdown'
 
     # Verify verbose output indicates no changes were detected
     run cat "$output_file"
-    assert_output --partial "No tracked changes detected."
-
+    assert_output --partial "No tracked changes detected by git status."
     # Verify only one commit command was run
     local commit_count
     # Count lines containing "Running git commit command:" in the log
