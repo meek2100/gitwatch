@@ -20,7 +20,7 @@ load 'startup-shutdown'
     echo "line1" >> file1.txt
 
     # Wait for commit+push (wait for remote ref to update)
-    wait_for_git_change 20 0.5 git rev-parse origin/master
+    run wait_for_git_change 20 0.5 git rev-parse origin/master
     assert_success "Git rev-parse origin/master failed after file1 add"
 
     run git rev-parse master
@@ -40,10 +40,10 @@ load 'startup-shutdown'
     cd .. # Back to repo root
 
     # Wait for commit+push (by checking that remote hash has changed)
-    wait_for_git_change 20 0.5 git rev-parse origin/master
+    run wait_for_git_change 20 0.5 git rev-parse origin/master
     assert_success "Push after adding file2 failed to appear on remote (timeout)"
 
-    run git rev-parse master
+     run git rev-parse master
     assert_success "Git rev-parse master failed after file2 add"
     local commit2=$output
     assert_not_equal "$lastcommit" "$commit2" "Commit after adding file2 in subdir failed"
@@ -66,7 +66,7 @@ load 'startup-shutdown'
     assert_success "rmdir subdir failed"
 
     # Wait for potential commit+push for removal (by checking that remote hash has changed again)
-    wait_for_git_change 20 1 git rev-parse origin/master # Slightly longer delay after removal
+    run wait_for_git_change 20 1 git rev-parse origin/master # Slightly longer delay after removal
     assert_success "Push after removal failed to appear on remote (timeout)"
 
     # Debug: Check git status right before hash comparison
