@@ -7,7 +7,12 @@ load 'test_helper/bats-file/load'
 # Load custom helpers
 load 'test_helper/custom_helpers.bash'
 # Load setup/teardown specific for paths with spaces
-load 'startup-shutdown-spaces'
+load 'startup-shutdown.bash' # Load the combined file
+
+# Override the default setup for this test file
+setup() {
+    setup_with_spaces
+}
 
 @test "spaces_in_target_dir: Handles paths with spaces correctly" {
     # Start gitwatch directly in the background - paths need careful quoting
