@@ -643,7 +643,6 @@ diff-lines() {
       # Handle the /dev/null case specifically for path variable
       if [[ "$stripped_reply" =~ ^---\ /dev/null ]]; then previous_path="/dev/null"; fi
       continue
-      # *** ADJUSTED REGEX for +++ line ***
       # Match '+++ b/path' - Capture everything after 'b/' using REPLY to handle potential leading color codes
     elif [[ "$REPLY" =~ ^($esc\[[0-9;]+m)*\+\+\+\ (b/)?(.*) ]]; then
       # Capture from BASH_REMATCH[3] which is after potential color codes and header
@@ -657,8 +656,10 @@ diff-lines() {
       if [[ "$path" == "/dev/null" ]]; then path=""; fi
       continue
       # --- Match hunk header ---
-    elif [[ "$stripped_reply" =~ ^@@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@ ]]; then
-      line=${BASH_REMATCH[2]:-1} # Set starting line number for additions, default to 1 if not captured
+      # *** ADJUSTED REGEX for Hunk Header (@@ ... @@) to handle color codes ***
+    elif [[ "$REPLY" =~ ^($esc\[[0-9;]+m)*@@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@ ]]; then
+      # Capture line number from BASH_REMATCH[3] (group after potential leading color code)
+      line=${BASH_REMATCH[3]:-1} # Set starting line number for additions, default to 1 if not captured
       continue
       # --- Match diff content lines ---
       # Match original line with color codes to preserve them
