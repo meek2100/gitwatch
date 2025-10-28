@@ -481,6 +481,48 @@ else
   stderr "Error: The target is neither a regular file nor a directory."; exit 3;
 fi
 
+# --- NEW: CRITICAL PRE-PERMISSION CHECK ON TARGET DIRECTORY ---
+# Check if the current user has the necessary permissions (R/W/X)
+# on the target directory itself ($TARGETDIR_ABS). This must run *before*
+# any attempt to run 'git rev-parse' which fails with the generic message.
+if ! [ -r "$TARGETDIR_ABS" ] || ! [ -w "$TARGETDIR_ABS" ] || ! [ -x "$TARGETDIR_ABS" ]; then
+  local CURRENT_UID
+  local CURRENT_USER
+  CURRENT_UID=$(id -u 2>/dev/null || echo "Unknown UID")
+  CURRENT_USER=$(id -n -u 2>/dev/null || echo "Unknown User")
+
+  local resolution_message=""
+  if [ -n "${GITWATCH_DOCKER_ENV:-}" ]; then
+    resolution_message=$(printf "
+Resolution required:
+1. **Container User Mismatch**: The current user (UID %s) lacks the required permissions.
+2. **Recommended Fix**: Ensure the host volume mounted to the repository (e.g., %s) is owned by the container's non-root user ('appuser').
+   - You may need to run \`chown\` on the host path or use Docker's \`user\` option.
+" "$CURRENT_UID" "$TARGETDIR_ABS")
+  else
+    resolution_message=$(printf "
+Resolution required:
+1. **Check Ownership**: The current user (UID %s) does not own or have R/W/X access to the directory.
+2. **Recommended Fix**: Ensure the watched directory is owned by the user running gitwatch.sh.
+   - Run: \`sudo chown -R \$USER:\$USER \"\$TARGETDIR_ABS\"\`
+" "$CURRENT_UID")
+  fi
+
+  stderr "========================================================================================="
+  stderr "⚠️  CRITICAL PERMISSION ERROR: Cannot Access Target Directory"
+  stderr "========================================================================================="
+  stderr "The application is running as user: $CURRENT_USER (UID $CURRENT_UID)"
+  stderr "Attempted to access target directory: $TARGETDIR_ABS"
+  stderr ""
+  stderr "This error indicates that the current user lacks the necessary Read/Write/Execute"
+  stderr "permissions on the target directory itself, preventing Git initialization/checks."
+  stderr ""
+  stderr "$resolution_message"
+  stderr "========================================================================================="
+  exit 7
+fi
+# --- END NEW: CRITICAL PRE-PERMISSION CHECK ON TARGET DIRECTORY ---
+
 # --- Determine Git Directory Path (Final) ---
 # This now uses the potentially modified $GIT command string from getopts -g handling
 # Run rev-parse from within the target directory context to correctly find .git
