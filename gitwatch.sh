@@ -499,6 +499,52 @@ GIT_DIR_PATH=$(cd "$TARGETDIR_ABS" && bash -c "$GIT rev-parse --absolute-git-dir
 }
 verbose_echo "Determined git directory for lockfiles: $GIT_DIR_PATH"
 
+# --- CRITICAL PERMISSION CHECK FOR NON-ROOT USER ON VOLUME MOUNT ---
+# Check if the current user has the necessary permissions (Read/Write/Execute)
+# on the .git directory. Failure here indicates a permission mismatch.
+if ! [ -r "$GIT_DIR_PATH" ] || ! [ -w "$GIT_DIR_PATH" ] || ! [ -x "$GIT_DIR_PATH" ]; then
+  CURRENT_UID="" # Initialize
+  CURRENT_USER="" # Initialize
+  # Use process substitution to get UID/Username robustly if the commands exist
+  CURRENT_UID=$(id -u 2>/dev/null || echo "Unknown UID")
+  CURRENT_USER=$(id -n -u 2>/dev/null || echo "Unknown User")
+
+  # --- Custom Resolution Message based on Environment ---
+  resolution_message=""
+  if [ -n "${GITWATCH_DOCKER_ENV:-}" ]; then
+    # Docker/Container-specific resolution
+    resolution_message=$(printf "
+Resolution required:
+1. **Container User Mismatch**: The current user (UID %s) lacks the required permissions.
+2. **Recommended Fix**: Ensure the host volume mounted to the repository (e.g., /app/gitwatch-test/vault) is owned by the container's non-root user ('appuser').
+   - You may need to run \`chown\` on the host path or use Docker's \`user\` option.
+" "$CURRENT_UID")
+  else
+    # Generic/Daemon/Standalone resolution
+    resolution_message=$(printf "
+Resolution required:
+1. **Check Ownership**: The current user (UID %s) does not own or have write access to the '.git' folder.
+2. **Recommended Fix**: Ensure the watched directory is owned by the user running gitwatch.sh.
+   - Run: \`sudo chown -R \$USER:\$USER \"\$GIT_DIR_PATH\"\`
+" "$CURRENT_UID")
+  fi
+  # ---------------------------------------------------
+
+  stderr "========================================================================================="
+  stderr "⚠️  CRITICAL PERMISSION ERROR: Cannot Access Git Repository Metadata"
+  stderr "========================================================================================="
+  stderr "The application is running as user: $CURRENT_USER (UID $CURRENT_UID)"
+  stderr "Attempted to access Git directory: $GIT_DIR_PATH"
+  stderr ""
+  stderr "This error indicates that the current user lacks the necessary Read/Write/Execute"
+  stderr "permissions on the Git repository's metadata folder (the '.git' directory)."
+  stderr ""
+  stderr "$resolution_message"
+  stderr "========================================================================================="
+  exit 7
+fi
+# --- END PERMISSION CHECK ---
+
 # Ensure GIT_DIR_PATH is absolute (belt-and-suspenders)
 if [[ "$GIT_DIR_PATH" != /* ]]; then
   # This might happen if rev-parse somehow failed to give absolute path or -g was relative

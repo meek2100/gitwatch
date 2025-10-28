@@ -20,6 +20,9 @@ COPY --chown=appuser:appgroup gitwatch.sh entrypoint.sh ./
 
 RUN chmod +x /app/gitwatch.sh /app/entrypoint.sh
 
+# Add an environment variable to signal gitwatch is running in a Docker environment
+ENV GITWATCH_DOCKER_ENV=true
+
 # Switch to the non-root user
 USER appuser
 
