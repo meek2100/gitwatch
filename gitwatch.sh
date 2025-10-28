@@ -514,19 +514,19 @@ if ! [ -r "$GIT_DIR_PATH" ] || ! [ -w "$GIT_DIR_PATH" ] || ! [ -x "$GIT_DIR_PATH
   if [ -n "${GITWATCH_DOCKER_ENV:-}" ]; then
     # Docker/Container-specific resolution
     resolution_message=$(printf "
-Resolution required:
-1. **Container User Mismatch**: The current user (UID %s) lacks the required permissions.
-2. **Recommended Fix**: Ensure the host volume mounted to the repository (e.g., /app/gitwatch-test/vault) is owned by the container's non-root user ('appuser').
-   - You may need to run \`chown\` on the host path or use Docker's \`user\` option.
-" "$CURRENT_UID")
+    Resolution required:
+    1. **Container User Mismatch**: The current user (UID %s) lacks the required permissions.
+    2. **Recommended Fix**: Ensure the host volume mounted to the repository (e.g., /app/gitwatch-test/vault) is owned by the container's non-root user ('appuser').
+    - You may need to run \`chown\` on the host path or use Docker's \`user\` option.
+    " "$CURRENT_UID")
   else
     # Generic/Daemon/Standalone resolution
     resolution_message=$(printf "
-Resolution required:
-1. **Check Ownership**: The current user (UID %s) does not own or have write access to the '.git' folder.
-2. **Recommended Fix**: Ensure the watched directory is owned by the user running gitwatch.sh.
-   - Run: \`sudo chown -R \$USER:\$USER \"\$GIT_DIR_PATH\"\`
-" "$CURRENT_UID")
+    Resolution required:
+    1. **Check Ownership**: The current user (UID %s) does not own or have write access to the '.git' folder.
+    2. **Recommended Fix**: Ensure the watched directory is owned by the user running gitwatch.sh.
+    - Run: \`sudo chown -R \$USER:\$USER \"\$GIT_DIR_PATH\"\`
+    " "$CURRENT_UID")
   fi
   # ---------------------------------------------------
 
