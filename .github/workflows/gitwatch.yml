@@ -9,6 +9,8 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+permissions: {} # Added top-level permissions
+
 jobs:
   #-------------------------------------------------------------------------
   super-lint:
@@ -30,11 +32,9 @@ jobs:
         uses: super-linter/super-linter@v8.2.1 # x-release-please-version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Tell Super-Linter to look for config files starting from the root
           LINTER_RULES_PATH: .
-          # Update exclude regex: remove symlink, keep tests/ and .editorconfig
           FILTER_REGEX_EXCLUDE: (^|/)tests/|^\.editorconfig$
-          # Disable potentially conflicting linters/formatters (only keep 'false' values)
+          # Disable potentially conflicting linters/formatters
           VALIDATE_PRETTIER: false
           VALIDATE_JAVASCRIPT_ES: false
           VALIDATE_TYPESCRIPT_ES: false
@@ -48,11 +48,7 @@ jobs:
           VALIDATE_PYTHON_ISORT: false
           VALIDATE_PYTHON_FLAKE8: false
           VALIDATE_PYTHON_PYLINT: false
-          # Removed VALIDATE_BIOME_LINT: true
-          # Removed VALIDATE_BIOME_FORMAT: true
-          # Removed VALIDATE_PYTHON_RUFF: true
-          # Removed VALIDATE_PYTHON_RUFF_FORMAT: true
-          # (Super-Linter will enable these by default when others are set to false)
+          VALIDATE_SHELL_SHFMT: false # Explicitly disable shfmt due to panic
 
   #-------------------------------------------------------------------------
   bats:
