@@ -5,7 +5,6 @@ FROM alpine:3.20
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 # Consolidate RUN commands and install dependencies
-# hadolint ignore=DL3018
 RUN apk add --no-cache bash git inotify-tools openssh && \
     mkdir -p /app && \
     chown appuser:appgroup /app
