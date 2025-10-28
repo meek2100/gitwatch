@@ -641,7 +641,7 @@ diff-lines() {
       # Handle the /dev/null case specifically for path variable
       if [[ "$stripped_reply" =~ ^---\ /dev/null ]]; then previous_path="/dev/null"; fi
       continue
-    # Match '+++ b/path' - Capture everything after 'b/'
+      # Match '+++ b/path' - Capture everything after 'b/'
     elif [[ "$stripped_reply" =~ ^\+\+\+\ (b/)?(.*) ]]; then
       path="${BASH_REMATCH[2]}"
       # Trim trailing color codes if present
@@ -662,17 +662,17 @@ diff-lines() {
       local display_content=${content:0:150}
 
       if [[ "$path" == "/dev/null" ]] && [[ "$previous_path" != "/dev/null" ]]; then # File deleted
-         # Use previous_path when path is /dev/null
-         echo "$previous_path:?: File deleted or moved."
+        # Use previous_path when path is /dev/null
+        echo "$previous_path:?: File deleted or moved."
       elif [[ -n "$path" ]] && [[ "$path" != "/dev/null" ]] && [[ -n "$line" ]]; then # Ensure path and line are set, and path is not /dev/null
         # Reconstruct the line with color codes if present, using prefix and limited content
         local color_codes=${BASH_REMATCH[1]:-} # Default to empty if no match
         echo "$path:$line: $color_codes$prefix$display_content"
       elif [[ -n "$previous_path" ]] && [[ "$previous_path" != "/dev/null" ]] && [[ -n "$line" ]]; then
-         # Fallback for context lines before path is defined (e.g. mode changes)
-         # Use previous_path if path is not yet set or is /dev/null
-         local color_codes=${BASH_REMATCH[1]:-}
-         echo "$previous_path:$line: $color_codes$prefix$display_content"
+        # Fallback for context lines before path is defined (e.g. mode changes)
+        # Use previous_path if path is not yet set or is /dev/null
+        local color_codes=${BASH_REMATCH[1]:-}
+        echo "$previous_path:$line: $color_codes$prefix$display_content"
       else
         # Log to stderr if still unable to determine path/line
         stderr "Warning: Could not parse line number or path in diff-lines for: $REPLY"
