@@ -172,19 +172,26 @@ Here's a breakdown of the important parts of the `docker-compose.yml` file:
 The following environment variables are available for configuring the
 `gitwatch` container:
 
-| Variable           | Default Value          | Description                                                                                                                   |
-| :----------------- | :--------------------- | :---------------------------------------------------------------------------------------------------------------------------- |
-| `GIT_WATCH_DIR`    | `/app/watched-repo`    | The directory inside the container to watch for changes. This must match the container path you set in the `volumes` section. |
-| `GIT_REMOTE`       | `origin`               | The name of the remote repository to push to.                                                                                 |
-| `GIT_BRANCH`       | `main`                 | The branch to push to.                                                                                                        |
-| `PULL_BEFORE_PUSH` | `"false"`              | Set to `"true"` to run `git pull --rebase` before every push.                                                                 |
-| `SLEEP_TIME`       | `2`                    | Time in seconds to wait after a file change before committing.                                                                |
-| `COMMIT_MSG`       | `"Auto-commit: %d"`    | The commit message format. `%d` is replaced with the date/time.                                                               |
-| `DATE_FMT`         | `"+%Y-%m-%d %H:%M:%S"` | The date format used in the commit message (see `man date` for options).                                                      |
-| `EXCLUDE_PATTERN`  | `""`                   | A comma-separated list of patterns to exclude from monitoring (e.g., `"*.log, *.tmp, tmp/"`).                                 |
-| `SKIP_IF_MERGING`  | `"false"`              | Set to `"true"` to prevent commits when a merge is in progress.                                                               |
-| `COMMIT_ON_START`  | `"false"`              | Set to "true" to commit any pending changes on startup.                                                                       |
-| `VERBOSE`          | `"false"`              | Set to "true" to enable verbose output for debugging.                                                                         |
+| Variable           | Default Value          | Description                                                                                                                       |
+| :----------------- | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------------- |
+| `PUID`             | `1000`                 | **Optional.** Sets the User ID (UID) for the container's non-root user to match the host user, preventing file permission issues. |
+| `PGID`             | `1000`                 | **Optional.** Sets the Group ID (GID) for the container's user. Use in conjunction with `PUID`.                                   |
+| `GIT_WATCH_DIR`    | `/app/watched-repo`    | The directory inside the container to watch for changes. This must match the container path you set in the `volumes` section.     |
+| `GIT_REMOTE`       | `origin`               | The name of the remote repository to push to.                                                                                     |
+| `GIT_BRANCH`       | `main`                 | The branch to push to.                                                                                                            |
+| `GIT_EXTERNAL_DIR` | `""`                   | Use with the `-g` flag (e.g., `/app/.git`) to specify an external Git directory.                                                  |
+| `PULL_BEFORE_PUSH` | `"false"`              | Set to `"true"` to run `git pull --rebase` before every push (`-R`).                                                              |
+| `SLEEP_TIME`       | `2`                    | Time in seconds to wait after a file change before committing (`-s`).                                                             |
+| `COMMIT_MSG`       | `"Auto-commit: %d"`    | The commit message format (`-m`). Ignored if `COMMIT_CMD` is set.                                                                 |
+| `DATE_FMT`         | `"+%Y-%m-%d %H:%M:%S"` | The date format used in the commit message (`-d`).                                                                                |
+| `COMMIT_CMD`       | `""`                   | Custom shell command to generate the entire commit message (`-c`). Overrides `COMMIT_MSG`.                                        |
+| `PASS_DIFFS`       | `"false"`              | Set to `"true"` to pipe the list of changed files to `COMMIT_CMD` (`-C`).                                                         |
+| `EVENTS`           | `""`                   | Events passed to the underlying watcher tool (`-e`). Uses platform defaults if empty.                                             |
+| `EXCLUDE_PATTERN`  | `""`                   | A comma-separated list of glob patterns to exclude from monitoring (`-x`).                                                        |
+| `SKIP_IF_MERGING`  | `"false"`              | Set to `"true"` to prevent commits when a merge is in progress (`-M`).                                                            |
+| `COMMIT_ON_START`  | `"false"`              | Set to `"true"` to commit any pending changes on startup (`-f`).                                                                  |
+| `VERBOSE`          | `"false"`              | Set to `"true"` to enable verbose output for debugging (`-v`).                                                                    |
+| `USE_SYSLOG`       | `"false"`              | Set to `"true"` to log all messages to syslog (`-S`).                                                                             |
 
 <!-- prettier-ignore-end -->
 
@@ -246,50 +253,46 @@ path to the Git repository you want to watch.
 
 To run this script, you must have installed and globally available:
 
-- `git` ([Git](https://github.com/git/git) |
-  [git-scm](http://www.git-scm.com))
-- `inotifywait` (part of
-  **[inotify-tools](https://github.com/rvoicilas/inotify-tools)**)
+- `git` ([Git](https://github.com/git/git) | [git-scm](http://www.git-scm.com))
+- **File Watcher:** Either `inotifywait` (part of **[inotify-tools](https://github.com/rvoicilas/inotify-tools)**, for Linux) or `fswatch` (for macOS/BSD).
+- **Locking (Highly Recommended):** `flock` (part of `util-linux` on most Linux distributions) for process locking and debouncing.
+
+The script automatically detects the appropriate watcher tool based on your operating system.
 
 ### Notes for Mac
 
-If running on macOS, you'll need to install the following Homebrew tools:
+If running on macOS, you'll need to install the required tools via Homebrew:
 
 ```sh
-brew install fswatch
-brew install coreutils
+brew install fswatch flock
 ```
 
 ## What it does
 
-When you start the script, it prepares some variables and checks if the
-file or directory given as input really exists.
+When you start the script, it first performs critical checks:
 
-Then it goes into the main loop (which will run forever, until the script
-is forcefully stopped/killed), which will:
+1. **Permission Check:** Verifies the user has read/write/execute permissions on the target directory and the `.git` directory.
+2. **Locking Check:** Attempts to acquire a non-blocking process lock using `flock` to prevent multiple instances from running concurrently on the same repository.
+3. **Optional Startup Commit:** If the `-f` flag is provided, it commits any pending staged changes before starting the watch loop.
 
-- watch for changes to the file/directory using `inotifywait`
-  (`inotifywait` will block until something happens)
-- wait 2 seconds
-- case file:
-  - `cd` into the directory containing the file (because `git` likes to
-    operate locally)
-  - `git add <file>`
-  - `git commit -m "Scripted auto-commit on change (<date>)"`
-- case directory:
-  - `cd` into the directory (because `git` likes to operate locally)
-  - `git add --all .`
-  - `git commit -m "Scripted auto-commit on change (<date>)"`
-- if a remote is defined (with `-r`) do a push after the commit (a specific
-  branch can be selected with `-b`)
+Then it enters the main loop, which runs forever (until forcefully stopped/killed), where it:
+
+- **Watches for changes** using `inotifywait` (Linux) or `fswatch` (macOS), which block until an event occurs.
+- **Debounces changes** for the configured `SLEEP_TIME` (default 2 seconds). The advanced debounce logic is PID-file-based and kills outdated commit timers when new changes arrive, ensuring only one commit runs for a rapid burst of changes.
+- **Stages changes:**
+  - Case file: `git add <file>`
+  - Case directory: `git add --all .`
+- **Avoids empty commits:** It compares the staged file tree with the HEAD file tree. If only metadata (like file timestamps) has changed, the commit is skipped, and any spurious index entries are unstaged with `git reset --mixed`.
+- **Commits changes:** `git commit -m "Scripted auto-commit on change (<date>)"`
+- **Optional Pull/Push:** If a remote is defined (`-r`):
+  - If `-R` is used, it runs `git pull --rebase <remote>` before pushing.
+  - It then pushes to the configured remote/branch (`-b`).
 
 Notes:
 
-- the waiting period of 2 sec is added to allow for several changes to be
-  written out completely before committing; depending on how fast the
-  script is executed, this might otherwise cause race conditions when
-  watching a folder
-- currently, folders are always watched recursively
+- The debouncing mechanism handles rapid, consecutive changes robustly, ensuring one successful commit per burst.
+- `gitwatch` includes graceful shutdown handling (`INT`, `TERM`) and automatic cleanup of lockfiles and timer PIDs via `trap`.
+- Repositories are always watched recursively by default when a directory is the target.
 
 ## Usage
 

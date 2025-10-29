@@ -3,6 +3,35 @@
 # Exit immediately if a command exits with a non-zero status
 set -e
 
+# --- PUID/PGID Switching for Volume Permissions ---
+# Default user is 'appuser' (UID 1000) created in the Dockerfile.
+# If PUID/PGID are set, change the UID/GID of appuser to match the host user.
+PUID=${PUID:-}
+PGID=${PGID:-}
+CONTAINER_USER="appuser"
+
+if [ -n "$PUID" ] && [ -n "$PGID" ]; then
+  # Check if PUID/PGID are different from default (1000/1000 in Alpine)
+  if [ "$PUID" != "$(id -u $CONTAINER_USER)" ] || [ "$PGID" != "$(id -g $CONTAINER_USER)" ]; then
+    echo "Starting as UID: $PUID, GID: $PGID"
+    # Change appuser's UID and GID
+    usermod -u "$PUID" "$CONTAINER_USER" 2>/dev/null || echo "Warning: Could not set UID for $CONTAINER_USER" >&2
+    groupmod -g "$PGID" "$CONTAINER_USER" 2>/dev/null || echo "Warning: Could not set GID for $CONTAINER_USER" >&2
+    # Ensure any necessary file ownership is corrected (though volumes should mostly handle it)
+    chown -R "$PUID":"$PGID" /app 2>/dev/null || true
+  else
+    echo "Starting as default user ($CONTAINER_USER) with ID: $PUID/$PGID"
+  fi
+  # Use gosu to execute the rest of the script as the correct user
+  GOSU_COMMAND="gosu $CONTAINER_USER"
+else
+  # No PUID/PGID set, run as the default appuser (which is PID 1, but we use 'exec' later)
+  echo "PUID/PGID not set. Running as default container user: $CONTAINER_USER"
+  GOSU_COMMAND="exec" # Use 'exec' to replace the shell, will run as USER appuser defined in Dockerfile
+fi
+# --------------------------------------------------
+
+
 # --- Environment Variable Configuration with Defaults ---
 # Target directory to watch
 GIT_WATCH_DIR=${GIT_WATCH_DIR:-/app/watched-repo}
@@ -34,7 +63,8 @@ USE_SYSLOG=${USE_SYSLOG:-false} # New: Log to Syslog (-S)
 # --- Command Construction ---
 
 # Use a bash array to safely build the command and its arguments
-cmd=( "/app/gitwatch.sh" )
+# Note: We do *not* include the script path here yet, it is added later with gosu/exec
+cmd=( )
 
 # Add options with arguments (remote, branch, sleep time, date format)
 cmd+=( -r "${GIT_REMOTE}" )
@@ -115,15 +145,15 @@ cmd+=( "${GIT_WATCH_DIR}" )
 # --- Execution Logic ---
 
 echo "Starting gitwatch with the following arguments:"
-printf "%q " "${cmd[@]}"
+printf "%q " "/app/gitwatch.sh" "${cmd[@]}"
 echo # Add a newline for cleaner logging
 echo "-------------------------------------------------"
 
-# Use 'exec' to replace the entrypoint shell process with gitwatch.sh.
-# This ensures that signals (like TERM) go directly to gitwatch.sh, and if gitwatch.sh
-# exits, the container stops immediately (PID 1 best practice).
-exec "${cmd[@]}"
+# Use 'gosu' or 'exec' to run the command, replacing the entrypoint shell process.
+# This ensures that signals (like TERM) go directly to gitwatch.sh (PID 1 best practice).
+# If PUID/PGID were set, GOSU_COMMAND is 'gosu appuser'. Otherwise, it's 'exec'.
+$GOSU_COMMAND "/app/gitwatch.sh" "${cmd[@]}"
 
-# If 'exec' fails, the script continues and exits with an error status.
-echo "ERROR: Exec failed to start gitwatch.sh. Check permissions and path." >&2
+# If 'exec' or 'gosu' fails, the script continues and exits with an error status.
+echo "ERROR: Exec/Gosu failed to start gitwatch.sh. Check permissions and path." >&2
 exit 1

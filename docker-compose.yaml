@@ -20,6 +20,12 @@ services:
       # OPTIONAL: If your repo's .git directory is separate (e.g., for volume mounts)
       # - /path/to/external/.git:/app/.git
     environment:
+      # --- User Configuration (Recommended for host volume mounts) ---
+      # Set to your host user's UID (e.g., '1000' for many Linux/macOS systems)
+      PUID: 1000
+      # Set to your host user's GID (e.g., '1000' or '100' for many Linux/macOS systems)
+      PGID: 1000
+
       # --- Watched Directory ---
       # This should match the container path in the 'volumes' section above
       GIT_WATCH_DIR: /app/watched-repo

@@ -166,3 +166,63 @@ load 'startup-shutdown'
     run chmod "$original_perms" "$target_dir"
     assert_success "Failed to restore original permissions"
 }
+
+@test "startup_commit_f_pull_rebase_conflict: -f flag fails commit gracefully and skips push on pull-rebase conflict" {
+    local output_file
+    output_file=$(mktemp "$testdir/output.XXXXX")
+    local conflict_file="conflict_file.txt"
+    local initial_remote_hash
+
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+
+    # 1. Create a file with conflicting content to be staged by -f
+    echo "LOCAL CHANGE TO CONFLICT" > "$conflict_file"
+    git add "$conflict_file"
+
+    # 2. Simulate Upstream Change on Remote
+    cd "$testdir"
+    run git clone -q remote local_ahead
+    assert_success "Cloning for local_ahead failed"
+    cd local_ahead
+    # Create the same file with different content
+    echo "UPSTREAM CHANGE TO CONFLICT" > "$conflict_file"
+    git add "$conflict_file"
+    git commit -q -m "Upstream conflict commit"
+    run git push -q origin master
+    assert_success "Push from local_ahead failed"
+    # Get the remote hash that gitwatch should not push past
+    initial_remote_hash=$(git rev-parse HEAD)
+    run rm -rf local_ahead
+
+    # 3. Go back to gitwatch repo
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+
+    # 4. Run gitwatch with -f, -r, and -R flags (expecting initial commit to succeed, but the subsequent pull-rebase to fail)
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -f -r origin -R "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+    GITWATCH_PID=$!
+    sleep 2 # Give time for initial commit (succeeds) and pull-rebase (fails)
+
+    # 5. Assert: Local commit hash *has* changed (due to -f)
+    run git log -1 --format=%H
+    assert_success
+    local local_commit_hash=$output
+    refute_output --partial "$(git rev-parse HEAD^)" "Local commit hash should not be the setup commit"
+
+    # 6. Assert: Repo is in a MERGE/REBASE state
+    run git status --short
+    assert_output --partial "UU $conflict_file" "Git status should show an unmerged file (rebase conflict)"
+
+    # 7. Assert: Remote hash has NOT changed (Push skipped due to pull failure)
+    run git rev-parse origin/master
+    assert_success
+    assert_equal "$initial_remote_hash" "$output" "Remote hash should NOT change (push should have been skipped)"
+
+    # 8. Assert: Log output shows the expected error message
+    run cat "$output_file"
+    assert_output --partial "ERROR: 'git pull' failed. Skipping push."
+    refute_output --partial "Executing push command:" "Should NOT show push attempt after pull failure"
+
+    # 9. Cleanup: Abort the rebase so teardown can clean the repo
+    git rebase --abort
+    cd /tmp
+}

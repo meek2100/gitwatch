@@ -21,8 +21,6 @@
       <string>/usr/local/bin/git</string>
       <key>GW_INW_BIN</key>
       <string>/usr/local/bin/fswatch</string>
-      <key>GW_RL_BIN</key>
-      <string>/usr/local/bin/greadlink</string>
     </dict>
  <!-- remove comment to log output from gitwatch
     <key>StandardOutPath</key>
