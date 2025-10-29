@@ -1013,7 +1013,6 @@ verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
 
   if [[ -n ${SLEEP_PID:-} ]] && kill -0 "$SLEEP_PID" &> /dev/null; then
     kill "$SLEEP_PID" &> /dev/null || true
-    wait "$SLEEP_PID" &> /dev/null || true
   fi
 
   (
