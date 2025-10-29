@@ -1056,7 +1056,8 @@ _perform_commit() {
   if [ -n "$PULL_CMD" ]; then
     verbose_echo "Executing pull command: $PULL_CMD"
     # Add timeout to pull command
-    local pull_cmd_with_timeout=$(printf "timeout -s 9 %s %s" "$TIMEOUT" "$PULL_CMD")
+    local pull_cmd_with_timeout
+    pull_cmd_with_timeout=$(printf "timeout -s 9 %s %s" "$TIMEOUT" "$PULL_CMD")
     if ! bash -c "$pull_cmd_with_timeout"; then
       if [ $? -eq 124 ]; then
         stderr "ERROR: 'git pull' timed out after $TIMEOUT seconds. Skipping push."
@@ -1071,7 +1072,8 @@ _perform_commit() {
   if [ -n "$PUSH_CMD" ]; then
     verbose_echo "Executing push command: $PUSH_CMD"
     # Add timeout to push command
-    local push_cmd_with_timeout=$(printf "timeout -s 9 %s %s" "$TIMEOUT" "$PUSH_CMD")
+    local push_cmd_with_timeout
+    push_cmd_with_timeout=$(printf "timeout -s 9 %s %s" "$TIMEOUT" "$PUSH_CMD")
     if ! bash -c "$push_cmd_with_timeout"; then
       if [ $? -eq 124 ]; then
         stderr "ERROR: 'git push' timed out after $TIMEOUT seconds."
