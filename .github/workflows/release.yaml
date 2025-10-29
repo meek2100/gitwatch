@@ -92,7 +92,22 @@ jobs:
           echo "$NOTES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Commit updated files
+      - name: Install Formatting Tools
+        run: |
+          pip install mdformat mdformat-toc mdformat-gfm mdformat-beautysh # Add relevant mdformat plugins from pre-commit
+          npm install -g prettier # Install prettier globally
+
+      - name: Format package.json with Prettier
+        run: |
+          prettier --write package.json
+          echo "Formatted package.json"
+
+      - name: Format CHANGELOG.md with mdformat
+        run: |
+          mdformat CHANGELOG.md
+          echo "Formatted CHANGELOG.md"
+
+      - name: Commit updated files # This step now commits the formatted files
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'

@@ -74,7 +74,16 @@ jobs:
           mv "${CHANGELOG_FILE}.tmp" "${CHANGELOG_FILE}"
           echo "Processed entry for CHANGELOG.md: ${NEW_ENTRY}"
 
-      - name: Commit and Push Updated Changelog
+      - name: Install mdformat
+        run: |
+          pip install mdformat mdformat-toc mdformat-gfm mdformat-beautysh # Add relevant mdformat plugins from pre-commit
+
+      - name: Format CHANGELOG.md with mdformat
+        run: |
+          mdformat CHANGELOG.md
+          echo "Formatted CHANGELOG.md"
+
+      - name: Commit and Push Updated Changelog # This step now commits the formatted file
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
