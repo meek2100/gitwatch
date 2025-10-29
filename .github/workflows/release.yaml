@@ -1,0 +1,136 @@
+name: Create Release and Update Files
+
+on:
+  push:
+    tags:
+      - "v*" # Trigger on tags like v0.5.0, v0.6, v1.0.0
+
+permissions:
+  contents: write # Needed to push updates to VERSION and CHANGELOG.md
+  # 'releases: write' is implicitly granted for creating releases
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          # Fetch all history to enable comparing tags
+          fetch-depth: 0
+          # Use a token with write permissions
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get tag version
+        id: get_version
+        run: |
+          # Extract the tag name (e.g., v0.6.0)
+          TAG=${GITHUB_REF#refs/tags/}
+          # Remove 'v' prefix for version files (e.g., 0.6.0)
+          VERSION=${TAG#v}
+          echo "tag_name=${TAG}" >> $GITHUB_OUTPUT
+          echo "version_number=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Update VERSION file
+        run: |
+          echo "${{ steps.get_version.outputs.version_number }}" > VERSION
+          echo "Updated VERSION file to ${{ steps.get_version.outputs.version_number }}"
+
+      - name: Update package.json
+        run: |
+          # Use jq to update the version field in package.json
+          # Install jq if not present (usually is on GitHub runners)
+          sudo apt-get update && sudo apt-get install -y jq
+          jq --arg new_version "${{ steps.get_version.outputs.version_number }}" '.version = $new_version' package.json > temp.json && mv temp.json package.json
+          echo "Updated package.json to version ${{ steps.get_version.outputs.version_number }}"
+
+      - name: Update CHANGELOG.md and Extract Notes
+        id: update_changelog
+        run: |
+          TAG_NAME="${{ steps.get_version.outputs.tag_name }}"
+          VERSION_NUMBER="${{ steps.get_version.outputs.version_number }}"
+          RELEASE_DATE=$(date +'%Y-%m-%d')
+          UNRELEASED_HEADER="## [Unreleased]"
+          # Escape brackets for literal matching in awk/sed
+          NEW_VERSION_HEADER="## \\[${VERSION_NUMBER}\\] - ${RELEASE_DATE}"
+          ESCAPED_UNRELEASED_HEADER="## \\[Unreleased\\]" # For sed and awk start pattern
+
+          # Check if [Unreleased] section exists
+          if ! grep -q "^${ESCAPED_UNRELEASED_HEADER}$" CHANGELOG.md; then
+            echo "Error: Could not find '${UNRELEASED_HEADER}' section in CHANGELOG.md"
+            exit 1
+          fi
+
+          # Extract release notes *before* modifying the file
+          # Use awk to print lines between [Unreleased] and the next version header (## [...)
+          awk -v start_header="$ESCAPED_UNRELEASED_HEADER" '
+            BEGIN { printing = 0; content = "" }
+            # If we find the start header
+            $0 == start_header { printing = 1; next }
+            # If we are printing and find the *next* version header, stop
+            printing && /^## \[/ { printing = 0 }
+            # If we are printing, append the line (trimming leading/trailing whitespace)
+            printing { gsub(/^[ \t]+|[ \t]+$/, ""); if (length($0) > 0) content = content $0 "\\n" } # Use \\n for newline literal
+            END { print content }
+          ' CHANGELOG.md > release_notes.txt
+
+          # Replace the [Unreleased] header with the new version header using sed
+          # Use a temporary file to avoid issues with in-place editing across systems
+          sed "s|^${ESCAPED_UNRELEASED_HEADER}$|${NEW_VERSION_HEADER}|" CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+
+          echo "Updated CHANGELOG.md header for version ${VERSION_NUMBER}"
+
+          # Check if notes were extracted
+          if [ ! -s release_notes.txt ]; then
+              echo "Warning: Could not extract release notes from CHANGELOG.md"
+              echo "No release notes found." > release_notes.txt # Use default if empty
+          fi
+
+          # Export notes for the release step (ensure newlines are handled correctly)
+          NOTES=$(cat release_notes.txt)
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Commit updated files
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add VERSION package.json CHANGELOG.md
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: Update VERSION, package.json, and CHANGELOG for ${{ steps.get_version.outputs.tag_name }}"
+            # Determine the branch the tag was pushed to (usually main/master)
+            BRANCH_NAME=$(git branch --show-current || git rev-parse --abbrev-ref HEAD)
+            # Ensure branch name is not empty or detached HEAD representation
+            if [ -z "$BRANCH_NAME" ] || [ "$BRANCH_NAME" = "HEAD" ]; then
+              echo "Could not determine branch name or HEAD is detached. Defaulting to 'main'."
+              BRANCH_NAME="main" # Or your default branch
+            fi
+            git push origin HEAD:${BRANCH_NAME}
+          fi
+
+      - name: Prepare Release Asset (Substitute Version)
+        run: |
+          # Read version from VERSION file
+          VERSION_NUMBER=$(cat VERSION)
+          # Create a temporary script with the version substituted
+          sed "s/%%GITWATCH_VERSION%%/${VERSION_NUMBER}/g" gitwatch.sh > gitwatch-release.sh
+          # Make it executable
+          chmod +x gitwatch-release.sh
+          echo "Created gitwatch-release.sh with version ${VERSION_NUMBER} embedded."
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2.0.8
+        with:
+          tag_name: ${{ steps.get_version.outputs.tag_name }}
+          name: Release ${{ steps.get_version.outputs.tag_name }}
+          body: ${{ steps.update_changelog.outputs.notes }}
+          files: | # Upload the version-substituted script
+            gitwatch-release.sh
+          draft: false
+          prerelease: false # Change to true if your tag indicates a prerelease (e.g., v1.0.0-rc1)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -43,6 +43,11 @@
 #set -euo pipefail
 # --------------------------
 
+# --- Version Info ---
+# This placeholder will be replaced by the release workflow
+GITWATCH_VERSION="%%GITWATCH_VERSION%%"
+# --- End Version Info ---
+
 REMOTE=""
 PULL_BEFORE_PUSH=0
 BRANCH=""
@@ -68,7 +73,7 @@ shelp() {
   echo ""
   echo "Usage:"
   echo "${0##*/} [-s <secs>] [-d <fmt>] [-r <remote> [-b <branch>]]"
-  echo "          [-m <msg>] [-l|-L <lines>] [-x <pattern>] [-M] [-S] [-v] [-f] <target>"
+  echo "          [-m <msg>] [-l|-L <lines>] [-x <pattern>] [-M] [-S] [-v] [-f] [-V] <target>"
   echo ""
   echo "Where <target> is the file or folder which should be watched. The target needs"
   echo "to be in a Git repository, or in the case of a folder, it may also be the top"
@@ -117,6 +122,7 @@ shelp() {
   echo " -M               Prevent commits when there is an ongoing merge in the repo"
   echo " -S               Log all messages to syslog (daemon mode)."
   echo " -v               Run in verbose mode for debugging. Enables informational messages and command tracing (set -x)."
+  echo " -V               Print version information and exit."
   echo " -x <pattern>     Pattern to exclude from inotifywait"
   echo ""
   echo "As indicated, several conditions are only checked once at launch of the"
@@ -265,7 +271,7 @@ fi
 # --- End Preliminary Path ---
 
 
-while getopts b:d:h:g:L:l:m:c:C:p:r:s:e:x:MRvSf option; do # Process command line options
+while getopts b:d:h:g:L:l:m:c:C:p:r:s:e:x:MRvSfV option; do # Process command line options
   case "${option}" in
     b) BRANCH=${OPTARG} ;;
     d) DATE_FMT=${OPTARG} ;;
@@ -315,6 +321,10 @@ while getopts b:d:h:g:L:l:m:c:C:p:r:s:e:x:MRvSf option; do # Process command lin
     v)
       VERBOSE=1
       # set -x is enabled below, after option parsing
+      ;;
+    V)
+      echo "gitwatch.sh version ${GITWATCH_VERSION:-unknown}"
+      exit 0
       ;;
     x) EXCLUDE_PATTERN=${OPTARG} ;;
     e) EVENTS=${OPTARG} ;;

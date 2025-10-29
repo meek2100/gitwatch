@@ -1,0 +1,89 @@
+name: Update Changelog on PR Merge
+
+on:
+  pull_request:
+    types: [closed] # Trigger when a PR is closed
+    branches:
+      - master # Only when the target branch is master
+
+permissions:
+  contents: write # Needed to commit the changelog update
+  pull-requests: read # Needed to get PR details
+
+jobs:
+  update_changelog:
+    # Only run if the PR was actually merged (not just closed)
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          # Check out the master branch explicitly
+          ref: master
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Fetch depth 0 to ensure we have the full history if needed,
+          # though not strictly necessary for just adding a line.
+          fetch-depth: 0
+
+      - name: Get PR Details
+        id: pr_details
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          PR_TITLE=${{ github.event.pull_request.title }}
+          PR_AUTHOR=${{ github.event.pull_request.user.login }}
+          # Simple format: "- PR Title (#Number) by @Author"
+          CHANGELOG_ENTRY="- ${PR_TITLE} (#${PR_NUMBER}) by @${PR_AUTHOR}"
+          echo "entry=${CHANGELOG_ENTRY}" >> $GITHUB_OUTPUT
+
+      - name: Update CHANGELOG.md
+        run: |
+          UNRELEASED_HEADER="## [Unreleased]"
+          ESCAPED_UNRELEASED_HEADER="## \\[Unreleased\\]" # For grep/sed
+          NEW_ENTRY="${{ steps.pr_details.outputs.entry }}"
+          CHANGELOG_FILE="CHANGELOG.md"
+
+          # Check if [Unreleased] section exists. If not, add it.
+          if ! grep -q "^${ESCAPED_UNRELEASED_HEADER}$" "${CHANGELOG_FILE}"; then
+            echo "'${UNRELEASED_HEADER}' section not found. Adding it."
+            # Add the header and a newline right after the main title block (e.g., after line 3)
+            # Use awk to insert after the first few lines (adjust line number if needed)
+            awk 'NR==3{print "\n## [Unreleased]\n"} {print}' "${CHANGELOG_FILE}" > "${CHANGELOG_FILE}.tmp" && mv "${CHANGELOG_FILE}.tmp" "${CHANGELOG_FILE}"
+            echo "Added '${UNRELEASED_HEADER}' section."
+          fi
+
+          # Now, insert the new entry directly below the [Unreleased] header
+          # Use awk to find the header and print the entry after it
+          awk -v header="$ESCAPED_UNRELEASED_HEADER" -v entry="$NEW_ENTRY" '
+          BEGIN { inserted = 0 }
+          { print } # Print the current line
+          # If the current line matches the header AND we haven't inserted yet
+          $0 == header && !inserted {
+            print entry
+            inserted = 1
+          }
+          ' "${CHANGELOG_FILE}" > "${CHANGELOG_FILE}.tmp"
+
+          # Check if awk actually inserted the line (basic check: file size difference)
+          if [ "$(wc -c < "${CHANGELOG_FILE}")" -eq "$(wc -c < "${CHANGELOG_FILE}.tmp")" ]; then
+             echo "Warning: awk may not have inserted the entry. Header might be missing or duplicated."
+             # Fallback: Append entry just in case awk failed silently (less ideal formatting)
+             # echo "$NEW_ENTRY" >> "${CHANGELOG_FILE}.tmp"
+          fi
+
+          mv "${CHANGELOG_FILE}.tmp" "${CHANGELOG_FILE}"
+          echo "Processed entry for CHANGELOG.md: ${NEW_ENTRY}"
+
+      - name: Commit and Push Updated Changelog
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add CHANGELOG.md
+          # Check if the changelog was actually modified
+          if git diff --staged --quiet; then
+            echo "No changes detected in CHANGELOG.md."
+          else
+            git commit -m "chore: Update CHANGELOG.md for PR #${{ github.event.pull_request.number }}"
+            # Push back to the master branch
+            git push origin master
+          fi

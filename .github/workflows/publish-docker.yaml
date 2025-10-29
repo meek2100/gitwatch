@@ -1,7 +1,11 @@
 ---
 name: Docker Build and Publish
 
-on: workflow_dispatch
+on:
+  push:
+    tags:
+      - "v*" # Trigger on tags like v0.5, v0.6, v1.0.0
+  workflow_dispatch: # Keep this so you can still run it manually
 
 permissions: {}
 
@@ -33,9 +37,12 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=sha
+            # This will create a Docker tag for the Git tag (e.g., v0.6)
+            type=ref,event=tag
+            # This will create a 'latest' tag if the tag is on the master branch
             type=ref,event=branch,pattern=master,value=latest
-            type=ref,event=branch,pattern={{sanitize}},enable_if=ne=refs/heads/master
+            # This will create a SHA-based tag
+            type=sha
 
       - name: Build and push Docker image
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
