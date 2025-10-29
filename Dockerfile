@@ -10,7 +10,6 @@ RUN apk add --no-cache \
         git=2.45.4-r0 \
         inotify-tools=4.23.9.0-r0 \
         openssh=9.7_p1-r5 \
-        procps=procps-ng-4.0.4-r0 \
     && mkdir -p /app \
     && chown appuser:appgroup /app
 
@@ -33,9 +32,9 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
     if ! test -f /tmp/gitwatch.pid; then exit 1; fi; \
     PID=$(cat /tmp/gitwatch.pid); \
     if ! kill -0 "$PID" 2>/dev/null; then exit 1; fi; \
-    # LIVENESS CHECK: Confirm the essential child process is active.
-    # We search the full command line for "inotifywait" (the watcher tool).
-    pgrep -f "inotifywait" >/dev/null \
+    # LIVENESS CHECK: Confirm the essential child watcher process is active.
+    # This checks command lines in /proc directly to avoid 'pgrep' dependency.
+    cat /proc/*/cmdline 2>/dev/null | grep -q "inotifywait" \
   '
 
 ENTRYPOINT ["/app/entrypoint.sh"]
