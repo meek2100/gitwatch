@@ -1,0 +1,108 @@
+#!/usr/bin/env bats
+
+# Load standard helpers
+load 'test_helper/bats-support/load'
+load 'test_helper/bats-assert/load'
+load 'test_helper/bats-file/load'
+# Load custom helpers
+load 'test_helper/custom_helpers'
+# Load setup/teardown
+load 'startup-shutdown'
+
+# This test checks that gitwatch exits gracefully when the target it is watching
+# (either a file or a directory) is deleted, as the underlying watcher tool will
+# terminate in this scenario.
+
+@test "target_deletion_file: Exits gracefully when the watched file is deleted" {
+    local output_file
+    output_file=$(mktemp "$testdir/output.XXXXX")
+    local watch_file="file_to_watch.txt"
+    local watched_file_path="$testdir/local/$TEST_SUBDIR_NAME/$watch_file"
+
+    # 1. Create and commit a file to watch
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+    echo "initial content" > "$watch_file"
+    git add "$watch_file"
+    git commit -q -m "Initial commit of watched file"
+
+    # 2. Start gitwatch watching the file, logging all output
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$watched_file_path" > "$output_file" 2>&1 &
+    GITWATCH_PID=$!
+    local watch_pid=$GITWATCH_PID
+    sleep 1 # Allow watcher to initialize
+
+    # 3. Delete the watched file
+    echo "# DEBUG: Deleting the watched file: $watched_file_path" >&3
+    run rm "$watch_file"
+    assert_success "Failed to delete watched file"
+
+    # 4. Wait for the main gitwatch process to terminate
+    local max_wait=5
+    local wait_count=0
+    # Use 'kill -0' to check if PID is alive, which is cleaner than 'ps'
+    while kill -0 "$watch_pid" 2>/dev/null && [ "$wait_count" -lt "$max_wait" ]; do
+        echo "# DEBUG: Waiting for gitwatch PID $watch_pid to exit..." >&3
+        sleep 1
+        wait_count=$((wait_count + 1))
+    done
+
+    # If the process is still running after the wait, fail
+    if kill -0 "$watch_pid" 2>/dev/null; then
+        fail "gitwatch process (PID $watch_pid) failed to exit after watched file deletion."
+    fi
+
+    # 5. Assert: Check log output confirms loop termination
+    run cat "$output_file"
+    assert_output --partial "File watcher process ended (or failed). Exiting via loop termination." "Did not log graceful exit message."
+
+    # 6. Cleanup: Unset the PID so _common_teardown doesn't try to kill the already dead process
+    unset GITWATCH_PID
+    cd /tmp
+}
+
+@test "target_deletion_dir: Exits gracefully when the watched directory is deleted" {
+    local output_file
+    output_file=$(mktemp "$testdir/output.XXXXX")
+    local sub_dir_path="$testdir/local/watched_sub_dir"
+
+    # 1. Setup: Create a subdirectory to watch and initialize an inner repo
+    cd "$testdir/local"
+    mkdir watched_sub_dir
+    cd watched_sub_dir
+    git init -q # Ensure it's a valid, watchable target
+
+    # 2. Start gitwatch watching the subdirectory, logging all output
+    _common_teardown # Ensures no zombie processes from the previous file test remain
+
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$sub_dir_path" > "$output_file" 2>&1 &
+    GITWATCH_PID=$!
+    local watch_pid=$GITWATCH_PID
+    sleep 1 # Allow watcher to initialize
+
+    # 3. Delete the watched directory
+    echo "# DEBUG: Deleting the watched directory: $sub_dir_path" >&3
+    cd /tmp # Move out of the directory before deletion
+    run rm -rf "$sub_dir_path"
+    assert_success "Failed to delete watched directory"
+
+    # 4. Wait for the main gitwatch process to terminate
+    local max_wait=5
+    local wait_count=0
+    while kill -0 "$watch_pid" 2>/dev/null && [ "$wait_count" -lt "$max_wait" ]; do
+        echo "# DEBUG: Waiting for gitwatch PID $watch_pid to exit..." >&3
+        sleep 1
+        wait_count=$((wait_count + 1))
+    done
+
+    if kill -0 "$watch_pid" 2>/dev/null; then
+        fail "gitwatch process (PID $watch_pid) failed to exit after watched directory deletion."
+    fi
+
+    # 5. Assert: Check log output confirms loop termination
+    run cat "$output_file"
+    assert_output --partial "File watcher process ended (or failed). Exiting via loop termination." "Did not log graceful exit message."
+
+    # 6. Cleanup
+    unset GITWATCH_PID
+    cd /tmp
+}

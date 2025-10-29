@@ -172,6 +172,19 @@ _strip_color() {
   echo "${input//$esc\[[0-9;]*m/}"
 }
 
+# _trim_spaces: Removes leading/trailing spaces.
+# Input: String via argument 1.
+# Output: Trimmed string to stdout.
+# Uses pure bash parameter expansion to replace ' | xargs'.
+_trim_spaces() {
+  local var="$1"
+  # Trim leading spaces (removes longest match of [^ ] from front)
+  var="${var#"${var%%[! ]*}"}"
+  # Trim trailing spaces (removes longest match of [^ ] from back)
+  var="${var%"${var##*[! ]*}"}"
+  echo "$var"
+}
+
 # shellcheck disable=SC2329 # Function is used via trap
 # clean up at end of program
 cleanup() {
@@ -754,8 +767,8 @@ diff-lines() {
     # Match '--- a/path' or '--- /dev/null' - Capture everything after 'a/' or '/dev/null'
     if [[ "$stripped_reply" =~ ^---\ (a/)?(.*) ]]; then
       # Capture the raw path (Group 2). Strip any potential trailing color codes.
-      # FIX: Use explicit argument passing to fix SC2119/SC2120 and remove printf
-      previous_path=$(_strip_color "${BASH_REMATCH[2]}" | xargs)
+      # FIX: Use explicit argument passing to fix SC2119/SC2120 and use pure Bash trim
+      previous_path=$(_trim_spaces "$(_strip_color "${BASH_REMATCH[2]}")")
       path="" # Reset new path
       line="" # Reset line number
       # Handle /dev/null case for clarity
@@ -765,8 +778,8 @@ diff-lines() {
       # Match '+++ b/path' - Capture everything after 'b/'
     elif [[ "$stripped_reply" =~ ^\+\+\+\ (b/)?(.*) ]]; then
       # Capture the raw path (Group 2). Strip any potential trailing color codes.
-      # FIX: Use explicit argument passing to fix SC2119/SC2120 and remove printf
-      path=$(_strip_color "${BASH_REMATCH[2]}" | xargs)
+      # FIX: Use explicit argument passing to fix SC2119/SC2120 and use pure Bash trim
+      path=$(_trim_spaces "$(_strip_color "${BASH_REMATCH[2]}")")
       # Ensure path is not /dev/null, which is technically possible but not relevant here
       if [[ "$path" == "/dev/null" ]]; then path=""; fi
       continue
