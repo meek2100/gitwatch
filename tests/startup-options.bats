@@ -25,7 +25,6 @@ load 'startup-shutdown'
     # 2. Start gitwatch with -f
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -f "$testdir/local/$TEST_SUBDIR_NAME" &
     GITWATCH_PID=$!
-
     # 3. Wait for the new commit to appear (it should be immediate)
     run wait_for_git_change 20 0.5 git log -1 --format=%H
     assert_success "Initial commit on start timed out"
@@ -38,6 +37,7 @@ load 'startup-shutdown'
     run git log -1 --pretty=%B
     assert_success
     assert_output --partial "Scripted auto-commit on change"
+
 
     cd /tmp
 }
@@ -56,9 +56,9 @@ load 'startup-shutdown'
 
     # 1. Start gitwatch with -f, logging all output
     # Note: Using WAITTIME from startup-shutdown.bash for the sleep duration
+
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -f "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
     GITWATCH_PID=$!
-
     # 2. Wait longer than the script's default commit/debounce time
     sleep "$WAITTIME"
 
@@ -70,8 +70,21 @@ load 'startup-shutdown'
 
     # 4. Verify log output confirms no commit was made
     run cat "$output_file"
-    assert_output --partial "No relevant changes detected by git status (porcelain check)." "Gitwatch should report no changes detected"
+    assert_output --partial "No relevant changes detected by git status (porcelain check)."
+    "Gitwatch should report no changes detected"
     refute_output --partial "Running git commit command:" "Should not show a commit command run"
 
     cd /tmp
+}
+
+# Test 3: Version flag
+@test "startup_version_V: -V flag prints version and exits" {
+    # 1. Get the expected version number dynamically from the VERSION file
+    local version_file="${BATS_TEST_DIRNAME}/../VERSION"
+    local expected_version_number=$(cat "$version_file")
+
+    # 2. Run gitwatch with -V and verify output/exit status
+    run "${BATS_TEST_DIRNAME}/../gitwatch.sh" -V
+    assert_success "Running gitwatch -V should exit successfully"
+    assert_output "gitwatch.sh version $expected_version_number" "Output should be the version string"
 }
