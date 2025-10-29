@@ -136,3 +136,33 @@ load 'startup-shutdown'
     # 3. Cleanup
     rm -rf "$non_repo_dir"
 }
+
+@test "startup_permission_check_target: Exits with code 7 when target directory is unwritable" {
+    local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
+    local original_perms
+
+    # 1. Get original permissions of the target directory
+    if [ "$RUNNER_OS" == "Linux" ]; then
+        original_perms=$(stat -c "%a" "$target_dir")
+    else
+        # Use stat -f "%A" for macOS/BSD permissions
+        original_perms=$(stat -f "%A" "$target_dir")
+    fi
+
+    # 2. Remove write and execute permissions for the current user
+    run chmod u-wx "$target_dir"
+    assert_success "Failed to change permissions on target directory"
+
+    # 3. Run gitwatch on the now unwritable target directory
+    run "${BATS_TEST_DIRNAME}/../gitwatch.sh" "$target_dir"
+
+    # 4. Assert exit code 7 and the critical permission error message
+    assert_failure "Gitwatch should exit with non-zero status on permission error"
+    assert_exit_code 7 "Gitwatch should exit with code 7 (Critical Permission Error)"
+    assert_output --partial "⚠️  CRITICAL PERMISSION ERROR: Cannot Access Target Directory"
+    assert_output --partial "permissions on the target directory itself"
+
+    # 5. Cleanup: Restore original permissions *before* teardown runs
+    run chmod "$original_perms" "$target_dir"
+    assert_success "Failed to restore original permissions"
+}
