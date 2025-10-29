@@ -17,8 +17,12 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
     # Change appuser's UID and GID
     usermod -u "$PUID" "$CONTAINER_USER" 2>/dev/null || echo "Warning: Could not set UID for $CONTAINER_USER" >&2
     groupmod -g "$PGID" "$CONTAINER_USER" 2>/dev/null || echo "Warning: Could not set GID for $CONTAINER_USER" >&2
-    # Ensure any necessary file ownership is corrected (though volumes should mostly handle it)
-    chown -R "$PUID":"$PGID" /app 2>/dev/null || true
+
+    # NEW: Only chown critical files (like the scripts) and rely on gosu
+    # to operate as the correct user on the mounted volumes. This avoids
+    # slow recursive chown on large volumes.
+    chown "$PUID":"$PGID" /app/entrypoint.sh /app/gitwatch.sh 2>/dev/null || true
+    chown "$PUID":"$PGID" /app 2>/dev/null || true
   else
     echo "Starting as default user ($CONTAINER_USER) with ID: $PUID/$PGID"
   fi
@@ -43,7 +47,7 @@ GIT_EXTERNAL_DIR=${GIT_EXTERNAL_DIR:-} # Path to the external .git directory (e.
 
 # Gitwatch behavior
 SLEEP_TIME=${SLEEP_TIME:-2}
-COMMIT_MSG=${COMMIT_MSG:-"Scripted auto-commit on change (%d) by gitwatch.sh"}
+COMMIT_MSG=${COMMIT_MSG:-"Auto-commit: %d"}
 DATE_FMT=${DATE_FMT:-"+%Y-%m-%d %H:%M:%S"}
 # New: Custom command for commit message
 COMMIT_CMD=${COMMIT_CMD:-}
