@@ -70,16 +70,25 @@ load 'startup-shutdown'
     assert_output --partial "No relevant changes detected by git status (porcelain check)."
 
     # Verify only one commit command was run
-    local commit_count
+    #local commit_count
 
-    ## NEW ##
-    echo "# DEBUG: Grepping log file for 'Running git commit command:'" >&3
+    # --- OLD: Verify via log count (Flaky) ---
+    # echo "# DEBUG: Grepping log file for 'Running git commit command:'" >&3
     # Count lines containing "Running git commit command:" in the log
-    commit_count=$(grep -c "Running git commit command:" "$output_file") # grep is okay in tests
+    # commit_count=$(grep -c "Running git commit command:" "$output_file")
+    # echo "# DEBUG: Commit count found: $commit_count" >&3
+    # assert_equal "$commit_count" "1" # Only the initial commit should have run
 
-    ## NEW ##
-    echo "# DEBUG: Commit count found: $commit_count" >&3
-    assert_equal "$commit_count" "1" # Only the initial commit should have run
+    # --- NEW: Verify commit history directly (Robust) ---
+    # --- Verify commit history directly ---
+    echo "# DEBUG: Verifying total commit count using git rev-list" >&3
+    # Count total commits: Initial commit (1) + commit from 'echo line1' (1) = 2
+    run git rev-list --count HEAD
+    assert_success "Failed to count commits"
+    local expected_commit_count=2
+    echo "# DEBUG: Expected commit count: $expected_commit_count, Actual found: $output" >&3
+    assert_equal "$output" "$expected_commit_count" "Expected $expected_commit_count commits in history (setup + echo), but found $output. Commit happened after touch."
+    # --- End NEW ---
 
-    cd /tmp
-}
+     cd /tmp
+ }
