@@ -105,7 +105,7 @@ jobs:
         run: |
           echo "--- Verifying gitwatch.sh content ---"
           # This checks for your new conditional logging fix
-          grep -C 3 "if bash -c \"\$commit_cmd\"" gitwatch.sh
+          grep -C 3 'verbose_echo "Running git commit command:' gitwatch.sh
           echo "--- Verifying debounce logic ---"
           # This checks for your new debounce fix (the one *without* 'wait')
           grep -C 3 "if \[\[ -n \${SLEEP_PID:-} \]\]" gitwatch.sh
