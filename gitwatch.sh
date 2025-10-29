@@ -921,8 +921,14 @@ _perform_commit() {
   # Commit
   local commit_cmd
   commit_cmd=$(printf "%s commit %s -m %q" "$GIT" "$GIT_COMMIT_ARGS" "$FINAL_COMMIT_MSG")
-  bash -c "$commit_cmd" || { stderr "ERROR: 'git commit' failed."; return 1; }
-  verbose_echo "Running git commit command: $commit_cmd"
+  if bash -c "$commit_cmd"; then
+    # Only print the verbose message if the commit was successful
+    verbose_echo "Running git commit command: $commit_cmd"
+  else
+    # Handle the commit failure (which includes "nothing to commit" errors)
+    stderr "ERROR: 'git commit' failed."
+    return 1
+  fi
 
   # Pull (if enabled)
   if [ -n "$PULL_CMD" ]; then
