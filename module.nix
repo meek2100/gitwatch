@@ -27,6 +27,12 @@ let
         sleepTimeArg = getvar "-s" "sleepTime" cfg;
         excludePatternArg = getvar "-x" "excludePattern" cfg;
         eventsArg = getvar "-e" "events" cfg;
+        gitDirArg = getvar "-g" "gitDir" cfg;
+
+        # Log diff line options (-l or -L)
+        logDiffLinesArg = if cfg.logDiffLines != null
+          then getvar (if cfg.logDiffNoColor then "-L" else "-l") "logDiffLines" cfg
+          else "";
 
         # Boolean options (flags)
         pullBeforePushFlag = getflag "-R" "pullBeforePush" cfg;
@@ -34,11 +40,23 @@ let
         commitOnStartFlag = getflag "-f" "commitOnStart" cfg;
         useSyslogFlag = getflag "-S" "useSyslog" cfg;
         verboseFlag = getflag "-v" "verbose" cfg;
+        passDiffsFlag = getflag "-C" "passDiffs" cfg;
+
+        # Custom command args (special handling to use -c and override -m/-l if present)
+        customCommandArgs = if cfg.customCommand != null
+          then lib.strings.concatStringsSep " " (lib.lists.filter (s: s != "") [
+            (getvar "-c" "customCommand" cfg)
+            passDiffsFlag
+          ])
+          else "";
+
 
         # Combine all arguments into a single string
         allArgs = lib.strings.concatStringsSep " " (lib.lists.filter (s: s != "") [
-          remoteArg branchArg messageArg dateFmtArg sleepTimeArg excludePatternArg eventsArg
+          remoteArg branchArg dateFmtArg sleepTimeArg excludePatternArg eventsArg gitDirArg logDiffLinesArg
           pullBeforePushFlag skipIfMergingFlag commitOnStartFlag useSyslogFlag verboseFlag
+          # Special handling for commit message: custom command overrides -m
+          (if cfg.customCommand != null then customCommandArgs else messageArg)
           # The path must be the last argument
           (lib.strings.escapeShellArg cfg.path)
         ]);
@@ -91,6 +109,8 @@ in
         sleepTime = 5;
         useSyslog = true;
         verbose = true;
+        logDiffLines = 10;
+        gitDir = "/mnt/data/.git";
       };
       disabled-repo = {
         enable = false;
@@ -153,7 +173,16 @@ in
           type = bool;
           default = false;
         };
-        # NEW VALUE OPTIONS
+        passDiffs = lib.mkOption {
+          description = "If true, pipe file list to custom command (-C).";
+          type = bool;
+          default = false;
+        };
+        logDiffNoColor = lib.mkOption {
+          description = "If true, logs diff lines without color (overrides -l to -L).";
+          type = bool;
+          default = false;
+        };
         sleepTime = lib.mkOption {
           description = "Time in seconds to wait after change detection (-s <secs>).";
           type = nullOr (oneOf [ str int ]);
@@ -171,6 +200,21 @@ in
         };
         events = lib.mkOption {
           description = "Events passed to inotifywait/fswatch (-e <events>).";
+          type = nullOr str;
+          default = null;
+        };
+        gitDir = lib.mkOption {
+          description = "Location of the .git directory, if stored elsewhere (-g).";
+          type = nullOr str;
+          default = null;
+        };
+        logDiffLines = lib.mkOption {
+          description = "Log actual changes up to a given number of lines, 0 for unlimited (-l).";
+          type = nullOr (oneOf [ str int ]);
+          default = null;
+        };
+        customCommand = lib.mkOption {
+          description = "Command to be run to generate a commit message (-c).";
           type = nullOr str;
           default = null;
         };
