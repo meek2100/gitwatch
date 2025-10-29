@@ -16,6 +16,9 @@ services:
 
       # Mount your git config to use your correct user name and email for commits
       - ~/.gitconfig:/root/.gitconfig:ro
+
+      # OPTIONAL: If your repo's .git directory is separate (e.g., for volume mounts)
+      # - /path/to/external/.git:/app/.git
     environment:
       # --- Watched Directory ---
       # This should match the container path in the 'volumes' section above
@@ -26,6 +29,9 @@ services:
       GIT_REMOTE: origin
       # The branch to push to (e.g., 'main' or 'master')
       GIT_BRANCH: main
+      # The path to an external .git directory (used with -g flag in gitwatch.sh)
+      # If your .git folder is mounted separately, set this to the container path (e.g., /app/.git)
+      GIT_EXTERNAL_DIR: ""
       # Set to "true" to run 'git pull --rebase' before every push
       PULL_BEFORE_PUSH: "false"
 

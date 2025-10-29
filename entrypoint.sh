@@ -10,6 +10,7 @@ GIT_WATCH_DIR=${GIT_WATCH_DIR:-/app/watched-repo}
 # Git options
 GIT_REMOTE=${GIT_REMOTE:-origin}
 GIT_BRANCH=${GIT_BRANCH:-main}
+GIT_EXTERNAL_DIR=${GIT_EXTERNAL_DIR:-} # NEW: Path to the external .git directory (e.g., /app/.git)
 
 # Gitwatch behavior
 SLEEP_TIME=${SLEEP_TIME:-2}
@@ -37,6 +38,11 @@ cmd+=( -b "${GIT_BRANCH}" )
 cmd+=( -s "${SLEEP_TIME}" )
 cmd+=( -m "${COMMIT_MSG}" )
 cmd+=( -d "${DATE_FMT}" )
+
+# NEW: Add external Git directory if set
+if [ -n "${GIT_EXTERNAL_DIR}" ]; then
+  cmd+=( -g "${GIT_EXTERNAL_DIR}" )
+fi
 
 # --- Convert User-Friendly Exclude Pattern to Regex ---
 if [ -n "${USER_EXCLUDE_PATTERN}" ]; then
