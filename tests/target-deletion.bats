@@ -5,7 +5,7 @@ load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'
 load 'test_helper/bats-file/load'
 # Load custom helpers
-load 'test_helper/custom_helpers'
+load 'test_helper/custom-helpers'
 # Load setup/teardown
 load 'startup-shutdown'
 
@@ -104,5 +104,62 @@ load 'startup-shutdown'
 
     # 6. Cleanup
     unset GITWATCH_PID
+    cd /tmp
+}
+
+@test "watcher_process_failure: Exits gracefully when the watcher binary terminates unexpectedly" {
+    local output_file
+    output_file=$(mktemp "$testdir/output.XXXXX")
+    local exit_code=5
+
+    # Determine watcher name for dummy creation
+    local watcher_name
+    if [ "$RUNNER_OS" == "Linux" ]; then
+        watcher_name="inotifywait"
+    else
+        watcher_name="fswatch"
+    fi
+
+    # 1. Create a dummy watcher binary that fails immediately
+    local dummy_watcher
+    # Note: Requires create_failing_watcher_bin from custom-helpers.bash
+    dummy_watcher=$(create_failing_watcher_bin "$watcher_name" "$exit_code")
+
+    # 2. Export the environment variable to force gitwatch.sh to use the dummy
+    export GW_INW_BIN="$dummy_watcher"
+
+    # 3. Start gitwatch (it will execute the failing dummy watcher)
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+    GITWATCH_PID=$!
+    local watch_pid=$GITWATCH_PID
+
+    # Give a short moment for the watcher to fail and the loop to exit
+    sleep 1
+
+    # 4. Wait for the main gitwatch process to terminate
+    local max_wait=5
+    local wait_count=0
+    while kill -0 "$watch_pid" 2>/dev/null && [ "$wait_count" -lt "$max_wait" ]; do
+        echo "# DEBUG: Waiting for gitwatch PID $watch_pid to exit..." >&3
+        sleep 1
+        wait_count=$((wait_count + 1))
+    done
+
+    # 5. Assert process terminated
+    if kill -0 "$watch_pid" 2>/dev/null; then
+        fail "gitwatch process (PID $watch_pid) failed to exit after watcher failure."
+    fi
+
+    # 6. Assert log output confirms failure and exit
+    run cat "$output_file"
+    assert_output --partial "DUMMY WATCHER: $watcher_name failed with code $exit_code" \
+        "The dummy watcher failure message was not captured."
+    assert_output --partial "File watcher process ended (or failed). Exiting via loop termination." \
+        "Did not log loop termination message."
+
+    # 7. Cleanup
+    unset GITWATCH_PID
+    unset GW_INW_BIN
+    rm -f "$dummy_watcher"
     cd /tmp
 }
