@@ -1029,9 +1029,18 @@ verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
     verbose_echo "Draining event: $drain_line"
   done
 
+  # --- MODIFIED DEBOUNCE LOGIC ---
   if [[ -n ${SLEEP_PID:-} ]] && kill -0 "$SLEEP_PID" &> /dev/null; then
+    verbose_echo "Debounce: Change detected while timer (PID $SLEEP_PID) was active. Killing old timer process group."
+    # Use pkill to kill all children of the subshell (e.g., the 'sleep' command) FIRST.
+    # This is crucial to prevent the 'perform_commit' in the old timer from running.
+    pkill -15 -P "$SLEEP_PID" &> /dev/null || true
+    # Now kill the parent subshell itself.
     kill "$SLEEP_PID" &> /dev/null || true
+    # Optional: Wait briefly to ensure termination before starting new timer
+    sleep 0.1
   fi
+  # --- END MODIFIED LOGIC ---
 
   (
     # Add error handling for sleep? No, should be reliable.
