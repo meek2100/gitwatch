@@ -87,6 +87,73 @@ load 'startup-shutdown'
     cd /tmp
 }
 
+@test "pull_rebase_on_fresh_repo: Handles upstream changes when local history is one commit behind remote" {
+    local output_file
+    output_file=$(mktemp "$testdir/output.XXXXX")
+
+    # 1. Start with the initial setup commit (which exists at this point)
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+    local initial_commit_hash=$(git log -1 --format=%H)
+
+    # 2. Simulate Upstream Change on Remote (Remote is now ahead of local)
+    cd "$testdir"
+    run git clone -q remote local_ahead
+    assert_success "Cloning for local_ahead failed"
+    cd local_ahead
+    echo "Upstream commit" > upstream_file.txt
+    git add upstream_file.txt
+    git commit -q -m "Upstream change (commit 2)"
+    run git push -q origin master
+    assert_success "Push from local_ahead failed"
+    local upstream_commit_hash=$(git rev-parse HEAD)
+    run rm -rf local_ahead
+
+    # 3. Go back to gitwatch repo (Local is now one commit behind remote)
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+    run git rev-parse origin/master
+    assert_success
+    assert_equal "$upstream_commit_hash" "$output" "Remote hash is incorrect after upstream push"
+    run git log -1 --format=%H
+    assert_success
+    assert_equal "$initial_commit_hash" "$output" "Local hash should be the initial commit"
+
+    # 4. Start gitwatch with -R and -r flag
+    echo "# DEBUG: Starting gitwatch with -R on a stale repo" >&3
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -R "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+    GITWATCH_PID=$!
+    sleep 1 # Allow watcher to initialize
+
+    # 5. Make a local change to trigger the commit/pull/rebase cycle
+    echo "Local commit 3" >> local_file.txt
+
+    # 6. Wait for the final push to complete (Remote hash changes after rebase/push)
+    # The final hash will be the rebased local commit
+    run wait_for_git_change 30 1 git rev-parse origin/master
+    assert_success "wait_for_git_change timed out after local change/rebase"
+
+    # 7. Assert: Verify the local repo has the upstream file
+    assert_file_exist "upstream_file.txt" "Upstream file was not pulled/rebased"
+
+    # 8. Assert: Verify the history is correct (Local HEAD should be the last commit)
+    local final_local_hash=$(git rev-parse HEAD)
+    local final_remote_hash=$(git rev-parse origin/master)
+    assert_equal "$final_local_hash" "$final_remote_hash" "Local and remote hashes do not match after rebase/push"
+    assert_not_equal "$upstream_commit_hash" "$final_local_hash" "Final hash should be the new local commit"
+
+    # 9. Assert: Verify rebase log confirms the pull
+    run cat "$output_file"
+    assert_output --partial "Executing pull command:" "Should execute pull command"
+    assert_output --partial "Successfully rebased and updated" "Rebase should succeed (Linux/Git message)" || \
+    assert_output --partial "Current branch master is up to date." "Pull might say up to date if rebase was fast-forward/already happened"
+
+    # The existing files must be present
+    assert_file_exist "initial_file.txt"
+    assert_file_exist "local_file.txt"
+    assert_file_exist "upstream_file.txt"
+
+    cd /tmp
+}
+
 
 @test "pull_rebase_conflict: Handles merge conflict with -R flag gracefully" {
     # Use a shorter sleep time to speed up the test
@@ -95,6 +162,7 @@ load 'startup-shutdown'
     local initial_file="conflict_file.txt"
 
     # Start gitwatch with pull-rebase enabled, shorter sleep, and redirect output for error analysis
+
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -s "$test_sleep_time" -r origin -R "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
     GITWATCH_PID=$!
     cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -112,6 +180,7 @@ load 'startup-shutdown'
     # --- Setup Conflict (File is on same line in both branches) ---
     # 1. Simulate Upstream change (local2)
     cd "$testdir"
+
     run git clone -q remote local2
     assert_success "Cloning for local2 failed"
     cd local2
@@ -171,6 +240,7 @@ load 'startup-shutdown'
     # 1. Start gitwatch with -R but NO -r
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -R "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
     GITWATCH_PID=$!
+
     sleep 1
 
     # 2. Trigger a local change
