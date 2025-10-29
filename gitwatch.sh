@@ -53,7 +53,7 @@ PULL_BEFORE_PUSH=0
 BRANCH=""
 SLEEP_TIME=2
 DATE_FMT="+%Y-%m-%d %H:%M:%S"
-COMMITMSG="Scripted auto-commit on change (%d) by gitwatch.sh"
+COMMITMSG="Auto-commit: %d"
 COMMITCMD=""
 PASSDIFFS=0
 LISTCHANGES=-1
@@ -107,7 +107,7 @@ shelp() {
   echo "                  %d in the string will be replaced by the formatted date/time"
   echo "                  (unless the <fmt> specified by -d is empty, in which case %d"
   echo "                  is replaced by an empty string); the default message is:"
-  echo '                  "Scripted auto-commit on change (%d) by gitwatch.sh"'
+  echo '                  "Auto-commit: %d"'
   echo " -c <command>     The command to be run to generate a commit message. If empty,"
   echo "                  defaults to the standard commit message. This option overrides -m,"
   echo "                  -d, and -l. Executed via bash -c."
@@ -581,9 +581,10 @@ GIT_DIR_PATH=$(cd "$TARGETDIR_ABS" && bash -c "$GIT rev-parse --absolute-git-dir
 verbose_echo "Determined git directory for lockfiles: $GIT_DIR_PATH"
 
 # --- CRITICAL PERMISSION CHECK FOR NON-ROOT USER ON VOLUME MOUNT ---
-# Check if the current user has the necessary permissions (Read/Write/Execute)
+# FIX: Only check for Read/Execute. Lack of Write will trigger lockfile fallback below.
+# Check if the current user has the necessary permissions (Read/Execute)
 # on the .git directory. Failure here indicates a permission mismatch.
-if ! [ -r "$GIT_DIR_PATH" ] || ! [ -w "$GIT_DIR_PATH" ] || ! [ -x "$GIT_DIR_PATH" ]; then
+if ! [ -r "$GIT_DIR_PATH" ] || ! [ -x "$GIT_DIR_PATH" ]; then
   CURRENT_UID="" # Initialize
   CURRENT_USER="" # Initialize
   # Use process substitution to get UID/Username robustly if the commands exist
@@ -604,7 +605,7 @@ if ! [ -r "$GIT_DIR_PATH" ] || ! [ -w "$GIT_DIR_PATH" ] || ! [ -x "$GIT_DIR_PATH
     # Generic/Daemon/Standalone resolution
     resolution_message=$(printf "
     Resolution required:
-    1. **Check Ownership**: The current user (UID %s) does not own or have write access to the '.git' folder.
+    1. **Check Ownership**: The current user (UID %s) does not own or have R/X access to the '.git' folder.
     2. **Recommended Fix**: Ensure the watched directory is owned by the user running gitwatch.sh.
     - Run: \`sudo chown -R \$USER:\$USER \"\$GIT_DIR_PATH\"\`
     " "$CURRENT_UID")
@@ -617,8 +618,9 @@ if ! [ -r "$GIT_DIR_PATH" ] || ! [ -w "$GIT_DIR_PATH" ] || ! [ -x "$GIT_DIR_PATH
   stderr "The application is running as user: $CURRENT_USER (UID $CURRENT_UID)"
   stderr "Attempted to access Git directory: $GIT_DIR_PATH"
   stderr ""
-  stderr "This error indicates that the current user lacks the necessary Read/Write/Execute"
-  stderr "permissions on the Git repository's metadata folder (the '.git' directory)."
+  stderr "This error indicates that the current user lacks the necessary Read/Execute"
+  stderr "permissions on the Git repository's metadata folder (the '.git' directory), which"
+  stderr "is required to perform Git operations."
   stderr ""
   stderr "$resolution_message"
   stderr "========================================================================================="
@@ -639,6 +641,7 @@ LOCKFILE_DIR="$GIT_DIR_PATH"
 LOCKFILE_BASENAME="gitwatch"
 
 # Check for write permission. If it fails, fall back to $TMPDIR
+# This handles the case where Write permission was missing on $GIT_DIR_PATH (the check above passed)
 if [ "$USE_FLOCK" -eq 1 ]; then
   if ! touch "$LOCKFILE_DIR/gitwatch.lock.tmp" 2>/dev/null; then
     verbose_echo "Warning: Cannot write lockfile to $LOCKFILE_DIR. Falling back to temporary directory."
