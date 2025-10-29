@@ -921,13 +921,31 @@ _perform_commit() {
   # Commit
   local commit_cmd
   commit_cmd=$(printf "%s commit %s -m %q" "$GIT" "$GIT_COMMIT_ARGS" "$FINAL_COMMIT_MSG")
-  if bash -c "$commit_cmd"; then
-    # Only print the verbose message if the commit was successful
+
+  # Run the commit command and capture its output and exit code
+  commit_output=$(bash -c "$commit_cmd" 2>&1) # Capture stdout and stderr
+  commit_exit_code=$? # Capture the exit code immediately
+
+  # Check the captured exit code
+  if [ "$commit_exit_code" -eq 0 ]; then
+    # Commit succeeded
     verbose_echo "Running git commit command: $commit_cmd"
+    # Optional: Log the commit output if verbose and needed for debugging
+    # verbose_echo "Commit output: $commit_output"
   else
-    # Handle the commit failure (which includes "nothing to commit" errors)
-    stderr "ERROR: 'git commit' failed."
-    return 1
+    # Commit failed
+    # Check stderr/stdout for "nothing to commit" as a secondary check (more robust than just exit code 1)
+    if [[ "$commit_output" == *"nothing to commit"* ]]; then
+      verbose_echo "Commit attempted, but no changes to commit."
+      # Treat "nothing to commit" as non-fatal for the script's main loop
+      # It still means this specific trigger didn't result in a *new* commit
+      return 0 # Return success because the script handled it, even though git didn't commit
+    else
+      # It was a different, unexpected error
+      stderr "ERROR: 'git commit' failed with exit code $commit_exit_code."
+      stderr "Commit output: $commit_output"
+      return 1 # Return failure code for unexpected errors
+    fi
   fi
 
   # Pull (if enabled)
