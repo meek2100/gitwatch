@@ -104,11 +104,11 @@ jobs:
         shell: bash
         run: |
           echo "--- Verifying gitwatch.sh content ---"
-          # This checks for your new conditional logging fix
-          grep -C 3 'verbose_echo "Running git commit command:' gitwatch.sh
-          echo "--- Verifying debounce logic ---"
-          # This checks for your new debounce fix (the one *without* 'wait')
-          grep -C 3 "if \[\[ -n \${SLEEP_PID:-} \]\]" gitwatch.sh
+          # Verify the git write-tree check
+          grep -C 3 'if \[ "$staged_tree_hash" = "$head_tree_hash" \];' gitwatch.sh
+          echo "--- Verifying debounce logic (PID File Method) ---"
+          # Verify the start of the new debounce logic block using the PID file
+          grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh # <-- CORRECTED LINE
           echo "--- End of verification ---"
 
       - name: Run tests individually
