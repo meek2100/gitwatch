@@ -1001,6 +1001,8 @@ perform_commit() {
   return $commit_status
 }
 
+# ... (end of perform_commit function) ...
+
 ###############################################################################
 
 # If -f is specified, perform an initial commit before starting to watch
@@ -1008,6 +1010,15 @@ if [ "$COMMIT_ON_START" -eq 1 ]; then
   verbose_echo "Performing initial commit check..."
   perform_commit
 fi
+
+# --- Debounce Timer PID File ---
+# Using a file to store the PID of the *active* timer subshell
+TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | sha256sum | awk '{print $1}').pid"
+CURRENT_TIMER_PID="" # Holds the PID of the currently running timer subshell
+
+# Cleanup PID file on exit
+trap 'rm -f "$TIMER_PID_FILE"; cleanup' EXIT INT TERM
+
 
 # main program loop: wait for changes and commit them
 #   whenever inotifywait reports a change, we spawn a timer (sleep process) that gives the writing
@@ -1029,27 +1040,39 @@ verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
     verbose_echo "Draining event: $drain_line"
   done
 
-  # --- MODIFIED DEBOUNCE LOGIC ---
-  if [[ -n ${SLEEP_PID:-} ]] && kill -0 "$SLEEP_PID" &> /dev/null; then
-    verbose_echo "Debounce: Change detected while timer (PID $SLEEP_PID) was active. Killing old timer process group."
-    # Use pkill to kill all children of the subshell (e.g., the 'sleep' command) FIRST.
-    # This is crucial to prevent the 'perform_commit' in the old timer from running.
-    pkill -15 -P "$SLEEP_PID" &> /dev/null || true
-    # Now kill the parent subshell itself.
-    kill "$SLEEP_PID" &> /dev/null || true
-    # Optional: Wait briefly to ensure termination before starting new timer
-    sleep 0.1
+  # --- SIMPLIFIED DEBOUNCE LOGIC ---
+  # Read the PID from the file if it exists
+  if [ -f "$TIMER_PID_FILE" ]; then
+    OLD_TIMER_PID=$(cat "$TIMER_PID_FILE")
+    # Check if that process is still running
+    if [[ -n "$OLD_TIMER_PID" ]] && kill -0 "$OLD_TIMER_PID" &>/dev/null; then
+      verbose_echo "Debounce: Timer (PID $OLD_TIMER_PID) is active. Killing it."
+      # Kill the old timer process group robustly
+      pkill -15 -P "$OLD_TIMER_PID" &>/dev/null || true
+      kill "$OLD_TIMER_PID" &>/dev/null || true
+    fi
   fi
-  # --- END MODIFIED LOGIC ---
 
+  # Start the new timer in the background
   (
-    # Add error handling for sleep? No, should be reliable.
+    # Subshell: Sleep first
     sleep "$SLEEP_TIME"
+    # Then attempt the commit
+    verbose_echo "Debounce Timer (PID $$): Sleep finished. Attempting commit."
     perform_commit
+    # Remove the PID file *after* attempting commit
+    rm -f "$TIMER_PID_FILE"
+    verbose_echo "Debounce Timer (PID $$): Commit attempt finished. PID file removed."
   ) &
-  SLEEP_PID=$!
+  # Store the PID of the *new* background subshell
+  CURRENT_TIMER_PID=$!
+  echo "$CURRENT_TIMER_PID" > "$TIMER_PID_FILE"
+  verbose_echo "Debounce: Started new timer (PID $CURRENT_TIMER_PID). PID stored in $TIMER_PID_FILE."
+  # --- END SIMPLIFIED DEBOUNCE LOGIC ---
 
 done
 
 verbose_echo "File watcher process ended (or failed). Exiting via loop termination."
+# Ensure PID file is removed if loop terminates unexpectedly
+rm -f "$TIMER_PID_FILE"
 exit 0 # Explicit exit to ensure cleanup trap runs
