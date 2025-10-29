@@ -736,7 +736,8 @@ diff-lines() {
   # Loop over diff lines, preserving leading/trailing whitespace (IFS= read -r)
   while IFS= read -r REPLY; do
     # 1. Strip leading color codes from the line for reliable regex matching
-    local stripped_reply="${REPLY##$color_regex}"
+    # FIX: Quoting $color_regex to fix SC2295
+    local stripped_reply="${REPLY##"$color_regex"}"
 
     # 2. Determine the raw line content (after removing the leading color codes)
     local raw_content_match
@@ -753,7 +754,8 @@ diff-lines() {
     # Match '--- a/path' or '--- /dev/null' - Capture everything after 'a/' or '/dev/null'
     if [[ "$stripped_reply" =~ ^---\ (a/)?(.*) ]]; then
       # Capture the raw path (Group 2). Strip any potential trailing color codes.
-      previous_path=$(printf "%s" "${BASH_REMATCH[2]}" | _strip_color | xargs)
+      # FIX: Use explicit argument passing to fix SC2119/SC2120 and remove printf
+      previous_path=$(_strip_color "${BASH_REMATCH[2]}" | xargs)
       path="" # Reset new path
       line="" # Reset line number
       # Handle /dev/null case for clarity
@@ -763,7 +765,8 @@ diff-lines() {
       # Match '+++ b/path' - Capture everything after 'b/'
     elif [[ "$stripped_reply" =~ ^\+\+\+\ (b/)?(.*) ]]; then
       # Capture the raw path (Group 2). Strip any potential trailing color codes.
-      path=$(printf "%s" "${BASH_REMATCH[2]}" | _strip_color | xargs)
+      # FIX: Use explicit argument passing to fix SC2119/SC2120 and remove printf
+      path=$(_strip_color "${BASH_REMATCH[2]}" | xargs)
       # Ensure path is not /dev/null, which is technically possible but not relevant here
       if [[ "$path" == "/dev/null" ]]; then path=""; fi
       continue
@@ -807,7 +810,8 @@ diff-lines() {
         local display_content=${raw_content_match:0:150}
 
         # Output: path:line: [COLOR_CODES]+/-content
-        local color_codes=${REPLY%%$stripped_reply} # Re-capture original leading color codes
+        # FIX: Quoting $stripped_reply to fix SC2295
+        local color_codes=${REPLY%%"$stripped_reply"} # Re-capture original leading color codes
 
         # Ensure '?' is output for line number if not yet set/relevant
         local output_line=${line:-?}
