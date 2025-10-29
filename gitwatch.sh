@@ -477,7 +477,7 @@ fi
 # END Patch for Compatibility Testing
 
 if [[ "$bash_major_version" -ge 4 ]]; then
-  READ_TIMEOUT="0.2" # Use faster timeout for modern bash
+  READ_TIMEOUT="0.1" # Use faster timeout for modern bash
 fi
 verbose_echo "Using read timeout: $READ_TIMEOUT seconds (Bash version: ${bash_major_version})"
 
