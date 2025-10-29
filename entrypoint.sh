@@ -10,12 +10,14 @@ GIT_WATCH_DIR=${GIT_WATCH_DIR:-/app/watched-repo}
 # Git options
 GIT_REMOTE=${GIT_REMOTE:-origin}
 GIT_BRANCH=${GIT_BRANCH:-main}
-GIT_EXTERNAL_DIR=${GIT_EXTERNAL_DIR:-} # NEW: Path to the external .git directory (e.g., /app/.git)
+GIT_EXTERNAL_DIR=${GIT_EXTERNAL_DIR:-} # Path to the external .git directory (e.g., /app/.git)
 
 # Gitwatch behavior
 SLEEP_TIME=${SLEEP_TIME:-2}
 COMMIT_MSG=${COMMIT_MSG:-"Scripted auto-commit on change (%d) by gitwatch.sh"}
 DATE_FMT=${DATE_FMT:-"+%Y-%m-%d %H:%M:%S"}
+# New: Custom command for commit message
+COMMIT_CMD=${COMMIT_CMD:-}
 # Read the user-friendly pattern
 USER_EXCLUDE_PATTERN=${EXCLUDE_PATTERN:-""}
 EVENTS=${EVENTS:-""}
@@ -25,6 +27,8 @@ PULL_BEFORE_PUSH=${PULL_BEFORE_PUSH:-false}
 SKIP_IF_MERGING=${SKIP_IF_MERGING:-false}
 VERBOSE=${VERBOSE:-false}
 COMMIT_ON_START=${COMMIT_ON_START:-false}
+PASS_DIFFS=${PASS_DIFFS:-false} # New: Pass diffs to custom command (-C)
+USE_SYSLOG=${USE_SYSLOG:-false} # New: Log to Syslog (-S)
 
 
 # --- Command Construction ---
@@ -32,14 +36,26 @@ COMMIT_ON_START=${COMMIT_ON_START:-false}
 # Use a bash array to safely build the command and its arguments
 cmd=( "/app/gitwatch.sh" )
 
-# Add options with arguments
+# Add options with arguments (remote, branch, sleep time, date format)
 cmd+=( -r "${GIT_REMOTE}" )
 cmd+=( -b "${GIT_BRANCH}" )
 cmd+=( -s "${SLEEP_TIME}" )
-cmd+=( -m "${COMMIT_MSG}" )
 cmd+=( -d "${DATE_FMT}" )
 
-# NEW: Add external Git directory if set
+# Add custom commit command (-c) which overrides -m and -d
+if [ -n "${COMMIT_CMD}" ]; then
+  cmd+=( -c "${COMMIT_CMD}" )
+  # If -C is enabled, add it now
+  if [ "${PASS_DIFFS}" = "true" ]; then
+    cmd+=( -C )
+  fi
+else
+  # Only include -m if no custom command is provided
+  cmd+=( -m "${COMMIT_MSG}" )
+fi
+
+
+# Add external Git directory if set
 if [ -n "${GIT_EXTERNAL_DIR}" ]; then
   cmd+=( -g "${GIT_EXTERNAL_DIR}" )
 fi
@@ -87,6 +103,11 @@ fi
 if [ "${COMMIT_ON_START}" = "true" ]; then
   cmd+=( -f )
 fi
+
+if [ "${USE_SYSLOG}" = "true" ]; then
+  cmd+=( -S )
+fi
+
 
 # The final argument is the directory to watch
 cmd+=( "${GIT_WATCH_DIR}" )
