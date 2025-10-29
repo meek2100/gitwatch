@@ -373,9 +373,9 @@ contains spaces or special characters, you need to escape them accordingly.
 #### SysVInit
 
 A central place to put startup scripts on Linux is generally
-`/etc/rc.local`. This file, if it has the +x bit, will be executed upon startup, **by the
-root user account**. If you want to start `gitwatch` from `rc.local`, the
-recommended way to call it is:
+`/etc/rc.local`. This file, if it has the +x bit, will be executed upon
+startup, **by the root user account**. If you want to start `gitwatch` from
+`rc.local`, the recommended way to call it is:
 
 <!-- markdownlint-disable -->
 
@@ -383,16 +383,25 @@ recommended way to call it is:
 
 <!-- markdownlint-restore -->
 
-The `<username>` bit should be replaced with your username or that of any other (non-root) user account; it only needs write-access to the Git repository of the file/folder you want to watch. The ampersand (`&`) at the end sends the launched process into the background (this is important if you have other calls in `rc.local` after the mentioned line, because the `gitwatch` call does not usually return).
+The `<username>` bit should be replaced with your username or that of any
+other (non-root) user account; it only needs write-access to the Git
+repository of the file/folder you want to watch. The ampersand (`&`) at the
+end sends the launched process into the background (this is important if
+you have other calls in `rc.local` after the mentioned line, because the
+`gitwatch` call does not usually return).
 
 #### systemd
 
 This service is designed to run in user space (`--user` flag).
 
-- If installed to a path other than `/usr/local/bin/gitwatch`, modify the `ExecStart` path within `gitwatch@.service` to suit.
-- Create the user systemd directory if it does not exist and copy the systemd service file:
+- If installed to a path other than `/usr/local/bin/gitwatch`, modify the
+  `ExecStart` path within `gitwatch@.service` to suit.
+- Create the user systemd directory if it does not exist and copy the
+  systemd service file:
   `mkdir -p "$HOME/.config/systemd/user" && cp gitwatch@.service $HOME/.config/systemd/user`
-- Start and enable the service for a given path and arguments by running the following command. The arguments are passed to the service after being escaped.
+- Start and enable the service for a given path and arguments by running
+  the following command. The arguments are passed to the service after
+  being escaped.
   `systemctl --user --now enable gitwatch@$(systemd-escape -- "'-r url/to/repository' /path/to/folder").service`
 
 ## Other Articles
