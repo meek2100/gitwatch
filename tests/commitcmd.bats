@@ -11,10 +11,10 @@ load 'startup-shutdown'
 
 @test "commit_command_single: Uses simple custom command output as commit message" {
     # Start gitwatch directly in the background
-    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c "uname" "$testdir/local/remote" &
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c "uname" "$testdir/local/$TEST_SUBDIR_NAME" &
     GITWATCH_PID=$!
 
-    cd "$testdir/local/remote"
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
     sleep 1 # Allow gitwatch to potentially initialize
     echo "line1" >> file1.txt
 
@@ -29,10 +29,10 @@ load 'startup-shutdown'
 
 @test "commit_command_format: Uses complex custom command with substitutions" {
     # Start gitwatch directly in the background
-    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c 'echo "$(uname) is the uname of this device, the time is $(date)"' "$testdir/local/remote" &
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c 'echo "$(uname) is the uname of this device, the time is $(date)"' "$testdir/local/$TEST_SUBDIR_NAME" &
     GITWATCH_PID=$!
 
-    cd "$testdir/local/remote"
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
     sleep 1
     echo "line1" >> file1.txt
 
@@ -49,10 +49,10 @@ load 'startup-shutdown'
 
 @test "commit_command_overwrite: -c flag overrides -l, -L, -d flags" {
     # Start gitwatch directly in the background
-    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c "uname" -l 123 -L 0 -d "+%Y" "$testdir/local/remote" &
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c "uname" -l 123 -L 0 -d "+%Y" "$testdir/local/$TEST_SUBDIR_NAME" &
     GITWATCH_PID=$!
 
-    cd "$testdir/local/remote"
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
     sleep 1
     echo "line1" >> file1.txt
 
