@@ -23,6 +23,7 @@
     - [Notes for Mac](#notes-for-mac)
   - [What it does](#what-it-does)
   - [Usage](#usage)
+    - [Behavior Notes](#behavior-notes)
     - [Starting on Boot](#starting-on-boot)
       - [SysVInit](#sysvinit)
       - [systemd](#systemd)
@@ -318,36 +319,61 @@ Notes:
 
 ## Usage
 
-`gitwatch.sh [-r <remote> [-b <branch>]] <file or directory to watch>`
+The general usage syntax is:
 
-It is expected that the watched file/directory are already in a Git
-repository (the script will not create a repository). If a folder is being
-watched, this will be watched fully recursively; this also means that all
-files and sub-folders added and removed from the directory will always be
-added and removed in the next commit. The `.git` folder will be excluded
-from the `inotifywait` call so changes to it will not cause unnecessary
-triggering of the script.
+```sh
+gitwatch.sh [-s <secs>] [-d <fmt>] [-r <remote> [-b <branch> | -R]] \
+    [-g <path>] [-m <msg>] [-l | -L <lines>] [-x <pattern>] \
+    [-c <command> [-C]] [-M] [-S] [-v] [-f] [-V] <target>
+```
 
-If you have any large files in your repository that are changing
-frequently, you might wish to ignore them with a `.gitignore` file.
+Where `<target>` is the file or folder to be watched.
+
+| Option | Argument    | Default                     | Description                                                                                                                        |
+| :----- | :---------- | :-------------------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
+| `-s`   | `<secs>`    | `2`                         | **Debounce Delay.** Time to wait after a change before initiating the commit process.                                              |
+| `-d`   | `<fmt>`     | `"+%Y-%m-%d %H:%M:%S"`      | **Date Format.** Format string for the timestamp (`%d`) in the commit message (see `man date`).                                    |
+| `-r`   | `<remote>`  | _None_                      | **Push Remote.** Specifies a remote to push to after every successful commit.                                                      |
+| `-R`   | _None_      | _None_                      | **Pull/Rebase.** If used with `-r`, performs a `git pull --rebase` before the push.                                                |
+| `-b`   | `<branch>`  | _Current_                   | **Target Branch.** Specifies the branch to push to.                                                                                |
+| `-g`   | `<path>`    | _None_                      | **Git Dir.** Specifies the path to an external `.git` directory (`--git-dir`).                                                     |
+| `-l`   | `<lines>`   | `-1`                        | **Log Changes (Color).** Includes diff lines in the commit message, up to `<lines>` count (use `0` for unlimited).                 |
+| `-L`   | `<lines>`   | `-1`                        | **Log Changes (Plain).** Same as `-l` but without colored formatting.                                                              |
+| `-m`   | `<msg>`     | `"Scripted auto-commit..."` | **Commit Message.** Template for the commit message. Ignored if `-c` is used.                                                      |
+| `-c`   | `<command>` | _None_                      | **Custom Message Command.** Command to run to generate the full commit message. Overrides `-m`, `-d`, `-l`, and `-L`.              |
+| `-C`   | _None_      | _None_                      | **Pipe Diff.** If used with `-c`, pipes the list of changed files (`git diff --staged --name-only`) to the custom command's stdin. |
+| `-e`   | `<events>`  | _OS Default_                | **Watcher Events.** Custom event list for `inotifywait` or `fswatch`.                                                              |
+| `-x`   | `<pattern>` | _None_                      | **Exclude Pattern.** Regex pattern to exclude files/directories from being monitored. The `.git` folder is always excluded.        |
+| `-M`   | _None_      | _None_                      | **Skip Merging.** Prevents commits if a Git merge/rebase is currently in progress.                                                 |
+| `-f`   | _None_      | _None_                      | **Commit on Start.** Commits any pending staged changes before starting the watch loop.                                            |
+| `-S`   | _None_      | _None_                      | **Syslog.** Logs all messages to syslog (daemon mode) instead of stdout/stderr.                                                    |
+| `-v`   | _None_      | _None_                      | **Verbose.** Enables verbose logging for debugging (`set -x` if not using syslog).                                                 |
+| `-V`   | _None_      | _None_                      | **Version.** Prints version information and exits.                                                                                 |
+
+### Behavior Notes
+
+- **Repository Requirement:** The watched file or directory must already be
+  part of a Git repository.
+- **Automatic Staging:** For a file target, only the file is staged
+  (`` `git add <file>` ``). For a directory target, all changes (adds,
+  modifications, deletions) in the directory are staged recursively
+  (`` `git add --all .` ``).
+- **Empty Commit Prevention:** `gitwatch` prevents commits if only metadata
+  (like timestamps) has changed, ensuring only meaningful file content or
+  file count changes result in a new commit.
 
 ### Starting on Boot
 
 If you want to have the script auto-started upon boot, the method to do
-this depends on your operating system and distribution. If you have a GUI
-dialog to set up startup launches, you might want to use that, so you can
-more easily find and change the startup script calls later on.
+this depends on your operating system and distribution.
 
 Please also note that if either of the paths involved (script or target)
-contains spaces or special characters, you need to escape them accordingly;
-if you don't know how to do that, the internet will help you, or feel free
-to ask here or contact me directly.
+contains spaces or special characters, you need to escape them accordingly.
 
 #### SysVInit
 
 A central place to put startup scripts on Linux is generally
-`/etc/rc.local` (to my knowledge; only tested and confirmed on Ubuntu).
-This file, if it has the +x bit, will be executed upon startup, **by the
+`/etc/rc.local`. This file, if it has the +x bit, will be executed upon startup, **by the
 root user account**. If you want to start `gitwatch` from `rc.local`, the
 recommended way to call it is:
 
@@ -357,21 +383,17 @@ recommended way to call it is:
 
 <!-- markdownlint-restore -->
 
-The `<username>` bit should be replaced with your username or that of any
-other (non-root) user account; it only needs write-access to the Git
-repository of the file/folder you want to watch. The ampersand (`&`) at the
-end sends the launched process into the background (this is important if
-you have other calls in `rc.local` after the mentioned line, because the
-`gitwatch` call does not usually return).
+The `<username>` bit should be replaced with your username or that of any other (non-root) user account; it only needs write-access to the Git repository of the file/folder you want to watch. The ampersand (`&`) at the end sends the launched process into the background (this is important if you have other calls in `rc.local` after the mentioned line, because the `gitwatch` call does not usually return).
 
 #### systemd
 
-- If installed to a path other than `/usr/local/bin/gitwatch`, modify
-  `gitwatch@.service` to suit
-- Create dir if it does not exist and copy systemd service file with
+This service is designed to run in user space (`--user` flag).
+
+- If installed to a path other than `/usr/local/bin/gitwatch`, modify the `ExecStart` path within `gitwatch@.service` to suit.
+- Create the user systemd directory if it does not exist and copy the systemd service file:
   `mkdir -p "$HOME/.config/systemd/user" && cp gitwatch@.service $HOME/.config/systemd/user`
-- Start and enable the service for a given path by running
-  `systemctl --user --now enable gitwatch@$(systemd-escape "'-r url/to/repository' /path/to/folder").service`
+- Start and enable the service for a given path and arguments by running the following command. The arguments are passed to the service after being escaped.
+  `systemctl --user --now enable gitwatch@$(systemd-escape -- "'-r url/to/repository' /path/to/folder").service`
 
 ## Other Articles
 
