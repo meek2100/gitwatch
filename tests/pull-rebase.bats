@@ -160,3 +160,43 @@ load 'startup-shutdown'
 
     cd /tmp
 }
+
+@test "pull_rebase_R_without_remote: -R flag without -r is ignored (no pull/push)" {
+    local output_file
+    output_file=$(mktemp "$testdir/output.XXXXX")
+
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+    local initial_hash=$(git log -1 --format=%H)
+
+    # 1. Start gitwatch with -R but NO -r
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -R "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+    GITWATCH_PID=$!
+    sleep 1
+
+    # 2. Trigger a local change
+    echo "local change with no push" >> no_push_file.txt
+
+    # Wait for the local commit to happen
+    run wait_for_git_change 20 0.5 git log -1 --format=%H
+    assert_success "Local commit failed"
+    local local_commit_hash=$output
+    assert_not_equal "$initial_hash" "$local_commit_hash" "Local commit didn't happen"
+
+    # 3. Wait a bit longer to ensure no push happens
+    sleep 2
+
+    # 4. Assert: Remote hash has NOT changed (still points to initial commit hash)
+    # The initial commit pushed by setup should be the parent of the local hash
+    local parent_hash=$(git rev-parse HEAD^)
+    run git rev-parse origin/master
+    assert_success
+    assert_equal "$parent_hash" "$output" "Remote should NOT have changed (push should have been skipped)"
+
+    # 5. Assert: Log confirms no remote was selected (no error or pull/push messages)
+    run cat "$output_file"
+    assert_output --partial "No push remote selected." "Should explicitly state no remote was selected"
+    refute_output --partial "Executing pull command:" "Should not show a pull command run"
+    refute_output --partial "Executing push command:" "Should not show a push command run"
+
+    cd /tmp
+}

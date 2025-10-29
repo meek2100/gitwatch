@@ -66,3 +66,28 @@ load 'startup-shutdown'
     refute_output --partial "file1.txt" # Should not be in commit msg due to -c override
     refute_output --partial "$(date +%Y)" # Should not be in commit msg due to -c override
 }
+
+@test "commit_command_pipe_C: -c and -C flags pipe list of changed files to command" {
+    local custom_cmd='while IFS= read -r file; do echo "Changed: $file"; done'
+
+    # Start gitwatch with custom command and the pipe flag -C
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c "$custom_cmd" -C "$testdir/local/$TEST_SUBDIR_NAME" &
+    GITWATCH_PID=$!
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+    sleep 1
+
+    # Stage two files
+    echo "change 1" > file_a.txt
+    echo "change 2" > file_b.txt
+
+    # Wait for the commit hash to change
+    wait_for_git_change 20 0.5 git log -1 --format=%H
+
+    # Verify commit message contains both file names, confirming the pipe worked
+    run git log -1 --pretty=%B
+    assert_success
+    assert_output --partial "Changed: file_a.txt"
+    assert_output --partial "Changed: file_b.txt"
+
+    cd /tmp
+}

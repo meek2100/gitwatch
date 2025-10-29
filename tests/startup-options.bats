@@ -42,6 +42,38 @@ load 'startup-shutdown'
     cd /tmp
 }
 
+@test "startup_commit_f_with_push: -f flag also pushes the initial commit to remote" {
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+
+    # 1. Create a file and stage it, but DO NOT commit it
+    echo "staged and pushed" > file_to_push.txt
+    git add file_to_push.txt
+
+    # Get the initial remote hash
+    local initial_remote_hash
+    initial_remote_hash=$(git rev-parse origin/master)
+    echo "# Initial remote hash: $initial_remote_hash" >&3
+
+    # 2. Start gitwatch with -f and -r origin
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -f -r origin "$testdir/local/$TEST_SUBDIR_NAME" &
+    GITWATCH_PID=$!
+
+    # 3. Wait for the remote hash to change (push success)
+    run wait_for_git_change 20 0.5 git rev-parse origin/master
+    assert_success "Initial commit push timed out"
+
+    # 4. Verify the remote hash has changed
+    local final_remote_hash=$output
+    assert_not_equal "$initial_remote_hash" "$final_remote_hash" "Remote hash should change after startup commit and push"
+
+    # 5. Verify the local commit message
+    run git log -1 --pretty=%B
+    assert_success
+    assert_output --partial "Scripted auto-commit on change"
+
+    cd /tmp
+}
+
 # Test 2: Commit on start does nothing if no changes are pending
 @test "startup_commit_no_change: -f flag does nothing if no changes are pending" {
     local output_file

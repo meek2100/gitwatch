@@ -40,6 +40,10 @@ cmd+=( -d "${DATE_FMT}" )
 
 # --- Convert User-Friendly Exclude Pattern to Regex ---
 if [ -n "${USER_EXCLUDE_PATTERN}" ]; then
+  # Note on pattern conversion: This logic converts comma-separated glob patterns
+  # (e.g., "*.log, tmp/") into a single regex string (e.g., ".*\.log|tmp/").
+  # If a raw regex is intended, glob characters like '*' must not be used.
+
   # 1. Replace commas with spaces to treat as separate words.
   PATTERNS_AS_WORDS=${USER_EXCLUDE_PATTERN//,/ }
   # 2. Use an array to store and automatically trim whitespace from each pattern.

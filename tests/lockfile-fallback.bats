@@ -18,6 +18,11 @@ load 'startup-shutdown'
         skip "Test skipped: 'flock' command not found, which is required for gitwatch lock logic."
     fi
 
+    # Skip if neither sha256sum nor md5sum is available, as the fallback logic depends on them for a unique name
+    if ! command -v sha256sum &>/dev/null && ! command -v md5sum &>/dev/null; then
+        skip "Test skipped: Neither 'sha256sum' nor 'md5sum' found, cannot verify hashed lockfile name."
+    fi
+
     local output_file
     output_file=$(mktemp "$testdir/output.XXXXX")
 
@@ -54,10 +59,12 @@ load 'startup-shutdown'
     # 4. Wait for initialization and check log
     sleep 2
 
-    # 5. Assert: Check log output confirms fallback
+    # 5. Assert: Check log output confirms fallback and the unique name format
     run cat "$output_file"
     assert_output --partial "Warning: Cannot write lockfile to $GIT_DIR_PATH. Falling back to temporary directory." "Did not log the expected fallback warning"
-    assert_output --partial "Using temporary lockfile base: /tmp/gitwatch-" "Did not log the expected temporary lockfile base"
+
+    # Assert that the path contains /tmp/gitwatch- and a hash (which ensures uniqueness per repo)
+    assert_output --regexp "/tmp/gitwatch-[0-9a-f]{32,64}\\.lock" "Did not log a temporary lockfile path with a hash"
 
     # 6. Trigger change and verify commit using the fallback lock
     cd "$testdir/local/$TEST_SUBDIR_NAME"
