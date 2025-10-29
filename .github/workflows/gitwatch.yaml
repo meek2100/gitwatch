@@ -93,6 +93,24 @@ jobs:
       # - name: Setup upterm session # Preserved commented-out step
       #   uses: lhotari/action-upterm@v1
 
+      - name: Display gitwatch.sh content before testing
+        shell: bash
+        run: |
+          echo "--- Displaying gitwatch.sh from $(pwd) ---"
+          cat gitwatch.sh
+          echo "--- End of gitwatch.sh ---"
+
+      - name: Verify script content before test
+        shell: bash
+        run: |
+          echo "--- Verifying gitwatch.sh content ---"
+          # This checks for your new conditional logging fix
+          grep -C 3 "if bash -c \"\$commit_cmd\"" gitwatch.sh
+          echo "--- Verifying debounce logic ---"
+          # This checks for your new debounce fix (the one *without* 'wait')
+          grep -C 3 "if \[\[ -n \${SLEEP_PID:-} \]\]" gitwatch.sh
+          echo "--- End of verification ---"
+
       - name: Run tests individually
         shell: bash
         run: |
