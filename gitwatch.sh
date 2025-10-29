@@ -469,10 +469,10 @@ if [ -n "${MOCK_BASH_MAJOR_VERSION:-}" ]; then
   # Use mock value for testing Bash compatibility logic
   bash_major_version="${MOCK_BASH_MAJOR_VERSION}"
 else
-# END Patch for Compatibility Testing
+  # END Patch for Compatibility Testing
   # Use native version array for production
   bash_major_version="${BASH_VERSINFO[0]:-0}"
-# START Patch for Compatibility Testing
+  # START Patch for Compatibility Testing
 fi
 # END Patch for Compatibility Testing
 
