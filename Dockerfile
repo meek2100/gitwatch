@@ -10,8 +10,7 @@ RUN apk add --no-cache \
         git=2.45.4-r0 \
         inotify-tools=4.23.9.0-r0 \
         openssh=9.7_p1-r5 \
-        # NEW DEPENDENCY: 'procps' for the pgrep command used in HEALTHCHECK
-        procps \
+        procps=procps-ng-4.0.4-r0 \
     && mkdir -p /app \
     && chown appuser:appgroup /app
 
