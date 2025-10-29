@@ -120,3 +120,19 @@ load 'startup-shutdown'
     assert_success "Running gitwatch -V should exit successfully"
     assert_output "gitwatch.sh version $expected_version_number" "Output should be the version string"
 }
+
+@test "startup_non_git_repo: Exits gracefully with code 6 if target is not a git repo" {
+    local non_repo_dir
+    non_repo_dir=$(mktemp -d)
+
+    # 1. Run gitwatch on a non-repo directory (no .git directory present)
+    run "${BATS_TEST_DIRNAME}/../gitwatch.sh" "$non_repo_dir"
+
+    # 2. Assert exit code 6 and the error message
+    assert_failure "Gitwatch should exit with non-zero status on non-repo"
+    assert_exit_code 6 "Gitwatch should exit with code 6 (Not a git repository)"
+    assert_output --partial "Error: Not a git repository"
+
+    # 3. Cleanup
+    rm -rf "$non_repo_dir"
+}

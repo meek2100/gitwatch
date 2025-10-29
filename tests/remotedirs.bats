@@ -12,7 +12,7 @@ load 'test_helper/custom-helpers'
 _remotedirs_cleanup() {
   echo "# Running custom cleanup for remotedirs" >&3
   if [ -n "${dotgittestdir:-}" ] && [ -d "$dotgittestdir" ];
-then
+  then
     echo "# Removing external git dir: $dotgittestdir" >&3
     rm -rf "$dotgittestdir"
   fi
@@ -66,6 +66,39 @@ teardown() {
     assert_success
     assert_output --partial "file1.txt"
     assert_output --partial "line2" # Depends on diff-lines output
+
+    cd /tmp # Move out before teardown
+}
+
+@test "remote_git_dirs_working_with_commit_and_push: -g flag works with external .git dir and -r push" {
+    dotgittestdir=$(mktemp -d)
+    # Use the TEST_SUBDIR_NAME variable defined in startup-shutdown.bash
+    run mv "$testdir/local/$TEST_SUBDIR_NAME/.git" "$dotgittestdir/"
+    assert_success
+
+    # Start gitwatch directly in the background with -r and -g
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -g "$dotgittestdir/.git" "$testdir/local/$TEST_SUBDIR_NAME" &
+    GITWATCH_PID=$!
+
+    # Use the TEST_SUBDIR_NAME variable defined in startup-shutdown.bash
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+    sleep 1
+    echo "line1" >> file_for_remote.txt
+
+    # Wait for the change to be pushed to the remote (by checking remote hash)
+    wait_for_git_change 30 1 git rev-parse origin/master
+    assert_success "Commit and push with -g timed out"
+
+    # Verify that the local and remote hashes match (indicating successful push)
+    # Use the external .git dir for the local check
+    local local_commit_hash=$(git --git-dir="$dotgittestdir/.git" rev-parse master)
+    local remote_commit_hash=$(git rev-parse origin/master)
+    assert_equal "$local_commit_hash" "$remote_commit_hash" "Local and remote hashes do not match after -g push"
+
+    # Verify commit message content
+    run git --git-dir="$dotgittestdir/.git" log -1 --pretty=%B
+    assert_success
+    assert_output --partial "file_for_remote.txt"
 
     cd /tmp # Move out before teardown
 }
