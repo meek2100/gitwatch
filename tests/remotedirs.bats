@@ -102,3 +102,45 @@ teardown() {
 
     cd /tmp # Move out before teardown
 }
+
+@test "remote_git_dirs_file_target: -g flag works with external .git dir and single file target" {
+    local target_file="single_watched_file.txt"
+    local watched_file_path="$testdir/local/$TEST_SUBDIR_NAME/$target_file"
+    dotgittestdir=$(mktemp -d)
+
+    # 1. Create the target file and commit it locally (needed for setup)
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+    echo "Initial content for single file watch" > "$target_file"
+    git add "$target_file"
+    git commit -q -m "Initial commit for single file test"
+
+    # 2. Move the .git directory externally
+    run mv "$testdir/local/$TEST_SUBDIR_NAME/.git" "$dotgittestdir/"
+    assert_success
+
+    # 3. Get the initial commit hash using the external git dir
+    local initial_hash
+    initial_hash=$(git --git-dir="$dotgittestdir/.git" log -1 --format=%H)
+
+    # 4. Start gitwatch targeting the file AND specifying the external git dir
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -g "$dotgittestdir/.git" "$watched_file_path" &
+    GITWATCH_PID=$!
+    sleep 1
+
+    # 5. Modify the file to trigger the commit
+    echo "Change to the single file" >> "$target_file"
+
+    # 6. Wait for the commit to happen using the external git dir
+    run wait_for_git_change 20 0.5 git --git-dir="$dotgittestdir/.git" log -1 --format=%H
+    assert_success "Commit timed out, suggesting -g with file target failed"
+
+    # 7. Verify the hash changed
+    local final_hash=$(git --git-dir="$dotgittestdir/.git" log -1 --format=%H)
+    assert_not_equal "$initial_hash" "$final_hash" "Commit hash should change after modifying single file"
+
+    # 8. Verify the file content is in the index (proving the 'git add' used the correct work-tree)
+    run git --git-dir="$dotgittestdir/.git" show HEAD:"$target_file"
+    assert_output --partial "Change to the single file"
+
+    cd /tmp # Move out before teardown
+}
