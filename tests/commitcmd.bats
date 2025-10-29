@@ -91,3 +91,35 @@ load 'startup-shutdown'
 
     cd /tmp
 }
+
+@test "commit_command_failure: -c failure uses fallback message and logs error" {
+    local output_file
+    output_file=$(mktemp "$testdir/output.XXXXX")
+
+    local failing_cmd='exit 1' # Simple command that fails
+
+    # Start gitwatch with custom command that fails, logging all output
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -c "$failing_cmd" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+    GITWATCH_PID=$!
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+    sleep 1 # Allow gitwatch to initialize
+
+    # Trigger a change
+    echo "line1" >> file_fail.txt
+
+    # Wait for the commit hash to change (the commit should succeed with the fallback message)
+    run wait_for_git_change 20 0.5 git log -1 --format=%H
+    assert_success "Commit timed out, suggesting the commit failed entirely"
+
+    # 1. Verify commit message contains the fallback string
+    run git log -1 --pretty=%B
+    assert_success
+    assert_output "Custom command failed" "Commit message should be the fallback text"
+
+    # 2. Verify log output contains the error message
+    run cat "$output_file"
+    assert_success
+    assert_output --partial "ERROR: Custom commit command '$failing_cmd' failed." "Log should contain the error from the failing custom command"
+
+    cd /tmp
+}
