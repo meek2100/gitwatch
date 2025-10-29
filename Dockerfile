@@ -26,14 +26,12 @@ ENV GITWATCH_DOCKER_ENV=true
 # Switch to the non-root user
 USER appuser
 
-# Healthcheck: Checks if the PID file exists, the parent is running, AND the child watcher process is active.
+# Healthcheck: Checks if the watcher process is active. The main process (PID 1)
+# is gitwatch.sh, and if it crashes, the container will stop automatically.
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
   CMD bash -c ' \
-    if ! test -f /tmp/gitwatch.pid; then exit 1; fi; \
-    PID=$(cat /tmp/gitwatch.pid); \
-    if ! kill -0 "$PID" 2>/dev/null; then exit 1; fi; \
     # LIVENESS CHECK: Confirm the essential child watcher process is active.
-    # This checks command lines in /proc directly to avoid 'pgrep' dependency.
+    # Checks all process command lines for the watcher tool string ("inotifywait").
     cat /proc/*/cmdline 2>/dev/null | grep -q "inotifywait" \
   '
 
