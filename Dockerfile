@@ -1,4 +1,3 @@
-# Pin Alpine version instead of using latest
 FROM alpine:3.20
 
 # Create a non-root user and group first
@@ -28,13 +27,15 @@ ENV GITWATCH_DOCKER_ENV=true
 # Switch to the non-root user for build/runtime defaults
 USER appuser
 
-# Healthcheck: Checks if the watcher process is active. The main process (PID 1)
+# Healthcheck: Checks if the watcher process is active.
+# The main process (PID 1)
 # is gitwatch.sh, and if it crashes, the container will stop automatically.
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
   CMD bash -c ' \
     # LIVENESS CHECK: Confirm the essential child watcher process is active.
-    # Checks all process command lines for the watcher tool string ("inotifywait").
-    cat /proc/*/cmdline 2>/dev/null | grep -q "inotifywait" \
+    # Checks all process command lines for the watcher tool string ("inotifywait" or "fswatch").
+    cat /proc/*/cmdline 2>/dev/null |
+    grep -q "inotifywait\|fswatch" \
   '
 
 ENTRYPOINT ["/app/entrypoint.sh"]
