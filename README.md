@@ -253,15 +253,21 @@ path to the Git repository you want to watch.
 
 To run this script, you must have installed and globally available:
 
-- `git` ([Git](https://github.com/git/git) | [git-scm](http://www.git-scm.com))
-- **File Watcher:** Either `inotifywait` (part of **[inotify-tools](https://github.com/rvoicilas/inotify-tools)**, for Linux) or `fswatch` (for macOS/BSD).
-- **Locking (Highly Recommended):** `flock` (part of `util-linux` on most Linux distributions) for process locking and debouncing.
+- `git` ([Git](https://github.com/git/git) |
+  [git-scm](http://www.git-scm.com))
+- **File Watcher:** Either `inotifywait` (part of
+  **[inotify-tools](https://github.com/rvoicilas/inotify-tools)**, for
+  Linux) or `fswatch` (for macOS/BSD).
+- **Locking (Highly Recommended):** `flock` (part of `util-linux` on most
+  Linux distributions) for process locking and debouncing.
 
-The script automatically detects the appropriate watcher tool based on your operating system.
+The script automatically detects the appropriate watcher tool based on your
+operating system.
 
 ### Notes for Mac
 
-If running on macOS, you'll need to install the required tools via Homebrew:
+If running on macOS, you'll need to install the required tools via
+Homebrew:
 
 ```sh
 brew install fswatch flock
@@ -271,28 +277,44 @@ brew install fswatch flock
 
 When you start the script, it first performs critical checks:
 
-1. **Permission Check:** Verifies the user has read/write/execute permissions on the target directory and the `.git` directory.
-2. **Locking Check:** Attempts to acquire a non-blocking process lock using `flock` to prevent multiple instances from running concurrently on the same repository.
-3. **Optional Startup Commit:** If the `-f` flag is provided, it commits any pending staged changes before starting the watch loop.
+1. **Permission Check:** Verifies the user has read/write/execute
+   permissions on the target directory and the `.git` directory.
+2. **Locking Check:** Attempts to acquire a non-blocking process lock using
+   `flock` to prevent multiple instances from running concurrently on the
+   same repository.
+3. **Optional Startup Commit:** If the `-f` flag is provided, it commits
+   any pending staged changes before starting the watch loop.
 
-Then it enters the main loop, which runs forever (until forcefully stopped/killed), where it:
+Then it enters the main loop, which runs forever (until forcefully
+stopped/killed), where it:
 
-- **Watches for changes** using `inotifywait` (Linux) or `fswatch` (macOS), which block until an event occurs.
-- **Debounces changes** for the configured `SLEEP_TIME` (default 2 seconds). The advanced debounce logic is PID-file-based and kills outdated commit timers when new changes arrive, ensuring only one commit runs for a rapid burst of changes.
+- **Watches for changes** using `inotifywait` (Linux) or `fswatch` (macOS),
+  which block until an event occurs.
+- **Debounces changes** for the configured `SLEEP_TIME` (default 2
+  seconds). The advanced debounce logic is PID-file-based and kills
+  outdated commit timers when new changes arrive, ensuring only one commit
+  runs for a rapid burst of changes.
 - **Stages changes:**
   - Case file: `git add <file>`
   - Case directory: `git add --all .`
-- **Avoids empty commits:** It compares the staged file tree with the HEAD file tree. If only metadata (like file timestamps) has changed, the commit is skipped, and any spurious index entries are unstaged with `git reset --mixed`.
-- **Commits changes:** `git commit -m "Scripted auto-commit on change (<date>)"`
+- **Avoids empty commits:** It compares the staged file tree with the HEAD
+  file tree. If only metadata (like file timestamps) has changed, the
+  commit is skipped, and any spurious index entries are unstaged with
+  `git reset --mixed`.
+- **Commits changes:**
+  `git commit -m "Scripted auto-commit on change (<date>)"`
 - **Optional Pull/Push:** If a remote is defined (`-r`):
   - If `-R` is used, it runs `git pull --rebase <remote>` before pushing.
   - It then pushes to the configured remote/branch (`-b`).
 
 Notes:
 
-- The debouncing mechanism handles rapid, consecutive changes robustly, ensuring one successful commit per burst.
-- `gitwatch` includes graceful shutdown handling (`INT`, `TERM`) and automatic cleanup of lockfiles and timer PIDs via `trap`.
-- Repositories are always watched recursively by default when a directory is the target.
+- The debouncing mechanism handles rapid, consecutive changes robustly,
+  ensuring one successful commit per burst.
+- `gitwatch` includes graceful shutdown handling (`INT`, `TERM`) and
+  automatic cleanup of lockfiles and timer PIDs via `trap`.
+- Repositories are always watched recursively by default when a directory
+  is the target.
 
 ## Usage
 
