@@ -153,6 +153,8 @@ jobs:
           bats custom-bins.bats
           echo "Running entrypoint-regex.bats..."
           bats entrypoint-regex.bats
+          echo "Running bash-compatibility.bats..."
+          bats bash-compatibility.bats
           echo "Running debounce.bats..."
           bats debounce.bats
           echo "Finished running tests"

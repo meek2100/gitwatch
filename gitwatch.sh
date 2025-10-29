@@ -463,9 +463,21 @@ fi
 READ_TIMEOUT="1" # Default for older bash
 # Check if BASH_VERSINFO is declared and is an array before accessing index 0
 # Use parameter expansion ${VAR[0]:-} to provide a default (e.g., '0') if not set/empty
-bash_major_version="${BASH_VERSINFO[0]:-0}"
+
+# START Patch for Compatibility Testing
+if [ -n "${MOCK_BASH_MAJOR_VERSION:-}" ]; then
+  # Use mock value for testing Bash compatibility logic
+  bash_major_version="${MOCK_BASH_MAJOR_VERSION}"
+else
+# END Patch for Compatibility Testing
+  # Use native version array for production
+  bash_major_version="${BASH_VERSINFO[0]:-0}"
+# START Patch for Compatibility Testing
+fi
+# END Patch for Compatibility Testing
+
 if [[ "$bash_major_version" -ge 4 ]]; then
-  READ_TIMEOUT="0.1" # Use faster timeout for modern bash
+  READ_TIMEOUT="0.2" # Use faster timeout for modern bash
 fi
 verbose_echo "Using read timeout: $READ_TIMEOUT seconds (Bash version: ${bash_major_version})"
 
@@ -684,7 +696,7 @@ check_git_config
 
 # Check if commit message needs any formatting (date splicing)
 # Use bash check for %d, avoiding grep dependency here
-if [[ "$COMMITMSG" != *%d* ]]; then # if commitmsg didn't contain %d
+if [[ "$COMMITMSG" != *%d* ]]; then # if commitmsg didn’t contain %d
   DATE_FMT=""                                     # empty date format (will disable splicing in the main loop)
   FORMATTED_COMMITMSG="$COMMITMSG"                # save (unchanging) commit message
 else
