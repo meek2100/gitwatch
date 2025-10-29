@@ -1,33 +1,72 @@
 { lib, pkgs, config, ... }:
 let
   gitwatch = pkgs.callPackage ./gitwatch.nix { };
+
+  # Helper to generate flag arguments for options that have values (e.g., -s 2)
+  getvar = flag: var: cfg:
+    # Check for null, empty string, and false for flexibility. Escape value for shell safety.
+    if cfg."${var}" != null && cfg."${var}" != "" && cfg."${var}" != false
+    then "${flag} ${lib.strings.escapeShellArg (toString cfg."${var}")}"
+    else "";
+
+  # Helper to generate flag arguments for boolean options (e.g., -R)
+  getflag = flag: var: cfg:
+    if cfg."${var}"
+    then "${flag}"
+    else "";
+
   mkSystemdService = name: cfg: lib.nameValuePair
     "gitwatch-${name}"
     (
       let
-        getvar = flag: var:
-          if cfg."${var}" != null
-          then "${flag} ${cfg."${var}"}"
-          else "";
-        branch = getvar "-b" "branch";
+        # Options with values
+        branchArg = getvar "-b" "branch" cfg;
+        remoteArg = getvar "-r" "remote" cfg;
+        messageArg = getvar "-m" "message" cfg;
+        dateFmtArg = getvar "-d" "dateFmt" cfg;
+        sleepTimeArg = getvar "-s" "sleepTime" cfg;
+        excludePatternArg = getvar "-x" "excludePattern" cfg;
+        eventsArg = getvar "-e" "events" cfg;
+
+        # Boolean options (flags)
+        pullBeforePushFlag = getflag "-R" "pullBeforePush" cfg;
+        skipIfMergingFlag = getflag "-M" "skipIfMerging" cfg;
+        commitOnStartFlag = getflag "-f" "commitOnStart" cfg;
+        useSyslogFlag = getflag "-S" "useSyslog" cfg;
+        verboseFlag = getflag "-v" "verbose" cfg;
+
+        # Combine all arguments into a single string
+        allArgs = lib.strings.concatStringsSep " " (lib.lists.filter (s: s != "") [
+          remoteArg branchArg messageArg dateFmtArg sleepTimeArg excludePatternArg eventsArg
+          pullBeforePushFlag skipIfMergingFlag commitOnStartFlag useSyslogFlag verboseFlag
+          # The path must be the last argument
+          (lib.strings.escapeShellArg cfg.path)
+        ]);
+
+        # Determine initial fetch command (git clone)
+        # Only include branchArg if it's set and we are cloning
+        cloneBranchArg = if cfg.branch != null then "-b ${lib.strings.escapeShellArg cfg.branch}" else "";
         fetcher =
           if cfg.remote == null
           then "true"
           else ''
+            if [ -n "${lib.strings.escapeShellArg cfg.remote}" ] && ! [ -d "${lib.strings.escapeShellArg cfg.path}" ]; then
+              git clone ${cloneBranchArg} "${lib.strings.escapeShellArg cfg.remote}" "${lib.strings.escapeShellArg cfg.path}"
+            fi
           '';
       in
       {
         inherit (cfg) enable;
+        # Use simple for service type, as gitwatch handles backgrounding if necessary
+        serviceConfig.Type = "simple";
+
         after = [ "network-online.target" ];
         wantedBy = [ "multi-user.target" ];
         description = "gitwatch for ${name}";
         path = with pkgs; [ gitwatch git openssh ];
         script = ''
-          if [ -n "${cfg.remote}" ] && ! [ -d "${cfg.path}" ]; then
-            git clone ${branch} "${cfg.remote}" "${cfg.path}"
-          fi
           ${fetcher}
-          gitwatch ${getvar "-r" "remote"} ${getvar "-m" "message"} ${branch} ${cfg.path}
+          gitwatch ${allArgs}
         '';
         serviceConfig.User = cfg.user;
       }
@@ -47,6 +86,11 @@ in
         path = "/home/user/watched-project";
         remote = "git@github.com:me/my-project.git";
         message = "Auto-commit by gitwatch on %d";
+        pullBeforePush = true;
+        skipIfMerging = true;
+        sleepTime = 5;
+        useSyslog = true;
+        verbose = true;
       };
       disabled-repo = {
         enable = false;
@@ -69,17 +113,64 @@ in
           default = "root";
         };
         remote = lib.mkOption {
-          description = "Optional url of remote repository";
+          description = "Optional url of remote repository (-r).";
           type = nullOr str;
           default = null;
         };
         message = lib.mkOption {
-          description = "Optional message to use in as commit message.";
+          description = "Optional message to use in as commit message (-m).";
           type = nullOr str;
           default = null;
         };
         branch = lib.mkOption {
-          description = "Optional branch in remote repository";
+          description = "Optional branch in remote repository (-b).";
+          type = nullOr str;
+          default = null;
+        };
+        # NEW BOOLEAN OPTIONS (FLAGS)
+        pullBeforePush = lib.mkOption {
+          description = "If true, run 'git pull --rebase' before push (-R).";
+          type = bool;
+          default = false;
+        };
+        skipIfMerging = lib.mkOption {
+          description = "If true, prevent commits when a merge is in progress (-M).";
+          type = bool;
+          default = false;
+        };
+        commitOnStart = lib.mkOption {
+          description = "If true, commit pending changes on startup (-f).";
+          type = bool;
+          default = false;
+        };
+        useSyslog = lib.mkOption {
+          description = "If true, log messages to syslog (-S).";
+          type = bool;
+          default = false;
+        };
+        verbose = lib.mkOption {
+          description = "If true, enable verbose output for debugging (-v).";
+          type = bool;
+          default = false;
+        };
+        # NEW VALUE OPTIONS
+        sleepTime = lib.mkOption {
+          description = "Time in seconds to wait after change detection (-s <secs>).";
+          type = nullOr (oneOf [ str int ]);
+          default = null;
+        };
+        dateFmt = lib.mkOption {
+          description = "The format string for the commit timestamp (-d <fmt>).";
+          type = nullOr str;
+          default = null;
+        };
+        excludePattern = lib.mkOption {
+          description = "Pattern to exclude from watching (-x <pattern>).";
+          type = nullOr str;
+          default = null;
+        };
+        events = lib.mkOption {
+          description = "Events passed to inotifywait/fswatch (-e <events>).";
           type = nullOr str;
           default = null;
         };
