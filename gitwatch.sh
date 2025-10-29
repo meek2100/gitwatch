@@ -160,6 +160,18 @@ verbose_echo() {
   fi
 }
 
+# _strip_color: Removes ANSI color codes from the input string.
+# Input: String via stdin or argument 1.
+# Output: Clean string to stdout.
+_strip_color() {
+  local input="${1:-$(cat)}"
+  # Define escape character
+  local esc=$'\033'
+  # Remove all ANSI color codes (from $esc[...m to end)
+  # Use ${VAR//PATTERN/REPLACEMENT} with the escape variable for safety.
+  echo "${input//$esc\[[0-9;]*m/}"
+}
+
 # shellcheck disable=SC2329 # Function is used via trap
 # clean up at end of program
 cleanup() {
@@ -706,83 +718,106 @@ else
 fi
 # --- End Pull/Push Command Setup ---
 
-# A function to reduce git diff output to the actual changed content, and insert file line numbers.
-# Based on "https://stackoverflow.com/a/12179492/199142" by John Mellor
+# diff-lines: Parses git diff output, extracts relevant lines, and prepends
+#             the path and line number to each relevant content line.
+#
+# Logic: Based on state (previous_path, path, line), it reconstructs
+#        the change log. Preserves color codes in the final output.
+#
+# Arguments: Receives git diff output via stdin.
 diff-lines() {
-  local path=""
-  local line=""
-  local previous_path=""
-  local esc=$'\033' # Local variable for escape character, accessible in regexes
-  # Regex to match optional color codes at the start of a line
-  local color_regex="^($esc\[[0-9;]+m)*"
+  local path=""           # Current file path (for additions/modifications)
+  local line=""           # Current line number in the new file (for additions)
+  local previous_path=""  # Previous file path (used for deletions/renames)
+  local esc=$'\033'       # Local variable for escape character
+  local color_regex="^($esc\[[0-9;]+m)*" # Regex to match optional leading color codes
+  local current_file_path # Path used for the final output line
 
-  while IFS= read -r; do # Use IFS= to preserve leading/trailing whitespace
-    # *** Insert SC Number FIX: Quote the variable expansion ***
-    local stripped_reply="${REPLY##"$color_regex"}" # Remove leading color codes for easier matching
+  # Loop over diff lines, preserving leading/trailing whitespace (IFS= read -r)
+  while IFS= read -r REPLY; do
+    # 1. Strip leading color codes from the line for reliable regex matching
+    local stripped_reply="${REPLY##$color_regex}"
 
-    # --- Match diff headers ---
+    # 2. Determine the raw line content (after removing the leading color codes)
+    local raw_content_match
+    local prefix=""
+
+    # Check if this line is a content line (+, -, or ' ')
+    if [[ "$stripped_reply" =~ ^([\ +-])(.*) ]]; then
+        prefix=${BASH_REMATCH[1]}
+        raw_content_match=${BASH_REMATCH[2]}
+    fi
+
+    # --- Match Headers and Update State ---
+
     # Match '--- a/path' or '--- /dev/null' - Capture everything after 'a/' or '/dev/null'
     if [[ "$stripped_reply" =~ ^---\ (a/)?(.*) ]]; then
-      previous_path="${BASH_REMATCH[2]}"
-      # Trim trailing color codes if present (like ESC[m)
-      # *** SC2295 FIX: Quote the variable expansion ***
-      previous_path="${previous_path%%"$esc"\[m*}"
-      # Trim trailing whitespace
-      previous_path="${previous_path%"${previous_path##*[![:space:]]}"}"
-      path="" # Reset path for new file diff
+      # Capture the raw path (Group 2). Strip any potential trailing color codes.
+      previous_path=$(printf "%s" "${BASH_REMATCH[2]}" | _strip_color | xargs)
+      path="" # Reset new path
       line="" # Reset line number
-      # Handle the /dev/null case specifically for path variable
-      if [[ "$stripped_reply" =~ ^---\ /dev/null ]]; then previous_path="/dev/null"; fi
+      # Handle /dev/null case for clarity
+      if [[ "$previous_path" == "/dev/null" ]]; then previous_path=""; fi
       continue
-      # Match '+++ b/path' - Capture everything after 'b/' using REPLY to handle potential leading color codes
-    elif [[ "$REPLY" =~ ^($esc\[[0-9;]+m)*\+\+\+\ (b/)?(.*) ]]; then
-      # Capture from BASH_REMATCH[3] which is after potential color codes and header
-      path="${BASH_REMATCH[3]}"
-      # Trim trailing color codes if present (like ESC[m\t)
-      # *** SC2295 FIX: Quote the variable expansion ***
-      path="${path%%"$esc"\[m*}"
-      # Trim trailing whitespace, including potential tabs
-      path="${path%"${path##*[![:space:]]}"}"
-      # Ensure /dev/null isn't captured as a real path here (though unlikely for +++)
+
+    # Match '+++ b/path' - Capture everything after 'b/'
+    elif [[ "$stripped_reply" =~ ^\+\+\+\ (b/)?(.*) ]]; then
+      # Capture the raw path (Group 2). Strip any potential trailing color codes.
+      path=$(printf "%s" "${BASH_REMATCH[2]}" | _strip_color | xargs)
+      # Ensure path is not /dev/null, which is technically possible but not relevant here
       if [[ "$path" == "/dev/null" ]]; then path=""; fi
       continue
-      # --- Match hunk header ---
-      # Use REPLY to match the whole line including potential start/end color codes
-    elif [[ "$REPLY" =~ ^($esc\[[0-9;]+m)*@@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@ ]]; then
-      # Capture line number from BASH_REMATCH[3] (group after potential leading color code)
-      line=${BASH_REMATCH[3]:-1} # Set starting line number for additions, default to 1 if not captured
-      continue
-      # --- Match diff content lines ---
-      # Match original line with color codes to preserve them
-    elif [[ "$REPLY" =~ ^($esc\[[0-9;]+m)*([\ +-])(.*) ]]; then # Capture +/- and content
-      local prefix=${BASH_REMATCH[2]}
-      local content=${BASH_REMATCH[3]}
-      # Apply width limit *after* capturing full content
-      local display_content=${content:0:150}
 
-      if [[ "$path" == "/dev/null" ]] && [[ "$previous_path" != "/dev/null" ]]; then # File deleted
-        # Use previous_path when path is /dev/null
-        echo "$previous_path:?: File deleted or moved."
-      elif [[ -n "$path" ]] && [[ "$path" != "/dev/null" ]] && [[ -n "$line" ]]; then # Ensure path and line are set, and path is not /dev/null
-        # Reconstruct the line with color codes if present, using prefix and limited content
-        local color_codes=${BASH_REMATCH[1]:-} # Default to empty if no match
-        echo "$path:$line: $color_codes$prefix$display_content"
-      elif [[ -n "$previous_path" ]] && [[ "$previous_path" != "/dev/null" ]] && [[ -n "$line" ]]; then
-        # Fallback for context lines before path is defined (e.g. mode changes)
-        # Use previous_path if path is not yet set or is /dev/null
-        local color_codes=${BASH_REMATCH[1]:-}
-        echo "$previous_path:$line: $color_codes$prefix$display_content"
+    # Match hunk header: @@ -<old_start>[,<old_count>] +<new_start>[,<new_count>] @@
+    elif [[ "$stripped_reply" =~ ^@@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@ ]]; then
+      # Capture line number from BASH_REMATCH[2] (new_start group)
+      line=${BASH_REMATCH[2]:-1} # Set starting line number for additions, default to 1
+      continue
+    fi
+
+    # --- Match Content Lines and Output ---
+
+    # Only process if we matched a content line (prefix is +, -, or ' ')
+    if [[ -n "$prefix" ]]; then
+
+      # 3. Determine the final file path for output
+      if [ "$prefix" = "-" ] && [ -n "$previous_path" ]; then
+        # For deletions, use the previous path
+        current_file_path="$previous_path"
+      elif [ -n "$path" ]; then
+        # For additions, context, or modifications, use the current path
+        current_file_path="$path"
       else
-        # Log to stderr if still unable to determine path/line
-        stderr "Warning: Could not parse line number or path in diff-lines for: $REPLY"
-        # Output something simple to stdout as a fallback
-        local color_codes=${BASH_REMATCH[1]:-}
-        echo "?:?: $color_codes$prefix$display_content"
+        # Still inside a previous file block (e.g., mode change context line)
+        current_file_path="$previous_path"
       fi
 
-      # Increment line number only for added or context lines shown in the diff
+      if [ -z "$current_file_path" ]; then
+        # Fail-safe: If path is empty, log warning and skip line
+        stderr "Warning: Could not determine file path for diff line: $REPLY"
+        continue
+      fi
+
+      # 4. Handle Deletions (Special Case for entire file deletion where line number is irrelevant)
+      if [ "$prefix" = "-" ] && [ -z "$path" ] && [ -n "$previous_path" ] && [ "$line" = "" ]; then
+        echo "$previous_path:?: File deleted."
+      # 5. Handle all other lines (Addition, Modification, Context)
+      elif [[ -n "$line" ]]; then
+        # Apply width limit *after* capturing full content
+        local display_content=${raw_content_match:0:150}
+
+        # Output: path:line: [COLOR_CODES]+/-content
+        local color_codes=${REPLY%%$stripped_reply} # Re-capture original leading color codes
+
+        # Ensure '?' is output for line number if not yet set/relevant
+        local output_line=${line:-?}
+
+        echo "$current_file_path:$output_line: ${color_codes}${prefix}${display_content}"
+      fi
+
+      # 6. Increment line number only for added or context lines
       if [[ "$prefix" != "-" ]] && [[ -n "$line" ]]; then
-        # Check if line is a number before incrementing
+        # Only increment if 'line' is a valid number (should be due to hunk match)
         [[ "$line" =~ ^[0-9]+$ ]] && ((line++))
       fi
     fi
