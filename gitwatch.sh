@@ -1020,12 +1020,12 @@ fi
 # Using a file to store the PID of the *active* timer subshell
 # Use sha256sum for uniqueness if available
 if is_command "sha256sum"; then
-    TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | sha256sum | awk '{print $1}').pid"
+  TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | sha256sum | awk '{print $1}').pid"
 elif is_command "md5sum"; then
-     TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | md5sum | awk '{print $1}').pid"
+  TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | md5sum | awk '{print $1}').pid"
 else
-     # Fallback if no hash command found
-     TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_${GIT_DIR_PATH//\//_}.pid"
+  # Fallback if no hash command found
+  TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_${GIT_DIR_PATH//\//_}.pid"
 fi
 
 # Cleanup PID file on exit
@@ -1083,8 +1083,8 @@ verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
     # **IMPROVED SAFEGUARD:** Check PID file *immediately* after sleep.
     # If the file is gone or contains a different PID, exit silently *before* printing/committing.
     if ! [ -f "$TIMER_PID_FILE" ] || [ "$(cat "$TIMER_PID_FILE")" != "$MY_PID" ]; then
-        verbose_echo "Debounce Timer (PID $MY_PID): Stale timer detected immediately after sleep. Exiting silently."
-        exit 0 # Exit subshell gracefully and silently
+      verbose_echo "Debounce Timer (PID $MY_PID): Stale timer detected immediately after sleep. Exiting silently."
+      exit 0 # Exit subshell gracefully and silently
     fi
 
     # If we got here, we are the active timer. Proceed.
@@ -1096,7 +1096,7 @@ verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
       rm -f "$TIMER_PID_FILE"
       verbose_echo "Debounce Timer (PID $MY_PID): Commit attempt finished. PID file removed."
     else
-       verbose_echo "Debounce Timer (PID $MY_PID): Commit attempt finished. PID file was already removed or changed."
+      verbose_echo "Debounce Timer (PID $MY_PID): Commit attempt finished. PID file was already removed or changed."
     fi
   ) &
   # --- END DEBOUNCE LOGIC REVISION 3 ---
