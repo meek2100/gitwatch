@@ -64,7 +64,6 @@ VERBOSE=0
 COMMIT_ON_START=0
 EVENTS="" # User-defined events
 USE_SYSLOG=0
-# SLEEP_PID="" # No longer used by PID file debounce
 USE_FLOCK=1 # Default to on, check for command availability below
 
 # Print a message about how to use this script
