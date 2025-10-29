@@ -90,6 +90,13 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Substitute Version Number into gitwatch.sh
+        shell: bash
+        run: |
+          VERSION_NUMBER=$(cat VERSION)
+          sed -i "s/%%GITWATCH_VERSION%%/${VERSION_NUMBER}/g" gitwatch.sh
+          echo "Substituted version ${VERSION_NUMBER} into gitwatch.sh for testing."
+
       # - name: Setup upterm session # Preserved commented-out step
       #   uses: lhotari/action-upterm@v1
 
@@ -140,6 +147,12 @@ jobs:
           bats hook-failure.bats
           echo "Running startup-options.bats..."
           bats startup-options.bats
+          echo "Running syslog.bats..."
+          bats syslog.bats
+          echo "Running custom-bins.bats..."
+          bats custom-bins.bats
+          echo "Running entrypoint-regex.bats..."
+          bats entrypoint-regex.bats
           echo "Running debounce.bats..."
           bats debounce.bats
           echo "Finished running tests"

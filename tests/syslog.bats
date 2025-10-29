@@ -1,0 +1,72 @@
+#!/usr/bin/env bats
+
+# Load standard helpers
+load 'test_helper/bats-support/load'
+load 'test_helper/bats-assert/load'
+load 'test_helper/bats-file/load'
+# Load custom helpers
+load 'test_helper/custom_helpers'
+# Load setup/teardown
+load 'startup-shutdown'
+
+# This test requires a functioning 'logger' command and a way to read system logs.
+# It will be skipped if the OS is not Linux or if 'logger' is not found.
+# Note: This test's reliability depends heavily on the runner environment's syslog configuration.
+@test "syslog_S: -S flag routes output to syslog (daemon.info/daemon.error)" {
+    if [ "$RUNNER_OS" != "Linux" ]; then
+        skip "Syslog test skipped: only runs on Linux runners."
+    fi
+    if ! command -v logger &>/dev/null; then
+        skip "Syslog test skipped: 'logger' command not found."
+    fi
+
+    local output_file
+    output_file=$(mktemp "$testdir/output.XXXXX")
+    local log_tag="${BATS_TEST_FILENAME##*/}" # Use the test file name as a log tag marker
+
+    # --- Setup: Check Initial Log Status (Optional, depends on runner) ---
+    # We will rely on a very recent log entry being unique.
+
+    # 1. Start gitwatch in the background with -S (syslog) and -v (verbose)
+    # Redirect STDOUT/STDERR to a file anyway, but this output should be minimal
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -S "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+    GITWATCH_PID=$!
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+    sleep 1 # Allow watcher to initialize
+
+    # 2. Trigger a successful commit (should log 'daemon.info' messages)
+    echo "syslog_test_line1" >> file1.txt
+    run wait_for_git_change 20 0.5 git log -1 --format=%H
+    assert_success "First commit timed out"
+
+    # 3. Trigger a commit failure (should log 'daemon.error' messages)
+    # Simulate a failing pre-commit hook (simplest way to trigger a commit failure)
+    local git_dir_path
+    git_dir_path=$(git rev-parse --git-path hooks)
+    local hook_file="$git_dir_path/pre-commit"
+    echo "#!/bin/bash" > "$hook_file"
+    echo "exit 1" >> "$hook_file"
+    chmod +x "$hook_file"
+
+    echo "syslog_test_line2" >> file2.txt
+    sleep "$WAITTIME" # Wait for commit attempt to finish/fail
+
+    # Cleanup the hook
+    rm -f "$hook_file"
+
+    # --- Assertions ---
+
+    # 4. Check that the error message exists in the log (this confirms syslog routing worked)
+    # We expect the critical ERROR message for hook failure:
+    run journalctl --since "1 minute ago" | grep "ERROR: 'git commit' failed with exit code 1."
+    assert_success "Did not find expected 'git commit failed' error in journalctl (syslog check failed)."
+    # Also check for a verbose message, which confirms daemon.info routing
+    run journalctl --since "1 minute ago" | grep "Starting file watch. Command: inotifywait"
+    assert_success "Did not find expected 'Starting file watch' info message in journalctl (syslog check failed)."
+
+    # 5. Check that STDOUT/STDERR capture file is empty (or near-empty)
+    run cat "$output_file"
+    assert_output "" "STDOUT/STDERR file should be empty when -S is used, but contained output."
+
+    cd /tmp
+}

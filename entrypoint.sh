@@ -51,7 +51,7 @@ if [ -n "${USER_EXCLUDE_PATTERN}" ]; then
   PROCESSED_PATTERN=${PROCESSED_PATTERN//./\\.}
 
   # 5. Convert glob stars `*` into the regex equivalent `.*`
-  PROCESSED_PATTERN=${PROCESSED_PATTERN//\*/\.\*}
+  PROCESSED_PATTERN=${PROCESSED_PATTERN//\*/.*}
 
   cmd+=( -x "${PROCESSED_PATTERN}" )
 fi

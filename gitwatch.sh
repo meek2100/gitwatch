@@ -133,7 +133,7 @@ shelp() {
   echo "config and restarting it afterwards."
   echo ""
   echo 'By default, gitwatch tries to use the binaries "git", "inotifywait" (or "fswatch" on macOS),'
-  echo "and \"flock\", expecting to find them in the PATH (it uses 'command -v' to check this"
+  echo "and \"flock\" (highly recommended for robust locking), expecting to find them in the PATH (it uses 'command -v' to check this"
   echo "and will abort with an error if they cannot be found). If you want to use"
   echo "binaries that are named differently and/or located outside of your PATH, you can"
   echo "define replacements in the environment variables GW_GIT_BIN, GW_INW_BIN, and"
