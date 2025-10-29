@@ -136,6 +136,8 @@ jobs:
           bats sync.bats
           echo "Running status-change.bats..."
           bats status-change.bats
+          echo "Running hook-failure.bats..."
+          bats hook-failure.bats
           echo "Running debounce.bats..."
           bats debounce.bats
           echo "Finished running tests"
