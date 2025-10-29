@@ -744,8 +744,8 @@ diff-lines() {
 
     # Check if this line is a content line (+, -, or ' ')
     if [[ "$stripped_reply" =~ ^([\ +-])(.*) ]]; then
-        prefix=${BASH_REMATCH[1]}
-        raw_content_match=${BASH_REMATCH[2]}
+      prefix=${BASH_REMATCH[1]}
+      raw_content_match=${BASH_REMATCH[2]}
     fi
 
     # --- Match Headers and Update State ---
@@ -760,7 +760,7 @@ diff-lines() {
       if [[ "$previous_path" == "/dev/null" ]]; then previous_path=""; fi
       continue
 
-    # Match '+++ b/path' - Capture everything after 'b/'
+      # Match '+++ b/path' - Capture everything after 'b/'
     elif [[ "$stripped_reply" =~ ^\+\+\+\ (b/)?(.*) ]]; then
       # Capture the raw path (Group 2). Strip any potential trailing color codes.
       path=$(printf "%s" "${BASH_REMATCH[2]}" | _strip_color | xargs)
@@ -768,7 +768,7 @@ diff-lines() {
       if [[ "$path" == "/dev/null" ]]; then path=""; fi
       continue
 
-    # Match hunk header: @@ -<old_start>[,<old_count>] +<new_start>[,<new_count>] @@
+      # Match hunk header: @@ -<old_start>[,<old_count>] +<new_start>[,<new_count>] @@
     elif [[ "$stripped_reply" =~ ^@@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@ ]]; then
       # Capture line number from BASH_REMATCH[2] (new_start group)
       line=${BASH_REMATCH[2]:-1} # Set starting line number for additions, default to 1
@@ -801,7 +801,7 @@ diff-lines() {
       # 4. Handle Deletions (Special Case for entire file deletion where line number is irrelevant)
       if [ "$prefix" = "-" ] && [ -z "$path" ] && [ -n "$previous_path" ] && [ "$line" = "" ]; then
         echo "$previous_path:?: File deleted."
-      # 5. Handle all other lines (Addition, Modification, Context)
+        # 5. Handle all other lines (Addition, Modification, Context)
       elif [[ -n "$line" ]]; then
         # Apply width limit *after* capturing full content
         local display_content=${raw_content_match:0:150}
