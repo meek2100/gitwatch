@@ -48,6 +48,10 @@ set -euo pipefail
 GITWATCH_VERSION="%%GITWATCH_VERSION%%"
 # --- End Version Info ---
 
+# --- Global Configuration Constants ---
+TIMEOUT=60 # Timeout for critical Git operations (commit, pull, push)
+# --------------------------------------
+
 REMOTE=""
 PULL_BEFORE_PUSH=0
 BRANCH=""
@@ -137,6 +141,7 @@ shelp() {
   echo "binaries that are named differently and/or located outside of your PATH, you can"
   echo "define replacements in the environment variables GW_GIT_BIN, GW_INW_BIN, and"
   echo "GW_FLOCK_BIN for git, inotifywait/fswatch, and flock, respectively."
+  echo "The read timeout for the drain loop can be set using the GW_READ_TIMEOUT environment variable."
 }
 
 # print all arguments to stderr
@@ -418,6 +423,12 @@ for cmd in "$BASE_GIT_CMD" "$INW"; do
     exit 2
   }
 done
+# 'timeout' is required for production robustness
+if ! is_command "timeout"; then
+  stderr "Error: Required command 'timeout' not found.
+  Hint: Install 'timeout' (e.g., 'apt install coreutils' or 'dnf install coreutils')."
+  exit 2
+fi
 # 'logger' is a special case, we only check if syslog is requested
 if [ "$USE_SYSLOG" -eq 1 ] && ! is_command "logger"; then
   stderr "Error: Required command 'logger' not found (for -S syslog option)."
@@ -459,26 +470,30 @@ fi
 
 
 # Determine the appropriate read timeout based on bash version
-READ_TIMEOUT="1" # Default for older bash
-# Check if BASH_VERSINFO is declared and is an array before accessing index 0
-# Use parameter expansion ${VAR[0]:-} to provide a default (e.g., '0') if not set/empty
+# New: Allow override via environment variable
+READ_TIMEOUT="${GW_READ_TIMEOUT:-}"
 
-# START Patch for Compatibility Testing
-if [ -n "${MOCK_BASH_MAJOR_VERSION:-}" ]; then
-  # Use mock value for testing Bash compatibility logic
-  bash_major_version="${MOCK_BASH_MAJOR_VERSION}"
-else
-  # END Patch for Compatibility Testing
-  # Use native version array for production
-  bash_major_version="${BASH_VERSINFO[0]:-0}"
+if [ -z "$READ_TIMEOUT" ]; then
+  READ_TIMEOUT="1" # Default for older bash
+  # Check if BASH_VERSINFO is declared and is an array before accessing index 0
+  # Use parameter expansion ${VAR[0]:-} to provide a default (e.g., '0') if not set/empty
   # START Patch for Compatibility Testing
-fi
-# END Patch for Compatibility Testing
+  if [ -n "${MOCK_BASH_MAJOR_VERSION:-}" ]; then
+    # Use mock value for testing Bash compatibility logic
+    bash_major_version="${MOCK_BASH_MAJOR_VERSION}"
+  else
+    # END Patch for Compatibility Testing
+    # Use native version array for production
+    bash_major_version="${BASH_VERSINFO[0]:-0}"
+    # START Patch for Compatibility Testing
+  fi
+  # END Patch for Compatibility Testing
 
-if [[ "$bash_major_version" -ge 4 ]]; then
-  READ_TIMEOUT="0.1" # Use faster timeout for modern bash
+  if [[ "$bash_major_version" -ge 4 ]]; then
+    READ_TIMEOUT="0.1" # Use faster timeout for modern bash
+  fi
 fi
-verbose_echo "Using read timeout: $READ_TIMEOUT seconds (Bash version: ${bash_major_version})"
+verbose_echo "Using read timeout: $READ_TIMEOUT seconds (Bash version: ${bash_major_version:-unknown})"
 
 
 ###############################################################################
@@ -757,7 +772,7 @@ diff-lines() {
   local line=""           # Current line number in the new file (for additions)
   local previous_path=""  # Previous file path (used for deletions/renames)
   local esc=$'\033'       # Local variable for escape character
-  local color_regex="^($esc\[[0-9;]+m)*" # Regex to match optional leading color codes
+  local color_regex="^($esc\[[0-9;]*m)*" # Regex to match optional leading color codes
   local current_file_path # Path used for the final output line
 
   # Loop over diff lines, preserving leading/trailing whitespace (IFS= read -r)
@@ -944,6 +959,7 @@ generate_commit_message() {
 _perform_commit() {
   # *** NEW PURE BASH STATUS CHECK ***
   local porcelain_output
+  # Note: git status --porcelain is fast and does not need timeout
   porcelain_output=$(bash -c "$GIT status --porcelain")
 
   if [ -z "$porcelain_output" ]; then
@@ -965,12 +981,14 @@ _perform_commit() {
   else
     add_cmd=$(printf "%s add --all ." "$GIT")
   fi
+  # git add is typically fast and doesn't need a timeout unless a huge repo/slow FS
   bash -c "$add_cmd" || { stderr "ERROR: 'git add' failed."; return 1; }
   verbose_echo "Running git add command: $add_cmd"
 
   # *** MODIFIED CHECK: Use git write-tree comparison ***
   # Final check: Only proceed if the staged tree differs from HEAD's tree (meaning content or number of files changed).
   local staged_tree_hash
+  # write-tree is typically fast
   staged_tree_hash=$(bash -c "$GIT write-tree") || {
     # If write-tree fails (e.g., due to index corruption), simply abort.
     verbose_echo "Error in git write-tree. Aborting commit."
@@ -1002,7 +1020,8 @@ _perform_commit() {
 
   # Commit
   local commit_cmd
-  commit_cmd=$(printf "%s commit %s -m %q" "$GIT" "$GIT_COMMIT_ARGS" "$FINAL_COMMIT_MSG")
+  # Add timeout to commit command
+  commit_cmd=$(printf "timeout -s 9 %s %s commit %s -m %q" "$TIMEOUT" "$GIT" "$GIT_COMMIT_ARGS" "$FINAL_COMMIT_MSG")
 
   # Run the commit command and capture its output and exit code
   commit_output=$(bash -c "$commit_cmd" 2>&1) # Capture stdout and stderr
@@ -1014,8 +1033,12 @@ _perform_commit() {
     verbose_echo "Running git commit command: $commit_cmd"
     # Optional: Log the commit output if verbose and needed for debugging
     # verbose_echo "Commit output: $commit_output"
+  elif [ "$commit_exit_code" -eq 124 ]; then
+    # Timeout exit code (124 from coreutils timeout)
+    stderr "ERROR: 'git commit' timed out after $TIMEOUT seconds."
+    return 1
   else
-    # Commit failed
+    # Commit failed (e.g., hook failure, no changes, etc.)
     # Check stderr/stdout for "nothing to commit" as a secondary check (more robust than just exit code 1)
     if [[ "$commit_output" == *"nothing to commit"* ]]; then
       verbose_echo "Commit attempted, but no changes to commit (post write-tree check)."
@@ -1032,8 +1055,14 @@ _perform_commit() {
   # Pull (if enabled)
   if [ -n "$PULL_CMD" ]; then
     verbose_echo "Executing pull command: $PULL_CMD"
-    if ! bash -c "$PULL_CMD"; then
-      stderr "ERROR: 'git pull' failed. Skipping push."
+    # Add timeout to pull command
+    local pull_cmd_with_timeout=$(printf "timeout -s 9 %s %s" "$TIMEOUT" "$PULL_CMD")
+    if ! bash -c "$pull_cmd_with_timeout"; then
+      if [ $? -eq 124 ]; then
+        stderr "ERROR: 'git pull' timed out after $TIMEOUT seconds. Skipping push."
+      else
+        stderr "ERROR: 'git pull' failed. Skipping push."
+      fi
       return 1 # Abort
     fi
   fi
@@ -1041,8 +1070,14 @@ _perform_commit() {
   # Push (if enabled)
   if [ -n "$PUSH_CMD" ]; then
     verbose_echo "Executing push command: $PUSH_CMD"
-    if ! bash -c "$PUSH_CMD"; then
-      stderr "ERROR: 'git push' failed."
+    # Add timeout to push command
+    local push_cmd_with_timeout=$(printf "timeout -s 9 %s %s" "$TIMEOUT" "$PUSH_CMD")
+    if ! bash -c "$push_cmd_with_timeout"; then
+      if [ $? -eq 124 ]; then
+        stderr "ERROR: 'git push' timed out after $TIMEOUT seconds."
+      else
+        stderr "ERROR: 'git push' failed."
+      fi
       return 1 # Report failure
     fi
   fi
@@ -1082,10 +1117,7 @@ perform_commit() {
   return $commit_status
 }
 
-# ... (end of perform_commit function) ...
-
-###############################################################################
-
+# ... (rest of the file is unchanged) ...
 # If -f is specified, perform an initial commit before starting to watch
 if [ "$COMMIT_ON_START" -eq 1 ]; then
   verbose_echo "Performing initial commit check..."

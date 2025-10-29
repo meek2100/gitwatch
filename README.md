@@ -329,26 +329,26 @@ gitwatch.sh [-s <secs>] [-d <fmt>] [-r <remote> [-b <branch> | -R]] \
 
 Where `<target>` is the file or folder to be watched.
 
-| Option | Argument    | Default                     | Description                                                                                                                        |
-| :----- | :---------- | :-------------------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
-| `-s`   | `<secs>`    | `2`                         | **Debounce Delay.** Time to wait after a change before initiating the commit process.                                              |
-| `-d`   | `<fmt>`     | `"+%Y-%m-%d %H:%M:%S"`      | **Date Format.** Format string for the timestamp (`%d`) in the commit message (see `man date`).                                    |
-| `-r`   | `<remote>`  | _None_                      | **Push Remote.** Specifies a remote to push to after every successful commit.                                                      |
-| `-R`   | _None_      | _None_                      | **Pull/Rebase.** If used with `-r`, performs a `git pull --rebase` before the push.                                                |
-| `-b`   | `<branch>`  | _Current_                   | **Target Branch.** Specifies the branch to push to.                                                                                |
-| `-g`   | `<path>`    | _None_                      | **Git Dir.** Specifies the path to an external `.git` directory (`--git-dir`).                                                     |
-| `-l`   | `<lines>`   | `-1`                        | **Log Changes (Color).** Includes diff lines in the commit message, up to `<lines>` count (use `0` for unlimited).                 |
-| `-L`   | `<lines>`   | `-1`                        | **Log Changes (Plain).** Same as `-l` but without colored formatting.                                                              |
-| `-m`   | `<msg>`     | `"Scripted auto-commit..."` | **Commit Message.** Template for the commit message. Ignored if `-c` is used.                                                      |
-| `-c`   | `<command>` | _None_                      | **Custom Message Command.** Command to run to generate the full commit message. Overrides `-m`, `-d`, `-l`, and `-L`.              |
-| `-C`   | _None_      | _None_                      | **Pipe Diff.** If used with `-c`, pipes the list of changed files (`git diff --staged --name-only`) to the custom command's stdin. |
-| `-e`   | `<events>`  | _OS Default_                | **Watcher Events.** Custom event list for `inotifywait` or `fswatch`.                                                              |
-| `-x`   | `<pattern>` | _None_                      | **Exclude Pattern.** Regex pattern to exclude files/directories from being monitored. The `.git` folder is always excluded.        |
-| `-M`   | _None_      | _None_                      | **Skip Merging.** Prevents commits if a Git merge/rebase is currently in progress.                                                 |
-| `-f`   | _None_      | _None_                      | **Commit on Start.** Commits any pending staged changes before starting the watch loop.                                            |
-| `-S`   | _None_      | _None_                      | **Syslog.** Logs all messages to syslog (daemon mode) instead of stdout/stderr.                                                    |
-| `-v`   | _None_      | _None_                      | **Verbose.** Enables verbose logging for debugging (`set -x` if not using syslog).                                                 |
-| `-V`   | _None_      | _None_                      | **Version.** Prints version information and exits.                                                                                 |
+| Option | Argument    | Default                | Description                                                                                                                        |
+| :----- | :---------- | :--------------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
+| `-s`   | `<secs>`    | `2`                    | **Debounce Delay.** Time to wait after a change before initiating the commit process.                                              |
+| `-d`   | `<fmt>`     | `"+%Y-%m-%d %H:%M:%S"` | **Date Format.** Format string for the timestamp (`%d`) in the commit message (see `man date`).                                    |
+| `-r`   | `<remote>`  | _None_                 | **Push Remote.** Specifies a remote to push to after every successful commit.                                                      |
+| `-R`   | _None_      | _None_                 | **Pull/Rebase.** If used with `-r`, performs a `git pull --rebase` before the push.                                                |
+| `-b`   | `<branch>`  | _Current_              | **Target Branch.** Specifies the branch to push to.                                                                                |
+| `-g`   | `<path>`    | _None_                 | **Git Dir.** Specifies the path to an external `.git` directory (`--git-dir`).                                                     |
+| `-l`   | `<lines>`   | `-1`                   | **Log Changes (Color).** Includes diff lines in the commit message, up to `<lines>` count (use `0` for unlimited).                 |
+| `-L`   | `<lines>`   | `-1`                   | **Log Changes (Plain).** Same as `-l` but without colored formatting.                                                              |
+| `-m`   | `<msg>`     | `"Auto-commit: %d"`    | **Commit Message.** Template for the commit message. Ignored if `-c` is used.                                                      |
+| `-c`   | `<command>` | _None_                 | **Custom Message Command.** Command to run to generate the full commit message. Overrides `-m`, `-d`, `-l`, and `-L`.              |
+| `-C`   | _None_      | _None_                 | **Pipe Diff.** If used with `-c`, pipes the list of changed files (`git diff --staged --name-only`) to the custom command's stdin. |
+| `-e`   | `<events>`  | _OS Default_           | **Watcher Events.** Custom event list for `inotifywait` or `fswatch`.                                                              |
+| `-x`   | `<pattern>` | _None_                 | **Exclude Pattern.** Regex pattern to exclude files/directories from being monitored. The `.git` folder is always excluded.        |
+| `-M`   | _None_      | _None_                 | **Skip Merging.** Prevents commits if a Git merge/rebase is currently in progress.                                                 |
+| `-f`   | _None_      | _None_                 | **Commit on Start.** Commits any pending staged changes before starting the watch loop.                                            |
+| `-S`   | _None_      | _None_                 | **Syslog.** Logs all messages to syslog (daemon mode) instead of stdout/stderr.                                                    |
+| `-v`   | _None_      | _None_                 | **Verbose.** Enables verbose logging for debugging (`set -x` if not using syslog).                                                 |
+| `-V`   | _None_      | _None_                 | **Version.** Prints version information and exits.                                                                                 |
 
 ### Behavior Notes
 

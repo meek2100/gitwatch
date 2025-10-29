@@ -66,7 +66,6 @@ wait_for_git_change() {
 
         current_output=$( "$@" )
         local current_status=$?
-
         if [ "$check_for_change" = true ]; then
             # Succeed if output is different from initial AND command was successful
             if [[ "$current_output" != "$initial_output" ]] && [ $current_status -eq 0 ]; then
@@ -110,6 +109,34 @@ create_failing_watcher_bin() {
     echo "#!/usr/bin/env bash" > "$dummy_path"
     echo "echo \"*** DUMMY WATCHER: $name failed with code $exit_code ***\" >&2" >> "$dummy_path"
     echo "exit $exit_code" >> "$dummy_path"
+    chmod +x "$dummy_path"
+    echo "$dummy_path"
+}
+
+# NEW: create_hanging_bin: Creates a dummy script that sleeps for a very long time,
+#                         simulating a hung command (e.g., git push to a dead server).
+#
+# Usage: create_hanging_bin <name>
+#
+# Arguments:
+#   name: The name of the binary to mock (e.g., git)
+#
+# Returns:
+#   The absolute path to the created dummy binary (to stdout).
+create_hanging_bin() {
+    local name="$1"
+    local dummy_path="$testdir/bin/$name-hanging"
+
+    # Ensure the directory exists
+    mkdir -p "$testdir/bin"
+
+    echo "#!/usr/bin/env bash" > "$dummy_path"
+    # Print signature to indicate the hanging version was called
+    echo "echo \"*** DUMMY HANG: $name called, will sleep 600s ***\" >&2" >> "$dummy_path"
+    # Sleep for 10 minutes (much longer than gitwatch.sh's 60s timeout)
+    echo "sleep 600" >> "$dummy_path"
+    # Exit cleanly if it ever wakes up, though it should be killed by 'timeout'
+    echo "exit 0" >> "$dummy_path"
     chmod +x "$dummy_path"
     echo "$dummy_path"
 }
