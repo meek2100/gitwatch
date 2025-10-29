@@ -59,7 +59,7 @@ VERBOSE=0
 COMMIT_ON_START=0
 EVENTS="" # User-defined events
 USE_SYSLOG=0
-SLEEP_PID="" # Define SLEEP_PID early for set -u safety
+# SLEEP_PID="" # No longer used by PID file debounce
 USE_FLOCK=1 # Default to on, check for command availability below
 
 # Print a message about how to use this script
@@ -155,18 +155,10 @@ verbose_echo() {
 }
 
 # shellcheck disable=SC2329 # Function is used via trap
-# clean up at end of program, killing the remaining sleep process if it still exists
+# clean up at end of program
 cleanup() {
   # shellcheck disable=SC2317 # Code is reachable via trap
   verbose_echo "Cleanup function called. Exiting."
-  # Check if SLEEP_PID is non-empty before trying to kill
-  # shellcheck disable=SC2317 # Code is reachable via trap
-  if [[ -n ${SLEEP_PID:-} ]] && kill -0 "$SLEEP_PID" &> /dev/null; then
-    # shellcheck disable=SC2317 # Code is reachable via trap
-    verbose_echo "Killing sleep process $SLEEP_PID."
-    # shellcheck disable=SC2317 # Code is reachable via trap
-    kill "$SLEEP_PID" &> /dev/null || true # Ignore error if already dead
-  fi
   # The lockfile descriptors (8 and 9) will be auto-released on exit
   # shellcheck disable=SC2317 # Code is reachable via trap
   exit 0
@@ -225,6 +217,7 @@ check_git_config() {
 ###############################################################################
 
 # --- Signal Trapping ---
+# Note: The trap for EXIT/INT/TERM is redefined later to include PID file cleanup
 trap "cleanup" EXIT # Ensure cleanup runs on script exit, for any reason
 trap "signal_handler INT" INT # Handle Ctrl+C
 trap "signal_handler TERM" TERM # Handle kill/systemd stop
@@ -810,7 +803,7 @@ generate_commit_message() {
     # Use --staged or --cached to show diff of what's about to be committed
     DIFF_COMMITMSG=$(bash -c "$GIT diff --staged -U0 '$LISTCHANGES_COLOR'" | diff-lines)
     local diff_lines_status=$?
-    set -e # Re-enable exit on error
+    #set -e # Re-enable exit on error (Keep disabled if set -e is globally off)
     if [ $diff_lines_status -ne 0 ]; then
       stderr 'Warning: diff-lines pipeline failed. Commit message may be incomplete.'
       DIFF_COMMITMSG=""
@@ -899,15 +892,28 @@ _perform_commit() {
   bash -c "$add_cmd" || { stderr "ERROR: 'git add' failed."; return 1; }
   verbose_echo "Running git add command: $add_cmd"
 
-  # Final check: Only proceed if there are actual content changes staged
-  # `git diff --staged --quiet` exits 0 if NO changes, non-zero if changes exist
-  if bash -c "$GIT diff --staged --quiet"; then
-    verbose_echo "No actual changes staged for commit after git add."
-    # Optional: If files were only touched, reset the index to avoid committing metadata changes
-    # bash -c "$GIT reset" || stderr "Warning: 'git reset' failed after detecting no content changes."
+  # *** MODIFIED CHECK: Use git write-tree comparison ***
+  # Final check: Only proceed if the staged tree differs from HEAD's tree (meaning content or number of files changed).
+  local staged_tree_hash
+  staged_tree_hash=$(bash -c "$GIT write-tree") || {
+    # If write-tree fails (e.g., due to index corruption), simply abort.
+    verbose_echo "Error in git write-tree. Aborting commit."
+    return 0 # Treat as non-fatal, might recover on next change
+  }
+  local head_tree_hash
+  # Get the tree hash of the last commit's content. Returns empty if no initial commit exists yet.
+  head_tree_hash=$(bash -c "$GIT rev-parse HEAD:." 2>/dev/null) || head_tree_hash=""
+
+  if [ "$staged_tree_hash" = "$head_tree_hash" ]; then
+    verbose_echo "Staged tree is identical to HEAD (only ephemeral metadata changed). Aborting commit."
+    # If git add coerced a spurious metadata change into the index, unstage it before exiting.
+    bash -c "$GIT reset --mixed" &> /dev/null || true # Use reset --mixed
     return 0
   fi
-  verbose_echo "Content changes detected after git add (diff-index)."
+
+  verbose_echo "Content or significant file changes detected (staged tree hash differs from HEAD). Committing."
+  # *** END MODIFIED CHECK ***
+
 
   # Generate commit message (reflects staged changes)
   local FINAL_COMMIT_MSG
@@ -936,15 +942,14 @@ _perform_commit() {
     # Commit failed
     # Check stderr/stdout for "nothing to commit" as a secondary check (more robust than just exit code 1)
     if [[ "$commit_output" == *"nothing to commit"* ]]; then
-      verbose_echo "Commit attempted, but no changes to commit."
-      # Treat "nothing to commit" as non-fatal for the script's main loop
-      # It still means this specific trigger didn't result in a *new* commit
-      return 0 # Return success because the script handled it, even though git didn't commit
+      verbose_echo "Commit attempted, but no changes to commit (post write-tree check)."
+      # This case should ideally not happen if write-tree check works, but handle defensively
+      return 0 # Return success
     else
       # It was a different, unexpected error
       stderr "ERROR: 'git commit' failed with exit code $commit_exit_code."
       stderr "Commit output: $commit_output"
-      return 1 # Return failure code for unexpected errors
+      return 1 # Return failure
     fi
   fi
 
@@ -1013,18 +1018,22 @@ fi
 
 # --- Debounce Timer PID File ---
 # Using a file to store the PID of the *active* timer subshell
-TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | sha256sum | awk '{print $1}').pid"
-CURRENT_TIMER_PID="" # Holds the PID of the currently running timer subshell
+# Use sha256sum for uniqueness if available
+if is_command "sha256sum"; then
+    TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | sha256sum | awk '{print $1}').pid"
+elif is_command "md5sum"; then
+     TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | md5sum | awk '{print $1}').pid"
+else
+     # Fallback if no hash command found
+     TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_${GIT_DIR_PATH//\//_}.pid"
+fi
 
 # Cleanup PID file on exit
+# Redefine trap to include PID file removal
 trap 'rm -f "$TIMER_PID_FILE"; cleanup' EXIT INT TERM
 
 
 # main program loop: wait for changes and commit them
-#   whenever inotifywait reports a change, we spawn a timer (sleep process) that gives the writing
-#   process some time (in case there are a lot of changes or w/e); if there is already a timer
-#   running when we receive an event, we kill it and start a new one; thus we only commit if there
-#   have been no changes reported during a whole timeout period
 verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
 # Execute the watcher and pipe its output to the read loop
 "${INW}" "${INW_ARGS[@]}" | while IFS= read -r line; do # Use IFS= to preserve leading spaces
@@ -1040,35 +1049,57 @@ verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
     verbose_echo "Draining event: $drain_line"
   done
 
-  # --- SIMPLIFIED DEBOUNCE LOGIC ---
+  # --- DEBOUNCE LOGIC REVISION 3 ---
   # Read the PID from the file if it exists
+  OLD_TIMER_PID=""
   if [ -f "$TIMER_PID_FILE" ]; then
     OLD_TIMER_PID=$(cat "$TIMER_PID_FILE")
-    # Check if that process is still running
-    if [[ -n "$OLD_TIMER_PID" ]] && kill -0 "$OLD_TIMER_PID" &>/dev/null; then
-      verbose_echo "Debounce: Timer (PID $OLD_TIMER_PID) is active. Killing it."
-      # Kill the old timer process group robustly
-      pkill -15 -P "$OLD_TIMER_PID" &>/dev/null || true
-      kill "$OLD_TIMER_PID" &>/dev/null || true
-    fi
+    # **Crucially, clear the PID file *before* killing**
+    # This acts as an immediate signal to any waking timer that it's stale.
+    rm -f "$TIMER_PID_FILE"
+    verbose_echo "Debounce: Cleared PID file (was for PID $OLD_TIMER_PID)."
+  fi
+
+  # Check if that old process is still running and kill it forcefully
+  if [[ -n "$OLD_TIMER_PID" ]] && kill -0 "$OLD_TIMER_PID" &>/dev/null; then
+    verbose_echo "Debounce: Timer (PID $OLD_TIMER_PID) is active. Killing it forcefully (SIGKILL)."
+    # Kill children first, then parent, using SIGKILL
+    pkill -9 -P "$OLD_TIMER_PID" &>/dev/null || true
+    kill -9 "$OLD_TIMER_PID" &>/dev/null || true
+    # Give a tiny moment for the OS to process the kill
+    sleep 0.05
   fi
 
   # Start the new timer in the background
   (
-    # Subshell: Sleep first
+    # Subshell: Store own PID immediately
+    MY_PID=$$
+    echo "$MY_PID" > "$TIMER_PID_FILE"
+    verbose_echo "Debounce Timer (PID $MY_PID): Started. PID stored."
+
+    # Sleep
     sleep "$SLEEP_TIME"
-    # Then attempt the commit
-    verbose_echo "Debounce Timer (PID $$): Sleep finished. Attempting commit."
+
+    # **IMPROVED SAFEGUARD:** Check PID file *immediately* after sleep.
+    # If the file is gone or contains a different PID, exit silently *before* printing/committing.
+    if ! [ -f "$TIMER_PID_FILE" ] || [ "$(cat "$TIMER_PID_FILE")" != "$MY_PID" ]; then
+        verbose_echo "Debounce Timer (PID $MY_PID): Stale timer detected immediately after sleep. Exiting silently."
+        exit 0 # Exit subshell gracefully and silently
+    fi
+
+    # If we got here, we are the active timer. Proceed.
+    verbose_echo "Debounce Timer (PID $MY_PID): Sleep finished. PID still valid. Attempting commit."
     perform_commit
-    # Remove the PID file *after* attempting commit
-    rm -f "$TIMER_PID_FILE"
-    verbose_echo "Debounce Timer (PID $$): Commit attempt finished. PID file removed."
+    # Remove the PID file *after* finishing commit attempt
+    # (Conditional rm -f is safe even if already removed)
+    if [ -f "$TIMER_PID_FILE" ] && [ "$(cat "$TIMER_PID_FILE")" = "$MY_PID" ]; then
+      rm -f "$TIMER_PID_FILE"
+      verbose_echo "Debounce Timer (PID $MY_PID): Commit attempt finished. PID file removed."
+    else
+       verbose_echo "Debounce Timer (PID $MY_PID): Commit attempt finished. PID file was already removed or changed."
+    fi
   ) &
-  # Store the PID of the *new* background subshell
-  CURRENT_TIMER_PID=$!
-  echo "$CURRENT_TIMER_PID" > "$TIMER_PID_FILE"
-  verbose_echo "Debounce: Started new timer (PID $CURRENT_TIMER_PID). PID stored in $TIMER_PID_FILE."
-  # --- END SIMPLIFIED DEBOUNCE LOGIC ---
+  # --- END DEBOUNCE LOGIC REVISION 3 ---
 
 done
 
