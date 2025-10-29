@@ -127,6 +127,37 @@ jobs:
             git push origin HEAD:${BRANCH_NAME}
           fi
 
+      - name: Prepare CHANGELOG.md for next cycle
+        run: |
+          # Insert the [Unreleased] header and a newline right after the main title block (e.g., after line 3)
+          # Use awk to find the main title line (e.g., # Changelog) and insert the new header after it.
+          # The main title block typically ends before the versioned sections start.
+          # Since line 3 is used in update-changelog, we target line 3 here as well.
+          UNRELEASED_HEADER="## [Unreleased]"
+          CHANGELOG_FILE="CHANGELOG.md"
+
+          # Insert the header and a newline right after line 3
+          awk 'NR==3{print "\n## [Unreleased]\n"} {print}' "${CHANGELOG_FILE}" > "${CHANGELOG_FILE}.tmp" && mv "${CHANGELOG_FILE}.tmp" "${CHANGELOG_FILE}"
+
+          echo "Re-added '${UNRELEASED_HEADER}' section to CHANGELOG.md for future PRs."
+
+      - name: Commit 'Unreleased' header to master
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add CHANGELOG.md
+          if git diff --staged --quiet; then
+            echo "No changes detected in CHANGELOG.md after re-add."
+          else
+            git commit -m "chore: Prepare CHANGELOG.md for next version"
+            # Determine the branch name as before
+            BRANCH_NAME=$(git branch --show-current || git rev-parse --abbrev-ref HEAD)
+            if [ -z "$BRANCH_NAME" ] || [ "$BRANCH_NAME" = "HEAD" ]; then
+              BRANCH_NAME="main" # Or your default branch
+            fi
+            git push origin HEAD:${BRANCH_NAME}
+          fi
+
       - name: Prepare Release Asset (Substitute Version)
         run: |
           # Read version from VERSION file
