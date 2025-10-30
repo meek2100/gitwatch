@@ -29,8 +29,8 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
   else
     echo "Starting as default user ($CONTAINER_USER) with ID: $PUID/$PGID"
   fi
-  # --- CHANGED: Set GOSU_COMMAND as an array ---
-  GOSU_COMMAND=( gosu "$CONTAINER_USER" )
+  # --- CHANGED: Use su-exec instead of gosu ---
+  GOSU_COMMAND=( su-exec "$CONTAINER_USER" )
 else
   # No PUID/PGID set, run as the default appuser (which is PID 1, but we use 'exec' later)
   echo "PUID/PGID not set. Running as default container user: $CONTAINER_USER"
