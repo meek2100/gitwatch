@@ -32,11 +32,11 @@ repos:
       - id: debug-statements
       - id: end-of-file-fixer
       - id: trailing-whitespace
-      - id: fix-line-endings
-        types: [text]
-        exclude: \.md$
       - id: check-json
       - id: mixed-line-ending
+        args: [--fix=lf]
+        types: [text]
+        exclude: \.md$
       - id: check-merge-conflict
       - id: check-executables-have-shebangs
       - id: check-shebang-scripts-are-executable
