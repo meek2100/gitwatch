@@ -313,29 +313,25 @@ brew install bats-core bats-support bats-assert bats-file
 
 ## Local Testing
 
-To run the BATS tests locally (highly recommended for development), you
-must install the `bats-core` CLI tool and the required helper libraries.
-The repository uses a custom module path (`tests/bats-custom`) which must
-be registered with BATS.
+This project uses [BATS](https://github.com/bats-core/bats-core) for
+testing. The easiest way to run the full test suite is by using the
+provided `Makefile`.
 
-1. **Install Dependencies**: Ensure you have `bats-core`, `bats-support`,
-   `bats-assert`, and `bats-file` installed via your system's package
-   manager.
+1.  **Install Dependencies**: Follow the instructions in `CONTRIBUTING.md`
+    to install the runtime and testing dependencies (like
+    `bats-core`, `shellcheck`, etc.).
 
-2. **Set Environment Variable**: When executing tests, you must set the
-   `BATS_LIB_PATH` environment variable to include two paths: a. The path
-   where your system installs the official BATS libraries (e.g.,
-   `/usr/local/lib/bats` on many systems). b. The root path containing your
-   custom module (`./tests`).
+2.  **Install Hooks**: Install the `pre-commit` hooks, which will ensure all
+    linting passes before you commit.
 
-   This allows BATS to locate both the official helper libraries and your
-   new custom scripts (e.g., `bats-custom/startup-shutdown`).
+    ```sh
+    pre-commit install
+    ```
 
-   ```sh
-   # Example: Run BATS, setting the necessary library paths
-   # You may need to adjust the first path segment to match your system's installation.
-   BATS_LIB_PATH="/usr/local/lib/bats:./tests" bats tests/
-   ```
+3.  **Run Tests**:
+    ```sh
+    make test
+    ```
 
 ## What it does
 
