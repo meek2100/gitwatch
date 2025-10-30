@@ -74,3 +74,34 @@ load 'bats-custom/startup-shutdown'
 
   cd /tmp
 }
+
+@test "symlinks: Adding a new symlink triggers commit" {
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+
+  # 1. Create a target file (but don't commit it)
+  echo "target 3" > real_file_3.txt
+  local initial_hash
+  initial_hash=$(git log -1 --format=%H)
+
+  # 2. Start gitwatch
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME" &
+  GITWATCH_PID=$!
+  sleep 1
+
+  # 3. Create the new symlink (this is the watched event)
+  ln -s real_file_3.txt new_link_to_file
+
+  # 4. Wait for commit
+  run wait_for_git_change 20 0.5 git log -1 --format=%H
+  assert_success "Commit for new symlink timed out"
+  local final_hash=$output
+  assert_not_equal "$initial_hash" "$final_hash" "Commit hash did not change"
+
+  # 5. Verify the symlink AND the untracked target file were committed
+  # (because gitwatch uses 'git add --all .')
+  run git log -1 --name-only
+  assert_output --partial "new_link_to_file"
+  assert_output --partial "real_file_3.txt"
+
+  cd /tmp
+}

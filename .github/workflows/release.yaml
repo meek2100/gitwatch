@@ -2,13 +2,15 @@
 name: Create Release and Update Files
 
 on:
-  push:
-    tags:
-      - "v*" # Trigger on tags like v0.5.0, v0.6, v1.0.0
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The new version number (e.g., 0.7.0)"
+        required: true
 
 permissions:
-  contents: write # Needed to push updates to VERSION and CHANGELOG.md
-  # 'releases: write' is implicitly granted for creating releases
+  contents: write # Needed to push branches, tags, and commits
+  pull-requests: write # Needed to create a pull request
 
 jobs:
   release:
@@ -17,33 +19,41 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
-          # Fetch all history to enable comparing tags
-          fetch-depth: 0
           # Use a token with write permissions
           token: ${{ secrets.GITHUB_TOKEN }}
+          # Fetch all history to enable comparing tags
+          fetch-depth: 0
 
-      - name: Get tag version
+      - name: Configure Git User
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Get Version Numbers
         id: get_version
         run: |
-          # Extract the tag name (e.g., v0.6.0)
-          TAG=${GITHUB_REF#refs/tags/}
-          # Remove 'v' prefix for version files (e.g., 0.6.0)
-          VERSION=${TAG#v}
-          echo "tag_name=${TAG}" >> $GITHUB_OUTPUT
-          echo "version_number=${VERSION}" >> $GITHUB_OUTPUT
+          VERSION_NUMBER=${{ github.event.inputs.version }}
+          TAG_NAME="v${VERSION_NUMBER}"
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "version_number=${VERSION_NUMBER}" >> $GITHUB_OUTPUT
+          echo "release_branch=release/${TAG_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Create Release Branch
+        run: |
+          git checkout -b ${{ steps.get_version.outputs.release_branch }} master
 
       - name: Update VERSION file
         run: |
           echo "${{ steps.get_version.outputs.version_number }}" > VERSION
-          echo "Updated VERSION file to ${{ steps.get_version.outputs.version_number }}"
 
       - name: Update package.json
         run: |
-          # Use jq to update the version field in package.json
-          # Install jq if not present (usually is on GitHub runners)
           sudo apt-get update && sudo apt-get install -y jq
           jq --arg new_version "${{ steps.get_version.outputs.version_number }}" '.version = $new_version' package.json > temp.json && mv temp.json package.json
-          echo "Updated package.json to version ${{ steps.get_version.outputs.version_number }}"
+
+      - name: Substitute Version in gitwatch.sh
+        run: |
+          sed -i "s/%%GITWATCH_VERSION%%/${{ steps.get_version.outputs.version_number }}/g" gitwatch.sh
 
       - name: Update CHANGELOG.md and Extract Notes
         id: update_changelog
@@ -52,42 +62,31 @@ jobs:
           VERSION_NUMBER="${{ steps.get_version.outputs.version_number }}"
           RELEASE_DATE=$(date +'%Y-%m-%d')
           UNRELEASED_HEADER="## [Unreleased]"
-          # Escape brackets for literal matching in awk/sed
-          NEW_VERSION_HEADER="## \\[${VERSION_NUMBER}\\] - ${RELEASE_DATE}"
-          ESCAPED_UNRELEASED_HEADER="## \\[Unreleased\\]" # For sed and awk start pattern
+          NEW_VERSION_HEADER="## [${VERSION_NUMBER}] - ${RELEASE_DATE}"
+          ESCAPED_UNRELEASED_HEADER="## \\[Unreleased\\]" # For sed and awk
 
-          # Check if [Unreleased] section exists
           if ! grep -q "^${ESCAPED_UNRELEASED_HEADER}$" CHANGELOG.md; then
             echo "Error: Could not find '${UNRELEASED_HEADER}' section in CHANGELOG.md"
             exit 1
           fi
 
-          # Extract release notes *before* modifying the file
-          # Use awk to print lines between [Unreleased] and the next version header (## [...)
+          # Extract release notes
           awk -v start_header="$ESCAPED_UNRELEASED_HEADER" '
             BEGIN { printing = 0; content = "" }
-            # If we find the start header
             $0 == start_header { printing = 1; next }
-            # If we are printing and find the *next* version header, stop
             printing && /^## \[/ { printing = 0 }
-            # If we are printing, append the line (trimming leading/trailing whitespace)
-            printing { gsub(/^[ \t]+|[ \t]+$/, ""); if (length($0) > 0) content = content $0 "\\n" } # Use \\n for newline literal
+            printing { gsub(/^[ \t]+|[ \t]+$/, ""); if (length($0) > 0) content = content $0 "\\n" }
             END { print content }
           ' CHANGELOG.md > release_notes.txt
 
-          # Replace the [Unreleased] header with the new version header using sed
-          # Use a temporary file to avoid issues with in-place editing across systems
+          # Replace the [Unreleased] header with the new version header
           sed "s|^${ESCAPED_UNRELEASED_HEADER}$|${NEW_VERSION_HEADER}|" CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
 
-          echo "Updated CHANGELOG.md header for version ${VERSION_NUMBER}"
-
-          # Check if notes were extracted
           if [ ! -s release_notes.txt ]; then
               echo "Warning: Could not extract release notes from CHANGELOG.md"
-              echo "No release notes found." > release_notes.txt # Use default if empty
+              echo "No release notes found." > release_notes.txt
           fi
 
-          # Export notes for the release step (ensure newlines are handled correctly)
           NOTES=$(cat release_notes.txt)
           echo "notes<<EOF" >> $GITHUB_OUTPUT
           echo "$NOTES" >> $GITHUB_OUTPUT
@@ -101,79 +100,76 @@ jobs:
 
       - name: Install Formatting Tools
         run: |
-          pip install mdformat mdformat-toc mdformat-gfm mdformat-beautysh # Add relevant mdformat plugins from pre-commit
-          npm install -g prettier # Install prettier globally
+          pip install mdformat mdformat-toc mdformat-gfm mdformat-beautysh
+          npm install -g prettier
 
       - name: Format package.json with Prettier
         run: |
           prettier --write package.json
-          echo "Formatted package.json"
 
       - name: Format CHANGELOG.md with mdformat
         run: |
           mdformat CHANGELOG.md
-          echo "Formatted CHANGELOG.md"
 
-      - name: Commit updated files # This step now commits the formatted files
+      - name: Commit updated files
+        id: commit_files
         run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add VERSION package.json CHANGELOG.md gitwatch.sh
-          # Check if there are changes to commit
           if git diff --staged --quiet; then
             echo "No changes to commit."
+            echo "committed=false" >> $GITHUB_OUTPUT
           else
-            git commit -m "chore: Update VERSION, package.json, CHANGELOG, and gitwatch.sh for ${{ steps.get_version.outputs.tag_name }}"
-            # Determine the branch the tag was pushed to (usually main/master)
-            BRANCH_NAME=$(git branch --show-current || git rev-parse --abbrev-ref HEAD)
-            # Ensure branch name is not empty or detached HEAD representation
-            if [ -z "$BRANCH_NAME" ] || [ "$BRANCH_NAME" = "HEAD" ]; then
-              echo "Could not determine branch name or HEAD is detached. Defaulting to 'main'."
-              BRANCH_NAME="main" # Or your default branch
-            fi
-            git push origin HEAD:${BRANCH_NAME}
+            git commit -m "chore: Prepare release ${{ steps.get_version.outputs.tag_name }}"
+            echo "committed=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Prepare CHANGELOG.md for next cycle
+      - name: Push Release Branch
         run: |
-          # Insert the [Unreleased] header and a newline right after the main title block (e.g., after line 3)
-          # Use awk to find the main title line (e.g., # Changelog) and insert the new header after it.
-          # The main title block typically ends before the versioned sections start.
-          # Since line 3 is used in update-changelog, we target line 3 here as well.
-          UNRELEASED_HEADER="## [Unreleased]"
-          CHANGELOG_FILE="CHANGELOG.md"
+          git push origin ${{ steps.get_version.outputs.release_branch }}
 
-          # Insert the header and a newline right after line 3
-          awk 'NR==3{print "\n## [Unreleased]\n"} {print}' "${CHANGELOG_FILE}" > "${CHANGELOG_FILE}.tmp" && mv "${CHANGELOG_FILE}.tmp" "${CHANGELOG_FILE}"
-
-          echo "Re-added '${UNRELEASED_HEADER}' section to CHANGELOG.md for future PRs."
-
-      - name: Commit 'Unreleased' header to master
+      - name: Create and Push Tag
+        if: steps.commit_files.outputs.committed == 'true'
         run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add CHANGELOG.md
-          if git diff --staged --quiet; then
-            echo "No changes detected in CHANGELOG.md after re-add."
-          else
-            git commit -m "chore: Prepare CHANGELOG.md for next version"
-            # Determine the branch name as before
-            BRANCH_NAME=$(git branch --show-current || git rev-parse --abbrev-ref HEAD)
-            if [ -z "$BRANCH_NAME" ] || [ "$BRANCH_NAME" = "HEAD" ]; then
-              BRANCH_NAME="main" # Or your default branch
-            fi
-            git push origin HEAD:${BRANCH_NAME}
-          fi
+          git tag ${{ steps.get_version.outputs.tag_name }}
+          git push origin ${{ steps.get_version.outputs.tag_name }}
 
       - name: Create GitHub Release
+        if: steps.commit_files.outputs.committed == 'true'
         uses: softprops/action-gh-release@v2.0.8
         with:
           tag_name: ${{ steps.get_version.outputs.tag_name }}
           name: Release ${{ steps.get_version.outputs.tag_name }}
           body: ${{ steps.update_changelog.outputs.notes }}
-          files: | # Upload the versioned script from the repo
+          files: |
             gitwatch.sh
           draft: false
-          prerelease: false # Change to true if your tag indicates a prerelease (e.g., v1.0.0-rc1)
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare CHANGELOG.md for next cycle
+        run: |
+          # Add the [Unreleased] header back
+          UNRELEASED_HEADER="## [Unreleased]"
+          CHANGELOG_FILE="CHANGELOG.md"
+          awk 'NR==3{print "\n## [Unreleased]\n"} {print}' "${CHANGELOG_FILE}" > "${CHANGELOG_FILE}.tmp" && mv "${CHANGELOG_FILE}.tmp" "${CHANGELOG_FILE}"
+
+      - name: Commit 'Unreleased' header to release branch
+        run: |
+          git add CHANGELOG.md
+          if git diff --staged --quiet; then
+            echo "No changes detected in CHANGELOG.md after re-add."
+          else
+            git commit -m "chore: Prepare CHANGELOG.md for next version"
+            git push origin ${{ steps.get_version.outputs.release_branch }}
+          fi
+
+      - name: Create Pull Request to master
+        uses: repo-sync/pull-request@v2
+        with:
+          source_branch: ${{ steps.get_version.outputs.release_branch }}
+          destination_branch: "master"
+          pr_title: "Merge release: ${{ steps.get_version.outputs.tag_name }}"
+          pr_body: "This PR merges the release preparations for ${{ steps.get_version.outputs.tag_name }} back into master."
+          pr_reviewer: "${{ github.actor }}"
+          token: ${{ secrets.GITHUB_TOKEN }}

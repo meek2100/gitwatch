@@ -25,6 +25,7 @@
   - [Local Testing](#local-testing)
   - [What it does](#what-it-does)
   - [Usage](#usage)
+    - [Security Considerations](#security-considerations)
     - [Behavior Notes](#behavior-notes)
     - [Advanced Environment Variables (non-Docker)](#advanced-environment-variables-non-docker)
     - [Starting on Boot](#starting-on-boot)
@@ -413,6 +414,20 @@ Where `<target>` is the file or folder to be watched.
 | `-S`   | _None_        | _None_                 | **Syslog.** Logs all messages to syslog (daemon mode) instead of stdout/stderr.                                                    |
 | `-v`   | _None_        | _None_                 | **Verbose.** Enables verbose logging for debugging (`set -x` if not using syslog).                                                 |
 | `-V`   | _None_        | _None_                 | **Version.** Prints version information and exits.                                                                                 |
+
+### Security Considerations
+
+**Arbitrary Code Execution via `-c`**
+
+The `-c` (custom command) flag is a powerful feature that executes
+arbitrary shell commands. This is by design, but it carries inherent
+security risks, especially if `gitwatch` is run as a privileged user or in
+an environment where the repository content (which could be pulled from a
+remote) is not fully trusted.
+
+**Warning:** Only use the `-c` flag with trusted commands. Never run
+`gitwatch` as root if watching a repository that could be modified by
+untrusted users.
 
 ### Behavior Notes
 
