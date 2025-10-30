@@ -25,6 +25,7 @@
   - [What it does](#what-it-does)
   - [Usage](#usage)
     - [Behavior Notes](#behavior-notes)
+    - [Advanced Environment Variables (non-Docker)](#advanced-environment-variables-non-docker)
     - [Starting on Boot](#starting-on-boot)
       - [SysVInit](#sysvinit)
       - [systemd](#systemd)
@@ -262,6 +263,8 @@ To run this script, you must have installed and globally available:
   Linux) or `fswatch` (for macOS/BSD).
 - **Locking (Highly Recommended):** `flock` (part of `util-linux` on most
   Linux distributions) for process locking and debouncing.
+- **Timeout (Required):** `timeout` (part of `coreutils` on most
+  Linux/macOS distributions) for robust Git operations.
 
 The script automatically detects the appropriate watcher tool based on your
 operating system.
@@ -273,7 +276,7 @@ the **BATS testing framework** via Homebrew:
 
 ```sh
 # Runtime Dependencies
-brew install fswatch flock
+brew install fswatch flock coreutils
 ```
 
 ```sh
@@ -356,33 +359,35 @@ Notes:
 The general usage syntax is:
 
 ```sh
-gitwatch.sh [-s <secs>] [-d <fmt>] [-r <remote> [-b <branch> | -R]] \
-    [-g <path>] [-m <msg>] [-l | -L <lines>] [-x <pattern>] \
+gitwatch.sh [-s <secs>] [-t <secs>] [-d <fmt>] [-r <remote> [-b <branch> | -R]] \
+    [-g <path>] [-m <msg>] [-l | -L <lines>] [-x <pattern>] [-X <glob/list>] \
     [-c <command> [-C]] [-M] [-S] [-v] [-f] [-V] <target>
 ```
 
 Where `<target>` is the file or folder to be watched.
 
-| Option | Argument    | Default                | Description                                                                                                                        |
-| :----- | :---------- | :--------------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
-| `-s`   | `<secs>`    | `2`                    | **Debounce Delay.** Time to wait after a change before initiating the commit process.                                              |
-| `-d`   | `<fmt>`     | `"+%Y-%m-%d %H:%M:%S"` | **Date Format.** Format string for the timestamp (`%d`) in the commit message (see `man date`).                                    |
-| `-r`   | `<remote>`  | _None_                 | **Push Remote.** Specifies a remote to push to after every successful commit.                                                      |
-| `-R`   | _None_      | _None_                 | **Pull/Rebase.** If used with `-r`, performs a `git pull --rebase` before the push.                                                |
-| `-b`   | `<branch>`  | _Current_              | **Target Branch.** Specifies the branch to push to.                                                                                |
-| `-g`   | `<path>`    | _None_                 | **Git Dir.** Specifies the path to an external `.git` directory (`--git-dir`).                                                     |
-| `-l`   | `<lines>`   | `-1`                   | **Log Changes (Color).** Includes diff lines in the commit message, up to `<lines>` count (use `0` for unlimited).                 |
-| `-L`   | `<lines>`   | `-1`                   | **Log Changes (Plain).** Same as `-l` but without colored formatting.                                                              |
-| `-m`   | `<msg>`     | `"Auto-commit: %d"`    | **Commit Message.** Template for the commit message. Ignored if `-c` is used.                                                      |
-| `-c`   | `<command>` | _None_                 | **Custom Message Command.** Command to run to generate the full commit message. Overrides `-m`, `-d`, `-l`, and `-L`.              |
-| `-C`   | _None_      | _None_                 | **Pipe Diff.** If used with `-c`, pipes the list of changed files (`git diff --staged --name-only`) to the custom command's stdin. |
-| `-e`   | `<events>`  | _OS Default_           | **Watcher Events.** Custom event list for `inotifywait` or `fswatch`.                                                              |
-| `-x`   | `<pattern>` | _None_                 | **Exclude Pattern.** Regex pattern to exclude files/directories from being monitored. The `.git` folder is always excluded.        |
-| `-M`   | _None_      | _None_                 | **Skip Merging.** Prevents commits if a Git merge/rebase is currently in progress.                                                 |
-| `-f`   | _None_      | _None_                 | **Commit on Start.** Commits any pending staged changes before starting the watch loop.                                            |
-| `-S`   | _None_      | _None_                 | **Syslog.** Logs all messages to syslog (daemon mode) instead of stdout/stderr.                                                    |
-| `-v`   | _None_      | _None_                 | **Verbose.** Enables verbose logging for debugging (`set -x` if not using syslog).                                                 |
-| `-V`   | _None_      | _None_                 | **Version.** Prints version information and exits.                                                                                 |
+| Option | Argument      | Default                | Description                                                                                                                        |
+| :----- | :------------ | :--------------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
+| `-s`   | `<secs>`      | `2`                    | **Debounce Delay.** Time to wait after a change before initiating the commit process.                                              |
+| `-t`   | `<secs>`      | `60`                   | **Git Timeout.** Timeout in seconds for critical Git operations (commit, pull, push).                                              |
+| `-d`   | `<fmt>`       | `"+%Y-%m-%d %H:%M:%S"` | **Date Format.** Format string for the timestamp (`%d`) in the commit message (see `man date`).                                    |
+| `-r`   | `<remote>`    | _None_                 | **Push Remote.** Specifies a remote to push to after every successful commit.                                                      |
+| `-R`   | _None_        | _None_                 | **Pull/Rebase.** If used with `-r`, performs a `git pull --rebase` before the push.                                                |
+| `-b`   | `<branch>`    | _Current_              | **Target Branch.** Specifies the branch to push to.                                                                                |
+| `-g`   | `<path>`      | _None_                 | **Git Dir.** Specifies the path to an external `.git` directory (`--git-dir`).                                                     |
+| `-l`   | `<lines>`     | `-1`                   | **Log Changes (Color).** Includes diff lines in the commit message, up to `<lines>` count (use `0` for unlimited).                 |
+| `-L`   | `<lines>`     | `-1`                   | **Log Changes (Plain).** Same as `-l` but without colored formatting.                                                              |
+| `-m`   | `<msg>`       | `"Auto-commit: %d"`    | **Commit Message.** Template for the commit message. Ignored if `-c` is used.                                                      |
+| `-c`   | `<command>`   | _None_                 | **Custom Message Command.** Command to run to generate the full commit message. Overrides `-m`, `-d`, `-l`, and `-L`.              |
+| `-C`   | _None_        | _None_                 | **Pipe Diff.** If used with `-c`, pipes the list of changed files (`git diff --staged --name-only`) to the custom command's stdin. |
+| `-e`   | `<events>`    | _OS Default_           | **Watcher Events.** Custom event list for `inotifywait` or `fswatch`.                                                              |
+| `-x`   | `<pattern>`   | _None_                 | **Exclude Regex.** Raw regex pattern to exclude files/directories from being monitored. The `.git` folder is always excluded.      |
+| `-X`   | `<glob/list>` | _None_                 | **Exclude Globs.** Comma-separated list of glob patterns to exclude (e.g., `*.log,tmp/`). Converted to regex.                      |
+| `-M`   | _None_        | _None_                 | **Skip Merging.** Prevents commits if a Git merge/rebase is currently in progress.                                                 |
+| `-f`   | _None_        | _None_                 | **Commit on Start.** Commits any pending staged changes before starting the watch loop.                                            |
+| `-S`   | _None_        | _None_                 | **Syslog.** Logs all messages to syslog (daemon mode) instead of stdout/stderr.                                                    |
+| `-v`   | _None_        | _None_                 | **Verbose.** Enables verbose logging for debugging (`set -x` if not using syslog).                                                 |
+| `-V`   | _None_        | _None_                 | **Version.** Prints version information and exits.                                                                                 |
 
 ### Behavior Notes
 
@@ -395,6 +400,21 @@ Where `<target>` is the file or folder to be watched.
 - **Empty Commit Prevention:** `gitwatch` prevents commits if only metadata
   (like timestamps) has changed, ensuring only meaningful file content or
   file count changes result in a new commit.
+
+### Advanced Environment Variables (non-Docker)
+
+For advanced use cases (e.g., running from source or via systemd), you can
+override default script behavior using environment variables:
+
+- `GW_GIT_BIN`: Specify the full path to the `git` binary.
+- `GW_INW_BIN`: Specify the full path to the watcher binary (`inotifywait`
+  or `fswatch`).
+- `GW_FLOCK_BIN`: Specify the full path to the `flock` binary.
+- `GW_TIMEOUT`: Overrides the default 60-second timeout for Git operations.
+- `GW_READ_TIMEOUT`: Overrides the auto-detected event drain timeout (e.g.,
+  `0.1` or `1`).
+- `GW_LOG_LINE_LENGTH`: Overrides the default 150-character truncation for
+  lines in the `-l`/`-L` commit log.
 
 ### Starting on Boot
 
