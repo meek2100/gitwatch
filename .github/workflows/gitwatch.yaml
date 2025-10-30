@@ -60,21 +60,34 @@ jobs:
       matrix:
         os: [ubuntu-latest, macOS-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 5
+    timeout-minutes: 10
 
     steps:
-      # Node setup
-      - name: Setup node
-        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          # Submodules are no longer needed
+          fetch-depth: 0
+          persist-credentials: false
 
-      # BATS install via npm
-      - name: Setup BATS (bats-core via npm)
-        run: sudo npm install -g bats # This should install bats-core
+      # NEW: Install BATS and its core helpers using the action.
+      # We install them into the workspace for cache support and accessibility.
+      - name: Setup BATS and Libraries
+        id: setup-bats
+        uses: bats-core/bats-action@42fcc8700f773c075a16a90eb11674c0318ad507
+        with:
+          # Explicitly set paths inside the workspace for caching
+          support-path: "${{ github.workspace }}/tests/bats-support"
+          assert-path: "${{ github.workspace }}/tests/bats-assert"
+          file-path: "${{ github.workspace }}/tests/bats-file"
+          # Disable bats-detik which is not used in this project
+          detik-install: "false"
 
-      - name: Install gitwatch dependencies
+      - name: Install gitwatch OS dependencies
         shell: bash
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt-get update
             sudo apt-get -y install inotify-tools util-linux
           elif [ "$RUNNER_OS" == "macOS" ]; then
             brew install fswatch flock bash
@@ -82,13 +95,6 @@ jobs:
             echo "Unsupported OS: $RUNNER_OS"
             exit 1
           fi
-
-      - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          submodules: true
-          fetch-depth: 0
-          persist-credentials: false
 
       - name: Substitute Version Number into gitwatch.sh
         shell: bash
@@ -115,18 +121,22 @@ jobs:
           grep -C 3 'if \[ "$staged_tree_hash" = "$head_tree_hash" \];' gitwatch.sh
           echo "--- Verifying debounce logic (PID File Method) ---"
           # Verify the start of the new debounce logic block using the PID file
-          grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh # <-- CORRECTED LINE
+          grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
           echo "--- End of verification ---"
 
       - name: Run tests individually
         shell: bash
+        # We set BATS_LIB_PATH to include both the action-installed path AND our custom module path.
+        # The action's default output path includes the action-installed libraries.
+        # We append the relative path to our new custom module.
+        env:
+          BATS_LIB_PATH: "${{ steps.setup-bats.outputs.lib-path }}:${{ github.workspace }}/tests"
         run: |
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
 
           cd tests
 
-          # Tests should now load helpers from the relative paths
           echo "Running commitcmd.bats..."
           bats commitcmd.bats
           echo "Running commitlog.bats..."
@@ -155,6 +165,20 @@ jobs:
           bats entrypoint-regex.bats
           echo "Running bash-compatibility.bats..."
           bats bash-compatibility.bats
+          echo "Running lockfile-fallback.bats..."
+          bats lockfile-fallback.bats
+          echo "Running perm-check.bats..."
+          bats perm-check.bats
+          echo "Running skip-merging.bats..."
+          bats skip-merging.bats
+          echo "Running target-deletion.bats..."
+          bats target-deletion.bats
+          echo "Running timeout.bats..."
+          bats timeout.bats
+          echo "Running diff-lines.bats..."
+          bats diff-lines.bats
+          echo "Running dependency-failure.bats..."
+          bats dependency-failure.bats
           echo "Running debounce.bats..."
           bats debounce.bats
           echo "Finished running tests"
