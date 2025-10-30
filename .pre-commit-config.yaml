@@ -54,12 +54,10 @@ repos:
     hooks:
       - id: docker-compose-check
   - repo: https://github.com/lovesegfault/beautysh.git
-    rev: v6.2.1
+    rev: v6.4.0
     hooks:
       - id: beautysh
         args: ["-i", "2"]
-        additional_dependencies:
-          - setuptools
         exclude: ^tests/diff-lines.bats$
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1
@@ -78,4 +76,3 @@ repos:
     hooks:
       - id: nixfmt
         name: Format Nix files
-        # REMOVED: types: [nix] to rely on auto-detection of file extensions.

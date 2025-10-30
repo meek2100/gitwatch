@@ -1,8 +1,3 @@
 [codespell]
-# List of words to ignore (to be added to built-in list)
-# Corresponds to --ignore-words-list in the original configuration.
 ignore-words-list=hist,thist
-
-# List of files/patterns to skip entirely.
-# Corresponds to --skip in the original configuration.
 skip=*.lock,*.json
