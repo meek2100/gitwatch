@@ -6,8 +6,8 @@
 _common_teardown() {
   echo '# Teardown started' >&3
   # Move out of test directory first to avoid issues with removal
-  # shellcheck disable=SC2103 # Moving out of test dir is intentional cleanup step
-  cd /tmp
+  # Fix SC2164: Use || true to acknowledge failure but proceed (non-fatal in teardown)
+  cd /tmp || true
 
   # --- More Robust Process Termination ---
   # Use pkill with the stored PID. Send TERM first, then KILL.
@@ -17,7 +17,7 @@ _common_teardown() {
     # Check if the process exists before trying to kill
     if ps -p "$GITWATCH_PID" > /dev/null;
     then
-      # Send TERM to the process group (children too) for graceful shutdown
+      # Try TERM first for graceful shutdown
       pkill -15 -P "$GITWATCH_PID" || true
       # Give it a moment to shut down gracefully
       sleep 0.5
@@ -25,7 +25,6 @@ _common_teardown() {
       if ps -p "$GITWATCH_PID" > /dev/null;
       then
         echo "# gitwatch process $GITWATCH_PID still running, sending KILL" >&3
-        # Send KILL to the process group
         pkill -9 -P "$GITWATCH_PID" || true
       else
         echo "# gitwatch process $GITWATCH_PID terminated gracefully" >&3
@@ -63,7 +62,7 @@ _common_setup() {
   local use_spaces=$1 # Argument: 1 for spaces, 0 for no spaces
 
   # Time to wait for gitwatch to respond
-  # shellcheck disable=SC2034 # Used by tests
+  # shellcheck disable=SC2034
   WAITTIME=4
 
   # Set up directory structure and initialize remote
@@ -90,19 +89,18 @@ _common_setup() {
   echo "# Using test directory: $testdir" >&3
   echo "# Local clone directory name will be: $TEST_SUBDIR_NAME" >&3
 
-  # shellcheck disable=SC2164 # Intentional directory change for setup
+  # shellcheck disable=SC2164
   cd "$testdir"
   mkdir remote
-  # shellcheck disable=SC2164 # Intentional directory change for setup
+  # shellcheck disable=SC2164
   cd remote
   git init -q --bare
-  # shellcheck disable=SC2103 # cd is intentional part of setup flow
+  # shellcheck disable=SC2103
   cd ..
 
   # --- Add initial commit directly to the bare remote ---
   # Clone the bare repo temporarily
   git clone -q remote "$initial_setup_dir"
-  # shellcheck disable=SC2164 # Intentional directory change for setup
   cd "$initial_setup_dir"
   # Create and commit an initial file
   echo "$initial_file_content" > initial_file.txt
@@ -111,15 +109,14 @@ _common_setup() {
   # Push back to the bare remote
   git push -q origin master
   # Go back up and remove the temporary clone
-  # shellcheck disable=SC2103 # cd is intentional part of setup flow
   cd ..
   rm -rf "$initial_setup_dir"
   # --- End initial commit ---
 
   # Now set up the local repo for the test
-  # shellcheck disable=SC2164 # Intentional directory change for setup
+  # shellcheck disable=SC2164
   mkdir local
-  # shellcheck disable=SC2164 # Intentional directory change for setup
+  # shellcheck disable=SC2164
   cd local
   # Clone into the potentially space-containing directory
   git clone -q ../remote "$TEST_SUBDIR_NAME"

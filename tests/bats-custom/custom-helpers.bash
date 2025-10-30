@@ -39,8 +39,8 @@ wait_for_git_change() {
   local current_output=""
 
   # Basic input validation
-  if !
-  [[ "$max_attempts" =~ ^[0-9]+$ ]] || ! [[ "$delay" =~ ^[0-9]+(\.[0-9]+)?$ ]];
+  # Fix for SC1073/SC1035/SC1072: Ensure correct spacing and structure for IF negation
+  if ! [[ "$max_attempts" =~ ^[0-9]+$ ]] || ! [[ "$delay" =~ ^[0-9]+(\.[0-9]+)?$ ]];
   then
     echo "Usage: wait_for_git_change [--target <expected>] <max_attempts> <delay_seconds> <command...>" >&3
     echo "Error: max_attempts must be an integer and delay_seconds must be a number." >&3
