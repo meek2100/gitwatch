@@ -3,14 +3,13 @@ FROM alpine:3.20
 # Create a non-root user and group first
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Consolidate RUN commands, pin package versions
-# Added 'gosu' for PUID/PGID support and fixed package pinning syntax where needed
+# Consolidate RUN commands
 RUN apk add --no-cache \
-        bash=5.2.26-r0 \
-        git=2.45.4-r0 \
-        inotify-tools=4.23.9.0-r0 \
-        openssh=9.7_p1-r5 \
-        gosu=1.16-r1 \
+        bash \
+        git \
+        inotify-tools \
+        openssh \
+        gosu \
     && mkdir -p /app \
     && chown appuser:appgroup /app
 
