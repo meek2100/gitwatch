@@ -533,7 +533,7 @@ if [ -d "$USER_PATH" ]; then
   TARGETDIR_ABS=$(cd "$TARGETDIR" && pwd -P) || { stderr "Error resolving path for '$TARGETDIR'"; exit 5; }
 
   # GIT_DIR_PATH logic moved AFTER getopts, handled below
-  local final_exclude_pattern_parts=("(\.git/|\.git$)")
+  final_exclude_pattern_parts=("(\.git/|\.git$)")
   if [ -n "${EXCLUDE_PATTERN:-}" ]; then final_exclude_pattern_parts+=("$EXCLUDE_PATTERN"); fi
   if [ -n "$PROCESSED_GLOB_PATTERN" ]; then final_exclude_pattern_parts+=("$PROCESSED_GLOB_PATTERN"); fi
 
