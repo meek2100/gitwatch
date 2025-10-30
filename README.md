@@ -20,8 +20,8 @@
     - [Docker Compose (Recommended)](#docker-compose-recommended)
     - [Using the Dockerfile](#using-the-dockerfile)
   - [Requirements](#requirements)
-  - [Local Testing](#local-testing)
     - [Notes for Mac](#notes-for-mac)
+  - [Local Testing](#local-testing)
   - [What it does](#what-it-does)
   - [Usage](#usage)
     - [Behavior Notes](#behavior-notes)
@@ -266,6 +266,22 @@ To run this script, you must have installed and globally available:
 The script automatically detects the appropriate watcher tool based on your
 operating system.
 
+### Notes for Mac
+
+If running on macOS, you'll need to install the required runtime tools and
+the **BATS testing framework** via Homebrew:
+
+```sh
+# Runtime Dependencies
+brew install fswatch flock
+```
+
+```sh
+# Testing Dependencies (Required to run .bats files locally)
+# bats-core and its helper libraries are now explicitly required.
+brew install bats-core bats-support bats-assert bats-file
+```
+
 ## Local Testing
 
 To run the BATS tests locally (highly recommended for development), you
@@ -291,22 +307,6 @@ be registered with BATS.
    # You may need to adjust the first path segment to match your system's installation.
    BATS_LIB_PATH="/usr/local/lib/bats:./tests" bats tests/
    ```
-
-### Notes for Mac
-
-If running on macOS, you'll need to install the required runtime tools and
-the **BATS testing framework** via Homebrew:
-
-```sh
-# Runtime Dependencies
-brew install fswatch flock
-```
-
-```sh
-# Testing Dependencies (Required to run .bats files locally)
-# bats-core and its helper libraries are now explicitly required.
-brew install bats-core bats-support bats-assert bats-file
-```
 
 ## What it does
 
