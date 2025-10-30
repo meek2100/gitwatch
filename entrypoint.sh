@@ -31,7 +31,8 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
 else
   # No PUID/PGID set, run as the default appuser (which is PID 1, but we use 'exec' later)
   echo "PUID/PGID not set. Running as default container user: $CONTAINER_USER"
-  GOSU_COMMAND="exec" # Use 'exec' to replace the shell, will run as USER appuser defined in Dockerfile
+  # Use 'exec' to replace the shell, will run as USER appuser defined in Dockerfile
+  GOSU_COMMAND="exec"
 fi
 # --------------------------------------------------
 
@@ -51,8 +52,10 @@ COMMIT_MSG=${COMMIT_MSG:-"Auto-commit: %d"}
 DATE_FMT=${DATE_FMT:-"+%Y-%m-%d %H:%M:%S"}
 # New: Custom command for commit message
 COMMIT_CMD=${COMMIT_CMD:-}
-# Read the user-friendly pattern
+# Read the user-friendly glob pattern (for -X)
 USER_EXCLUDE_PATTERN=${EXCLUDE_PATTERN:-""}
+# New: Read the raw regex pattern (for -x)
+RAW_EXCLUDE_REGEX=${RAW_EXCLUDE_REGEX:-""}
 EVENTS=${EVENTS:-""}
 
 # Boolean flags (set to "true" to enable)
@@ -94,11 +97,17 @@ if [ -n "${GIT_EXTERNAL_DIR}" ]; then
   cmd+=( -g "${GIT_EXTERNAL_DIR}" )
 fi
 
-# --- Convert User-Friendly Exclude Pattern to Regex ---
+# --- Exclusion Logic: Pass variables to their respective flags ---
+
+# 1. Pass raw regex pattern (for backward compatibility) to -x
+if [ -n "${RAW_EXCLUDE_REGEX}" ]; then
+  cmd+=( -x "${RAW_EXCLUDE_REGEX}" )
+fi
+
+# 2. Convert and pass user-friendly glob pattern to -X
 if [ -n "${USER_EXCLUDE_PATTERN}" ]; then
   # Note on pattern conversion: This logic converts comma-separated glob patterns
   # (e.g., "*.log, tmp/") into a single regex string (e.g., ".*\.log|tmp/").
-  # If a raw regex is intended, glob characters like '*' must not be used.
 
   # 1. Replace commas with spaces to treat as separate words.
   PATTERNS_AS_WORDS=${USER_EXCLUDE_PATTERN//,/ }
@@ -113,7 +122,8 @@ if [ -n "${USER_EXCLUDE_PATTERN}" ]; then
   # 5. Convert glob stars `*` into the regex equivalent `.*`
   PROCESSED_PATTERN=${PROCESSED_PATTERN//\*/.*}
 
-  cmd+=( -x "${PROCESSED_PATTERN}" )
+  # Pass the CONVERTED PATTERN using the NEW -X (Glob Exclude) flag
+  cmd+=( -X "${PROCESSED_PATTERN}" )
 fi
 
 

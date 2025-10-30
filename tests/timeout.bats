@@ -29,9 +29,9 @@ load 'bats-custom/startup-shutdown'
     local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
 
     echo "# DEBUG: Starting gitwatch with hanging git binary and sleep=${test_sleep_time}s" >&3
+
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -s "$test_sleep_time" -r origin "$target_dir" > "$output_file" 2>&1 &
     GITWATCH_PID=$!
-
     cd "$target_dir"
     sleep 1 # Allow watcher to initialize
 
@@ -40,15 +40,9 @@ load 'bats-custom/startup-shutdown'
 
     # 5. Wait for the debounce period (1s) plus a small buffer, then wait for the
     # expected timeout period (60s) to be triggered by the script itself.
-    # Since the script uses 'timeout 60' internally, we wait slightly longer than 60s for the kill to happen.
-    local total_wait_time=5 # Since our mocked git binary sleeps for 600s,
-                            # the internal timeout (60s) should kill it fast.
-                            # We use a short wait here to see the initial attempt, then rely on the kill by the script's 'timeout'
+    local total_wait_time=5
     echo "# DEBUG: Waiting ${total_wait_time}s for commit attempt and expected timeout failure..." >&3
     sleep "$total_wait_time"
-    # Note: If the actual script timeout (60s) is too long for CI, this test might be slow.
-    # Assuming the CI environment is fast enough to see the failure log quickly,
-    # even with a small wait, as the DUMMY HANG message will appear instantly.
 
     # 6. Assert: The commit/push failed due to timeout
     run cat "$output_file"
@@ -61,7 +55,7 @@ load 'bats-custom/startup-shutdown'
     cd /tmp
 }
 
-@test "timeout_pull_rebase: Ensures hung git pull command is terminated and logged" {
+@test "timeout_git_pull_rebase: Ensures hung git pull command is terminated and logged" {
     local output_file
     output_file=$(mktemp "$testdir/output.XXXXX")
 
@@ -76,10 +70,10 @@ load 'bats-custom/startup-shutdown'
     local test_sleep_time=1
     local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
 
+
     echo "# DEBUG: Starting gitwatch with hanging git binary and -R" >&3
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -s "$test_sleep_time" -r origin -R "$target_dir" > "$output_file" 2>&1 &
     GITWATCH_PID=$!
-
     cd "$target_dir"
     sleep 1 # Allow watcher to initialize
 
@@ -96,6 +90,54 @@ load 'bats-custom/startup-shutdown'
     assert_output --partial "Running git commit command:" "Commit should succeed before pull attempt."
     assert_output --partial "*** DUMMY HANG: git called, will sleep 600s ***" "Hanging dummy git binary was not called for pull."
     assert_output --partial "ERROR: 'git pull' timed out after 60 seconds. Skipping push." "Pull timeout error was not logged."
+
+    # 7. Cleanup
+    unset GW_GIT_BIN
+    rm -f "$dummy_git_path"
+    cd /tmp
+}
+
+@test "timeout_git_commit: Ensures hung git commit command is terminated and logged" {
+    local output_file
+    output_file=$(mktemp "$testdir/output.XXXXX")
+
+    # 1. Setup: Create a hanging dummy 'git' binary
+    # This dummy binary will be called via 'timeout 60 /path/to/git-hanging commit...'
+    local dummy_git_path
+    dummy_git_path=$(create_hanging_bin "git-commit-hang")
+
+    # 2. Set environment variable to force gitwatch to use the hanging binary
+    # We must use the full path to the hanging binary here.
+    export GW_GIT_BIN="$dummy_git_path"
+
+    # 3. Start gitwatch
+    local test_sleep_time=1
+    local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
+    local initial_hash
+
+    cd "$target_dir"
+    initial_hash=$(git log -1 --format=%H)
+    echo "# DEBUG: Starting gitwatch with hanging commit binary" >&3
+
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -s "$test_sleep_time" "$target_dir" > "$output_file" 2>&1 &
+    GITWATCH_PID=$!
+    sleep 1 # Allow watcher to initialize
+
+    # 4. Trigger a change
+    echo "change to trigger commit timeout" >> commit_timeout_file.txt
+
+    # 5. Wait for the script's internal timeout (60s) to be triggered.
+    local total_wait_time=5
+    echo "# DEBUG: Waiting ${total_wait_time}s for commit attempt and expected timeout failure..." >&3
+    sleep "$total_wait_time"
+
+    # 6. Assert: Commit did NOT happen, and timeout error was logged
+    run git log -1 --format=%H
+    assert_equal "$initial_hash" "$output" "Commit hash should NOT change"
+
+    run cat "$output_file"
+    assert_output --partial "*** DUMMY HANG: git-commit-hang called, will sleep 600s ***" "Hanging dummy git binary was not called for commit."
+    assert_output --partial "ERROR: 'git commit' timed out after 60 seconds." "Commit timeout error was not logged."
 
     # 7. Cleanup
     unset GW_GIT_BIN

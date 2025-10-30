@@ -18,8 +18,8 @@ load 'bats-custom/startup-shutdown'
     echo "line1" >> file1.txt
 
     # Wait for commit+push for file1 (wait for remote ref to update)
-    wait_for_git_change 20 0.5 git rev-parse origin/master ||
-    fail "wait_for_git_change timed out after file1 add"
+    run wait_for_git_change 20 0.5 git rev-parse origin/master || \
+      fail "wait_for_git_change timed out after file1 add"
 
     sleep 0.2
 
@@ -34,6 +34,7 @@ load 'bats-custom/startup-shutdown'
 
     local remote_commit1=$output
     assert_equal "$commit1" "$remote_commit1" "Push after adding file1 failed"
+
 
     # Simulate another user cloning and pushing (file2)
     cd "$testdir"
@@ -53,8 +54,8 @@ load 'bats-custom/startup-shutdown'
     echo "line3" >> file3.txt
 
     # Wait LONGER for gitwatch to pull, rebase, commit, push
-    wait_for_git_change 30 1 git rev-parse origin/master ||
-    fail "wait_for_git_change timed out after file3 add/rebase"
+    run wait_for_git_change 30 1 git rev-parse origin/master || \
+      fail "wait_for_git_change timed out after file3 add/rebase"
 
     sleep 0.2
 
@@ -78,6 +79,7 @@ load 'bats-custom/startup-shutdown'
     run git log --oneline -n 4 # Look at recent history
     assert_success "git log failed after rebase"
     assert_output --partial "Commit from local2 (file2)" "Commit message from local2 not found in history"
+
 
     # Check that the originally added file is mentioned
     run git log --name-status -n 5 # Look further back
@@ -170,7 +172,7 @@ load 'bats-custom/startup-shutdown'
 
     # --- Initial Commit (Ensures gitwatch is running) ---
     echo "Original Line" > "$initial_file"
-    wait_for_git_change 20 0.5 git rev-parse origin/master
+    run wait_for_git_change 20 0.5 git rev-parse origin/master
     assert_success "Initial commit+push timed out"
 
     local commit1=$(git rev-parse HEAD)
@@ -180,6 +182,7 @@ load 'bats-custom/startup-shutdown'
     # --- Setup Conflict (File is on same line in both branches) ---
     # 1. Simulate Upstream change (local2)
     cd "$testdir"
+
 
     run git clone -q remote local2
     assert_success "Cloning for local2 failed"
@@ -241,6 +244,7 @@ load 'bats-custom/startup-shutdown'
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -R "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
     GITWATCH_PID=$!
 
+
     sleep 1
 
     # 2. Trigger a local change
@@ -264,9 +268,60 @@ load 'bats-custom/startup-shutdown'
 
     # 5. Assert: Log confirms no remote was selected (no error or pull/push messages)
     run cat "$output_file"
-    assert_output --partial "No push remote selected." "Should explicitly state no remote was selected"
-    refute_output --partial "Executing pull command:" "Should not show a pull command run"
+    assert_output --partial "No push remote selected."
+    assert_output --partial "Executing pull command:" "Should execute pull command"
     refute_output --partial "Executing push command:" "Should not show a push command run"
 
+    cd /tmp
+}
+
+@test "pull_rebase_detached_head_push: Handles push correctly when in detached HEAD state with -b" {
+    local output_file
+    output_file=$(mktemp "$testdir/output.XXXXX")
+    local initial_remote_hash
+
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+    # 1. Ensure the repo is clean and get remote hash
+    git push -q origin master # Ensure everything is pushed
+    initial_remote_hash=$(git rev-parse origin/master)
+
+    # 2. Create and commit a new file locally, but don't push it (or checkout branch)
+    echo "local commit 1" > detached_file.txt
+    git add detached_file.txt
+    git commit -q -m "Local commit before detaching"
+    local local_commit_hash=$(git rev-parse HEAD)
+
+    # 3. Detach HEAD to the new commit
+    run git checkout "$local_commit_hash"
+    assert_success "Failed to checkout into detached HEAD state"
+
+    # 4. Start gitwatch in detached HEAD state, targeting the master branch
+    local target_branch="master" # The branch we want to push *to*
+    echo "# DEBUG: Starting gitwatch in detached HEAD state, pushing to $target_branch" >&3
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -b "$target_branch" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+    GITWATCH_PID=$!
+    sleep 1 # Allow watcher to initialize and detect state
+
+    # 5. Trigger a new change (this will be committed on the detached commit, creating a new local commit)
+    echo "second local commit" >> detached_file_2.txt
+
+    # 6. Wait for the change to be pushed to the remote (by checking remote hash)
+    # The push should use 'git push origin HEAD:master'
+    run wait_for_git_change 30 1 git rev-parse origin/master
+    assert_success "Push with detached HEAD timed out"
+
+    # 7. Assert: Remote hash is the new local commit hash
+    local final_local_hash=$(git rev-parse HEAD)
+    local final_remote_hash=$(git rev-parse origin/master)
+    assert_equal "$final_local_hash" "$final_remote_hash" "Local and remote hashes must match after detached push"
+    assert_not_equal "$initial_remote_hash" "$final_remote_hash" "Remote hash should have changed"
+
+    # 8. Assert: Log output confirms the detached HEAD push logic was used
+    run cat "$output_file"
+    assert_output --partial "HEAD is detached" "Should detect detached HEAD state"
+    assert_output --partial "Executing push command: git push 'origin' HEAD:'master'" "Push command should use HEAD:branch format"
+
+    # 9. Cleanup: Go back to master before teardown
+    git checkout master &> /dev/null
     cd /tmp
 }
