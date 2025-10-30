@@ -126,7 +126,7 @@ setup() {
   run generate_commit_message
   assert_success
   assert_output --partial "Too many lines changed (1 > 0).
-Summary:"
+  Summary:"
   assert_output --partial "file.txt | 10 ++++++++++"
 }
 

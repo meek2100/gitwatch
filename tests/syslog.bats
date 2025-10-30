@@ -79,13 +79,13 @@ load 'bats-custom/startup-shutdown'
   # 4. Check that the error message exists in the log (this confirms syslog routing worked)
   # We expect the critical ERROR message for hook failure:
   run bash -c "$SYSLOG_CHECK_CMD |
-grep \"ERROR: 'git commit' failed with exit code 1.\""
+  grep \"ERROR: 'git commit' failed with exit code 1.\""
   assert_success "Did not find expected 'git commit failed' error in syslog."
 
   # Also check for a verbose message, which confirms daemon.info routing
   # Note: The watcher command may differ (inotifywait vs fswatch), so we check for a generic startup message
   run bash -c "$SYSLOG_CHECK_CMD |
-grep \"Starting file watch. Command:\""
+  grep \"Starting file watch. Command:\""
   assert_success "Did not find expected 'Starting file watch' info message in syslog."
 
   # 5. Check that STDOUT/STDERR capture file is empty (or near-empty)

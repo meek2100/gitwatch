@@ -71,7 +71,7 @@ load 'bats-custom/startup-shutdown'
   local actual_commit_attempts
   # shellcheck disable=SC2002 # cat | grep is inefficient but common in bats tests
   actual_commit_attempts=$(grep -c "Debounce Timer.*Sleep finished.
-Attempting commit." "$output_file" || echo 0)
+  Attempting commit." "$output_file" || echo 0)
   echo "# DEBUG: Expected commit attempts (sleep finished): $expected_commit_attempts, Actual found: $actual_commit_attempts" >&3
   assert_equal "$actual_commit_attempts" "$expected_commit_attempts" "Expected only one timer to finish sleeping and attempt commit"
 
