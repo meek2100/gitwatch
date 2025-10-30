@@ -55,8 +55,7 @@ load 'bats-custom/startup-shutdown'
 
     # Generate 10 lines of content (which should exceed the max_lines=5 limit)
     local expected_total_lines=10
-    for i in $(seq 1 $expected_total_lines);
-    do
+    for i in $(seq 1 $expected_total_lines); do
         echo "Line number $i" >> long_file.txt
     done
 
@@ -149,5 +148,45 @@ load 'bats-custom/startup-shutdown'
     # This grep will fail if it finds the escape character \x1B (or \033)
     refute_output --regexp $'\x1B' "Commit message should not contain ANSI escape codes"
 
+    cd /tmp
+}
+
+# --- NEW TEST (Gap 2) ---
+@test "commit_log_env_var_override: GW_LOG_LINE_LENGTH overrides default" {
+    # 1. Set a short, custom line length
+    export GW_LOG_LINE_LENGTH=10
+
+    local long_line="This line is definitely longer than 10 characters"
+    local truncated_line="This line " # The first 10 chars
+    local initial_hash
+
+    # 2. Start gitwatch. We use -l 0 to prove the env var overrides the flag logic's default.
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 0 "$testdir/local/$TEST_SUBDIR_NAME" &
+    GITWATCH_PID=$!
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+    sleep 1
+
+    initial_hash=$(git log -1 --format=%H)
+
+    # 3. Create a file with the long line
+    echo "$long_line" >> env_var_test.txt
+
+    # 4. Wait for the commit
+    run wait_for_git_change 20 0.5 git log -1 --format=%H
+    assert_success "Commit timed out"
+    assert_not_equal "$initial_hash" "$output" "Commit hash did not change"
+
+    # 5. Verify the commit message contains the *truncated* line
+    run git log -1 --pretty=%B
+    assert_success
+
+    # Assert that the truncated line is present (with the '+' from diff-lines)
+    assert_output --partial "+${truncated_line}"
+
+    # Assert that the *full* line is *not* present
+    refute_output --partial "+${long_line}"
+
+    # 6. Cleanup
+    unset GW_LOG_LINE_LENGTH
     cd /tmp
 }

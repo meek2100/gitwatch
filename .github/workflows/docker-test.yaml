@@ -1,0 +1,51 @@
+---
+name: Docker E2E Tests
+
+on:
+  push:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  docker-e2e:
+    name: Docker E2E Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # This step is identical to the one in your gitwatch.yaml
+      # to ensure a consistent BATS environment
+      - name: Setup BATS and Libraries
+        id: setup-bats
+        uses: bats-core/bats-action@42fcc8700f773c075a16a90eb11674c0318ad507
+        with:
+          support-path: "${{ github.workspace }}/tests/bats-support"
+          assert-path: "${{ github.workspace }}/tests/bats-assert"
+          file-path: "${{ github.workspace }}/tests/bats-file"
+          detik-install: "false"
+
+      - name: Substitute Version Number into gitwatch.sh
+        shell: bash
+        run: |
+          VERSION_NUMBER=$(cat VERSION)
+          sed -i "s/%%GITWATCH_VERSION%%/${VERSION_NUMBER}/g" gitwatch.sh
+          echo "Substituted version ${VERSION_NUMBER} into gitwatch.sh for testing."
+
+      - name: Run Docker E2E BATS tests
+        shell: bash
+        # Set BATS_LIB_PATH to include action-installed libraries
+        # Our new docker.bats test file does not use the custom-helpers
+        env:
+          BATS_LIB_PATH: "${{ steps.setup-bats.outputs.lib-path }}"
+        run: |
+          # Run the new docker.bats test file
+          bats tests/docker.bats
