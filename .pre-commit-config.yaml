@@ -78,7 +78,10 @@ repos:
     hooks:
       - id: hadolint
         name: Lint Dockerfiles
-        # args: [--ignore, DL3025]
+        # --- THIS IS THE FIX ---
+        # Ignore the "Pin versions" rule, which conflicts with
+        # the build process in Alpine 3.20+
+        args: [--ignore, DL3018]
   - repo: https://github.com/NixOS/nixfmt
     rev: v1.1.0
     hooks:
