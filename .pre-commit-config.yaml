@@ -68,7 +68,7 @@ repos:
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
-        files: ^[^\.].*\.sh$
+        files: \.(sh|bats)$
         args: [--shell, bash]
   - repo: https://github.com/AleksaC/hadolint-py
     rev: v2.14.0
