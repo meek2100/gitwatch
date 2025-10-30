@@ -76,7 +76,7 @@ jobs:
         id: setup-bats
         uses: bats-core/bats-action@42fcc8700f773c075a16a90eb11674c0318ad507
         with:
-          # Explicitly set paths inside the workspace for caching
+          # Explicitly set paths inside the workspace for caching and clear paths for BATS_LIB_PATH
           support-path: "${{ github.workspace }}/tests/bats-support"
           assert-path: "${{ github.workspace }}/tests/bats-assert"
           file-path: "${{ github.workspace }}/tests/bats-file"
@@ -100,7 +100,7 @@ jobs:
         shell: bash
         run: |
           VERSION_NUMBER=$(cat VERSION)
-          sed -i "s/%%GITWATCH_VERSION%%/${VERSION_NUMBER}/g" gitwatch.sh
+          sed -i '' "s/%%GITWATCH_VERSION%%/${VERSION_NUMBER}/g" gitwatch.sh
           echo "Substituted version ${VERSION_NUMBER} into gitwatch.sh for testing."
 
       # - name: Setup upterm session # Preserved commented-out step
@@ -126,9 +126,7 @@ jobs:
 
       - name: Run tests individually
         shell: bash
-        # We set BATS_LIB_PATH to include both the action-installed path AND our custom module path.
-        # The action's default output path includes the action-installed libraries.
-        # We append the relative path to our new custom module.
+        # Set BATS_LIB_PATH to include action-installed libraries and our custom module
         env:
           BATS_LIB_PATH: "${{ steps.setup-bats.outputs.lib-path }}:${{ github.workspace }}/tests"
         run: |
