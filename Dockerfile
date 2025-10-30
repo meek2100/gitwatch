@@ -10,7 +10,7 @@ RUN apk add --no-cache \
         git=2.45.4-r0 \
         inotify-tools=4.23.9.0-r0 \
         openssh=9.7_p1-r5 \
-        su-exec=0.3-r0 \
+        su-exec=0.2-r3 \
     && mkdir -p /app \
     && chown appuser:appgroup /app
 
