@@ -849,7 +849,7 @@ diff-lines() {
       line=""                   # Reset line number state
       continue
 
-    # Match '--- a/path' or '--- /dev/null' - Capture everything after 'a/' or '/dev/null'
+      # Match '--- a/path' or '--- /dev/null' - Capture everything after 'a/' or '/dev/null'
     elif [[ "$stripped_reply" =~ ^---\ (a/)?(.*) ]]; then
       # Capture the raw path (Group 2). Strip any potential trailing color codes.
       # FIX: Use explicit argument passing to fix SC2119/SC2120 and use pure Bash trim
@@ -876,7 +876,7 @@ diff-lines() {
       line=${BASH_REMATCH[2]:-1} # Set starting line number for additions, default to 1
       continue
 
-    # NEW: Match file mode changes
+      # NEW: Match file mode changes
     elif [[ "$stripped_reply" =~ ^new\ mode\ ([0-9]+) ]]; then
       echo "$current_file_path:?: Mode changed to ${BASH_REMATCH[1]}"
       continue
