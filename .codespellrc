@@ -1,0 +1,10 @@
+# .codespellrc
+# Configuration file for Codespell.
+
+# List of words to ignore (to be added to built-in list)
+# Corresponds to --ignore-words-list in CLI.
+ignore-words-list = hist,thist
+
+# List of files/patterns to skip entirely.
+# Corresponds to --skip in CLI.
+skip = *.lock,*.json

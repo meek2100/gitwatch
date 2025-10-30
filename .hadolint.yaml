@@ -1,0 +1,8 @@
+# .hadolint.yaml
+# Hadolint configuration for gitwatch Dockerfile
+
+# Ignore rule DL3018: Pinning versions in apk add or use 'run --mount=type=cache ...' to fix.
+# This is ignored because we rely on Alpine's stable release to provide consistent packages
+# and explicitly use 'apk add --no-cache' for a cleaner build.
+ignored:
+  - DL3018

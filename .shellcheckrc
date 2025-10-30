@@ -1,0 +1,11 @@
+# .shellcheckrc
+# Global configuration file for ShellCheck.
+# See: https://www.shellcheck.net/wiki/ConfigurationFiles
+
+# Set the default shell variant to bash for improved accuracy.
+shell = bash
+
+# Specific warnings are handled via inline comments in individual files.
+
+# Global disable warnings that are commonly triggered in robust shell scripts or BATS tests:
+#disable=

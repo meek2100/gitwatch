@@ -6,7 +6,7 @@ repos:
     rev: "v3.6.2"
     hooks:
       - id: prettier
-        types_or: [javascript, json, markdown, yaml, html, css]
+        # Configuration now handled entirely in .prettierrc.yaml
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.45.0
     hooks:
@@ -41,15 +41,15 @@ repos:
     rev: v1.37.1
     hooks:
       - id: yamllint
-        args:
-          - "-d {extends: relaxed, rules: {line-length: {max: 90}}}"
+        # Removed complex inline arguments, relying on the existing .yamllint.yaml file
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:
       - id: codespell
+        # Configuration now handled entirely in .codespellrc
         args:
-          - "--ignore-words-list=hist,thist"
-          - "--skip=*.lock,*.json"
+          - --config
+          - .codespellrc
   - repo: https://github.com/IamTheFij/docker-pre-commit
     rev: v3.0.1
     hooks:
@@ -58,7 +58,7 @@ repos:
     rev: v6.2.1
     hooks:
       - id: beautysh
-        args: ["-i", "2"]
+        args: ["--config", ".beautyshrc"]
         additional_dependencies:
           - setuptools
         exclude: ^tests/diff-lines.bats$
@@ -67,13 +67,13 @@ repos:
     hooks:
       - id: shellcheck
         files: \.(sh|bats|bash)$
-        args: [--shell, bash]
+        args: ["--external-config", ".shellcheckrc"]
   - repo: https://github.com/AleksaC/hadolint-py
     rev: v2.14.0
     hooks:
       - id: hadolint
         name: Lint Dockerfiles
-        args: [--ignore, DL3018]
+        args: [--config, .hadolint.yaml]
   - repo: https://github.com/NixOS/nixfmt
     rev: v1.1.0
     hooks:
