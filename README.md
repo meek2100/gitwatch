@@ -317,21 +317,22 @@ This project uses [BATS](https://github.com/bats-core/bats-core) for
 testing. The easiest way to run the full test suite is by using the
 provided `Makefile`.
 
-1.  **Install Dependencies**: Follow the instructions in `CONTRIBUTING.md`
-    to install the runtime and testing dependencies (like
-    `bats-core`, `shellcheck`, etc.).
+1. **Install Dependencies**: Follow the instructions in `CONTRIBUTING.md`
+   to install the runtime and testing dependencies (like
+   `bats-core`, `shellcheck`, etc.).
 
-2.  **Install Hooks**: Install the `pre-commit` hooks, which will ensure all
-    linting passes before you commit.
+2. **Install Hooks**: Install the `pre-commit` hooks, which will ensure all
+   linting passes before you commit.
 
-    ```sh
-    pre-commit install
-    ```
+   ```sh
+   pre-commit install
+   ```
 
-3.  **Run Tests**:
-    ```sh
-    make test
-    ```
+3. **Run Tests**:
+
+   ```sh
+   make test
+   ```
 
 ## What it does
 
