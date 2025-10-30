@@ -10,6 +10,7 @@
   - [What to use it for?](#what-to-use-it-for)
   - [Installation](#installation)
     - [From Source](#from-source)
+    - [Releases](#releases)
       - [Update](#update)
     - [bpkg](#bpkg)
     - [Archlinux](#archlinux)
@@ -81,6 +82,24 @@ that for you if `/usr/local/bin` is in your `$PATH`. You may need to invoke
 git clone https://github.com/gitwatch/gitwatch.git
 cd gitwatch
 [sudo] install -b gitwatch.sh /usr/local/bin/gitwatch
+```
+
+### Releases
+
+For the most stable version, you can download the `gitwatch.sh` script
+directly from the project's
+[GitHub Releases page](https://github.com/gitwatch/gitwatch/releases/latest).
+
+This is a simple way to get the latest tagged script without cloning the
+entire repository. A common way to install it is to download it directly
+into your local bin path:
+
+```sh
+# Download the latest version to /usr/local/bin (you may need sudo)
+curl -L -o /usr/local/bin/gitwatch [https://github.com/gitwatch/gitwatch/releases/latest/download/gitwatch.sh](https://github.com/gitwatch/gitwatch/releases/latest/download/gitwatch.sh)
+
+# Make it executable
+chmod +x /usr/local/bin/gitwatch
 ```
 
 #### Update
