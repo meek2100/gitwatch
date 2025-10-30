@@ -1,13 +1,13 @@
 #!/usr/bin/env bats
 
 # Load standard helpers
-load 'test_helper/bats-support/load'
-load 'test_helper/bats-assert/load'
-load 'test_helper/bats-file/load'
+load 'bats-support/load'
+load 'bats-assert/load'
+load 'bats-file/load'
 # Load custom helpers
-load 'test_helper/custom-helpers'
+load 'bats-custom/custom-helpers'
 # Load setup/teardown
-load 'startup-shutdown'
+load 'bats-custom/startup-shutdown'
 
 # This test requires a functioning 'logger' command and a way to read system logs.
 # It will be skipped if the OS is not Linux or if 'logger' is not found.

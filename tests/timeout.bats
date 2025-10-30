@@ -1,13 +1,13 @@
 #!/usr/bin/env bats
 
 # Load standard helpers
-load 'test_helper/bats-support/load'
-load 'test_helper/bats-assert/load'
-load 'test_helper/bats-file/load'
+load 'bats-support/load'
+load 'bats-assert/load'
+load 'bats-file/load'
 # Load custom helpers (includes create_hanging_bin)
-load 'test_helper/custom-helpers'
+load 'bats-custom/custom-helpers'
 # Load setup/teardown
-load 'startup-shutdown'
+load 'bats-custom/startup-shutdown'
 
 
 @test "timeout_git_push: Ensures hung git push command is terminated and logged" {

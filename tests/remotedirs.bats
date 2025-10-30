@@ -1,11 +1,11 @@
 #!/usr/bin/env bats
 
 # Load helpers FIRST
-load 'test_helper/bats-support/load'
-load 'test_helper/bats-assert/load'
-load 'test_helper/bats-file/load'
+load 'bats-support/load'
+load 'bats-assert/load'
+load 'bats-file/load'
 # Load custom helpers
-load 'test_helper/custom-helpers'
+load 'bats-custom/custom-helpers'
 
 # Define the custom cleanup logic specific to this file
 # Use standard echo to output debug info to avoid relying on bats-support inside teardown
@@ -20,7 +20,7 @@ _remotedirs_cleanup() {
 
 # Load the base setup/teardown AFTER defining the custom helper
 # This file now contains _common_teardown() and a default teardown() wrapper
-load 'startup-shutdown'
+load 'bats-custom/startup-shutdown'
 
 # Define the final teardown override that calls both the custom
 # cleanup for this file and the common teardown logic.
@@ -32,15 +32,15 @@ teardown() {
 
 @test "remote_git_dirs_working_with_commit_logging: -g flag works with external .git dir" {
     dotgittestdir=$(mktemp -d)
-    # Use the TEST_SUBDIR_NAME variable defined in startup-shutdown.bash
+    # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
     run mv "$testdir/local/$TEST_SUBDIR_NAME/.git" "$dotgittestdir/"
     assert_success
 
     # Start gitwatch directly in the background
-    # Use the TEST_SUBDIR_NAME variable defined in startup-shutdown.bash
+    # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 -g "$dotgittestdir/.git" "$testdir/local/$TEST_SUBDIR_NAME" &
     GITWATCH_PID=$!
-    # Use the TEST_SUBDIR_NAME variable defined in startup-shutdown.bash
+    # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
     cd "$testdir/local/$TEST_SUBDIR_NAME"
     sleep 1
     echo "line1" >> file1.txt
@@ -72,7 +72,7 @@ teardown() {
 
 @test "remote_git_dirs_working_with_commit_and_push: -g flag works with external .git dir and -r push" {
     dotgittestdir=$(mktemp -d)
-    # Use the TEST_SUBDIR_NAME variable defined in startup-shutdown.bash
+    # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
     run mv "$testdir/local/$TEST_SUBDIR_NAME/.git" "$dotgittestdir/"
     assert_success
 
@@ -80,7 +80,7 @@ teardown() {
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -g "$dotgittestdir/.git" "$testdir/local/$TEST_SUBDIR_NAME" &
     GITWATCH_PID=$!
 
-    # Use the TEST_SUBDIR_NAME variable defined in startup-shutdown.bash
+    # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
     cd "$testdir/local/$TEST_SUBDIR_NAME"
     sleep 1
     echo "line1" >> file_for_remote.txt

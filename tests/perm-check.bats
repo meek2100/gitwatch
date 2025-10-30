@@ -1,13 +1,13 @@
 #!/usr/bin/env bats
 
 # Load standard helpers
-load 'test_helper/bats-support/load'
-load 'test_helper/bats-assert/load'
-load 'test_helper/bats-file/load'
+load 'bats-support/load'
+load 'bats-assert/load'
+load 'bats-file/load'
 # Load custom helpers
-load 'test_helper/custom-helpers'
+load 'bats-custom/custom-helpers'
 # Load setup/teardown
-load 'startup-shutdown'
+load 'bats-custom/startup-shutdown'
 
 # Test to ensure the SECOND critical permission check (on the .git directory)
 # exits gracefully with the critical permission error (Exit Code 7) when Read/Execute fail.

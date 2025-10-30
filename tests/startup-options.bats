@@ -1,13 +1,13 @@
 #!/usr/bin/env bats
 
 # Load standard helpers
-load 'test_helper/bats-support/load'
-load 'test_helper/bats-assert/load'
-load 'test_helper/bats-file/load'
+load 'bats-support/load'
+load 'bats-assert/load'
+load 'bats-file/load'
 # Load custom helpers
-load 'test_helper/custom-helpers'
+load 'bats-custom/custom-helpers'
 # Load setup/teardown
-load 'startup-shutdown'
+load 'bats-custom/startup-shutdown'
 
 # Test 1: Commit on start successfully commits staged changes
 @test "startup_commit_f: -f flag commits staged changes on startup" {
@@ -87,7 +87,7 @@ load 'startup-shutdown'
     echo "# Initial hash: $initial_commit_hash" >&3
 
     # 1. Start gitwatch with -f, logging all output
-    # Note: Using WAITTIME from startup-shutdown.bash for the sleep duration
+    # Note: Using WAITTIME from bats-custom/startup-shutdown.bash for the sleep duration
 
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -f "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
     GITWATCH_PID=$!

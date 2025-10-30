@@ -1,11 +1,13 @@
 #!/usr/bin/env bats
 
 # Load standard helpers
-load 'test_helper/bats-support/load'
-load 'test_helper/bats-assert/load'
-load 'test_helper/bats-file/load'
+load 'bats-support/load'
+load 'bats-assert/load'
+load 'bats-file/load'
+# Load custom helpers
+load 'bats-custom/custom-helpers'
 # Load setup/teardown
-load 'startup-shutdown'
+load 'bats-custom/startup-shutdown'
 
 # --- Mock Dependencies for Isolation ---
 # The actual logic for these functions lives inside gitwatch.sh,
@@ -13,7 +15,7 @@ load 'startup-shutdown'
 
 stderr() {
   # Mock stderr output for debugging or warning messages
-  echo "MOCK_STDERR: $@" >&3
+  echo "MOCK_STDERR: $*" >&3
 }
 
 _strip_color() {
