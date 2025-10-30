@@ -10,6 +10,7 @@ load 'bats-custom/custom-helpers'
 load 'bats-custom/startup-shutdown'
 
 @test "dependency_failure_syslog: -S flag exits with code 2 if 'logger' command is missing" {
+  # This test temporarily manipulates the PATH environment variable to simulate a missing 'logger' command.
   local path_backup="$PATH"
 
   # 1. Temporarily remove common binary directories from PATH to simulate 'logger' missing
@@ -45,8 +46,8 @@ load 'bats-custom/startup-shutdown'
   # Use a conservative filter to remove typical bin directories, but keep others like bats dependencies
   local new_path
   # shellcheck disable=SC2155 # Split assignment to avoid masking error from pipe
-  # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
   new_path="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr/local/)?(s)?bin' | tr '\n' ':')"
+  # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
   export PATH="$new_path"
 
   # 2. Assert that 'timeout' is not found in the simulated PATH
@@ -73,8 +74,8 @@ load 'bats-custom/startup-shutdown'
   # 1. Hide 'git'
   local new_path
   # shellcheck disable=SC2155 # Split assignment to avoid masking error from pipe
-  # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
   new_path="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr/local/)?(s)?bin' | tr '\n' ':')"
+  # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
   export PATH="$new_path"
   run command -v git
   refute_success "Failed to simulate missing 'git' command"
@@ -109,8 +110,8 @@ load 'bats-custom/startup-shutdown'
   # 1. Hide the watcher
   local new_path
   # shellcheck disable=SC2155 # Split assignment to avoid masking error from pipe
-  # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
   new_path="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr/local/)?(s)?bin' | tr '\n' ':')"
+  # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
   export PATH="$new_path"
   run command -v "$watcher_name"
   refute_success "Failed to simulate missing '$watcher_name' command"
@@ -139,8 +140,8 @@ load 'bats-custom/startup-shutdown'
   # 1. Hide 'flock'
   local new_path
   # shellcheck disable=SC2155 # Split assignment to avoid masking error from pipe
-  # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
   new_path="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr/local/)?(s)?bin' | tr '\n' ':')"
+  # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
   export PATH="$new_path"
   run command -v flock
   refute_success "Failed to simulate missing 'flock' command"
@@ -180,8 +181,8 @@ load 'bats-custom/startup-shutdown'
   # 1. Hide 'flock'
   local new_path
   # shellcheck disable=SC2155 # Split assignment to avoid masking error from pipe
-  # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
   new_path="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr/local/)?(s)?bin' | tr '\n' ':')"
+  # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
   export PATH="$new_path"
   run command -v flock
   refute_success "Failed to simulate missing 'flock' command"

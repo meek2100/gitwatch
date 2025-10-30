@@ -59,12 +59,15 @@ setup() {
   LISTCHANGES_COLOR="--color=always"
   COMMITCMD=""
   PASSDIFFS=0
+  # shellcheck disable=SC2034 # Global variable, used by sourced script logic
   FORMATTED_COMMITMSG="" # This gets set by the script
   if [[ "$COMMITMSG" != *%d* ]];
   then
     DATE_FMT=""
+    # shellcheck disable=SC2034 # Global variable, used by sourced script logic
     FORMATTED_COMMITMSG="$COMMITMSG"
   else
+    # shellcheck disable=SC2034 # Global variable, used by sourced script logic
     FORMATTED_COMMITMSG="$COMMITMSG"
   fi
   # Ensure TIMEOUT has a default value if not set by script (it should be): "${TIMEOUT:=60}"
@@ -126,7 +129,7 @@ setup() {
   run generate_commit_message
   assert_success
   assert_output --partial "Too many lines changed (1 > 0).
-  Summary:"
+Summary:"
   assert_output --partial "file.txt | 10 ++++++++++"
 }
 
