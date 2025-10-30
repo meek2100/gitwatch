@@ -39,7 +39,6 @@ wait_for_git_change() {
   local current_output=""
 
   # Basic input validation
-  # Fix for SC1073/SC1035/SC1072: Ensure correct spacing and structure for IF negation
   if ! [[ "$max_attempts" =~ ^[0-9]+$ ]] || ! [[ "$delay" =~ ^[0-9]+(\.[0-9]+)?$ ]];
   then
     echo "Usage: wait_for_git_change [--target <expected>] <max_attempts> <delay_seconds> <command...>" >&3
@@ -144,12 +143,15 @@ create_hanging_bin() {
   mkdir -p "$testdir/bin"
 
   echo "#!/usr/bin/env bash" > "$dummy_path"
-  # Print signature to indicate the hanging version was called
-  echo "echo \"*** DUMMY HANG: $name called, will sleep 600s ***\" >&2" >> "$dummy_path"
-  # Sleep for 10 minutes (much longer than gitwatch.sh's 60s timeout)
-  echo "sleep 600" >> "$dummy_path"
-  # Exit cleanly if it ever wakes up, though it should be killed by 'timeout'
-  echo "exit 0" >> "$dummy_path"
+  # Fix SC2129: Combine redirects
+  {
+    # Print signature to indicate the hanging version was called
+    echo "echo \"*** DUMMY HANG: $name called, will sleep 600s ***\" >&2"
+    # Sleep for 10 minutes (much longer than gitwatch.sh's 60s timeout)
+    echo "sleep 600"
+    # Exit cleanly if it ever wakes up, though it should be killed by 'timeout'
+    echo "exit 0"
+  } >> "$dummy_path"
   chmod +x "$dummy_path"
   echo "$dummy_path"
 }

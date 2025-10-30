@@ -81,8 +81,8 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
   +++ b/file_with_color.txt
   @@ -1,2 +1,2 @@
   -${ESC}[31mdeleted line${ESC}[0m
-+${ESC}[32madded line${ESC}[0m
-"
+  +${ESC}[32madded line${ESC}[0m
+  "
   run diff-lines <<< "$DIFF_INPUT"
   assert_success
   # The output should contain the ANSI codes exactly as printed in the input

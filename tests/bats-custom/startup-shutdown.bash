@@ -6,7 +6,7 @@
 _common_teardown() {
   echo '# Teardown started' >&3
   # Move out of test directory first to avoid issues with removal
-  # Fix SC2164: Use || true to acknowledge failure but proceed (non-fatal in teardown)
+  # shellcheck disable=SC2103
   cd /tmp || true
 
   # --- More Robust Process Termination ---
@@ -17,8 +17,7 @@ _common_teardown() {
     # Check if the process exists before trying to kill
     if ps -p "$GITWATCH_PID" > /dev/null;
     then
-      # Try TERM first for graceful shutdown
-      pkill -15 -P "$GITWATCH_PID" || true
+      pkill -15 -P "$GITWATCH_PID" || true # Try TERM first for graceful shutdown
       # Give it a moment to shut down gracefully
       sleep 0.5
       # Force KILL if it's still running
@@ -73,35 +72,35 @@ _common_setup() {
     # Define a global variable Bats tests can use, e.g., TEST_SUBDIR_NAME
     # shellcheck disable=SC2034 # Used by tests
     TEST_SUBDIR_NAME="rem with spaces"
-    local initial_setup_dir="initial-setup-spaces"
-    local initial_commit_msg="Initial commit for space test setup"
-    local initial_file_content="initial setup with spaces"
+    initial_setup_dir="initial-setup-spaces"
+    initial_commit_msg="Initial commit for space test setup"
+    initial_file_content="initial setup with spaces"
   else
-    local testdir
     testdir=$(mktemp -d)
     # shellcheck disable=SC2034 # Used by tests
     TEST_SUBDIR_NAME="remote" # Standard clone dir name
-    local initial_setup_dir="initial-setup"
-    local initial_commit_msg="Initial commit for test setup"
-    local initial_file_content="initial setup"
+    initial_setup_dir="initial-setup"
+    initial_commit_msg="Initial commit for test setup"
+    initial_file_content="initial setup"
   fi
 
   echo "# Using test directory: $testdir" >&3
   echo "# Local clone directory name will be: $TEST_SUBDIR_NAME" >&3
 
   # shellcheck disable=SC2164
-  cd "$testdir"
+  cd "$testdir" || return 1
   mkdir remote
   # shellcheck disable=SC2164
-  cd remote
+  cd remote || return 1
   git init -q --bare
   # shellcheck disable=SC2103
-  cd ..
+  cd .. || return 1
 
   # --- Add initial commit directly to the bare remote ---
   # Clone the bare repo temporarily
   git clone -q remote "$initial_setup_dir"
-  cd "$initial_setup_dir"
+  # shellcheck disable=SC2164 # Fix SC2164
+  cd "$initial_setup_dir" || return 1
   # Create and commit an initial file
   echo "$initial_file_content" > initial_file.txt
   git add initial_file.txt
@@ -109,15 +108,15 @@ _common_setup() {
   # Push back to the bare remote
   git push -q origin master
   # Go back up and remove the temporary clone
-  cd ..
+  cd .. || return 1
   rm -rf "$initial_setup_dir"
   # --- End initial commit ---
 
   # Now set up the local repo for the test
   # shellcheck disable=SC2164
   mkdir local
-  # shellcheck disable=SC2164
-  cd local
+  # shellcheck disable=SC2164 # Fix SC2164
+  cd local || return 1
   # Clone into the potentially space-containing directory
   git clone -q ../remote "$TEST_SUBDIR_NAME"
 
