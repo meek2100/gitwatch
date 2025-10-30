@@ -17,7 +17,7 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 # Copy files and ensure correct ownership
-COPY --chown=appuser:appgroup gitwatch.sh entrypoint.sh ./
+COPY --chown=appuser:appgroup gitwatch.sh entrypoint.sh LICENSE ./
 
 RUN chmod +x /app/gitwatch.sh /app/entrypoint.sh
 
@@ -34,8 +34,7 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
   CMD bash -c ' \
     # LIVENESS CHECK: Confirm the essential child watcher process is active.
     # Checks all process command lines for the watcher tool string ("inotifywait" or "fswatch").
-    cat /proc/*/cmdline 2>/dev/null |
-    grep -q "inotifywait\|fswatch" \
+    cat /proc/*/cmdline 2>/dev/null | grep -q "inotifywait\|fswatch" \
   '
 
 ENTRYPOINT ["/app/entrypoint.sh"]
