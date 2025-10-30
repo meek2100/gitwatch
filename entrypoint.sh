@@ -10,6 +10,9 @@ PUID=${PUID:-}
 PGID=${PGID:-}
 CONTAINER_USER="appuser"
 
+# --- NEW: Define GOSU_COMMAND as an array ---
+declare -a GOSU_COMMAND
+
 if [ -n "$PUID" ] && [ -n "$PGID" ]; then
   # Check if PUID/PGID are different from default (1000/1000 in Alpine)
   if [ "$PUID" != "$(id -u $CONTAINER_USER)" ] || [ "$PGID" != "$(id -g $CONTAINER_USER)" ]; then
@@ -26,13 +29,14 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
   else
     echo "Starting as default user ($CONTAINER_USER) with ID: $PUID/$PGID"
   fi
-  # Use gosu to execute the rest of the script as the correct user
-  GOSU_COMMAND="gosu $CONTAINER_USER"
+  # --- CHANGED: Set GOSU_COMMAND as an array ---
+  GOSU_COMMAND=( gosu "$CONTAINER_USER" )
 else
   # No PUID/PGID set, run as the default appuser (which is PID 1, but we use 'exec' later)
   echo "PUID/PGID not set. Running as default container user: $CONTAINER_USER"
   # Use 'exec' to replace the shell, will run as USER appuser defined in Dockerfile
-  GOSU_COMMAND="exec"
+  # --- CHANGED: Set GOSU_COMMAND as an array ---
+  GOSU_COMMAND=( exec )
 fi
 # --------------------------------------------------
 
@@ -150,8 +154,8 @@ echo "-------------------------------------------------"
 
 # Use 'gosu' or 'exec' to run the command, replacing the entrypoint shell process.
 # This ensures that signals (like TERM) go directly to gitwatch.sh (PID 1 best practice).
-# If PUID/PGID were set, GOSU_COMMAND is 'gosu appuser'. Otherwise, it's 'exec'.
-$GOSU_COMMAND "/app/gitwatch.sh" "${cmd[@]}"
+# --- CHANGED: Use array expansion "${GOSU_COMMAND[@]}" ---
+"${GOSU_COMMAND[@]}" "/app/gitwatch.sh" "${cmd[@]}"
 
 # If 'exec' or 'gosu' fails, the script continues and exits with an error status.
 echo "ERROR: Exec/Gosu failed to start gitwatch.sh. Check permissions and path." >&2

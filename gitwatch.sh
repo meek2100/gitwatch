@@ -546,11 +546,12 @@ if [ -d "$USER_PATH" ]; then
   if [ -n "${EXCLUDE_PATTERN:-}" ]; then final_exclude_pattern_parts+=("$EXCLUDE_PATTERN"); fi
   if [ -n "$PROCESSED_GLOB_PATTERN" ]; then final_exclude_pattern_parts+=("$PROCESSED_GLOB_PATTERN"); fi
 
-  # Combine all parts with the regex OR pipe (|) and wrap in a non-capturing group.
-  # Note: The watcher tool typically assumes the entire pattern is wrapped if it contains ORs.
-  EXCLUDE_REGEX="($(IFS=\|; echo "${final_exclude_pattern_parts[*]}")"
-  EXCLUDE_REGEX="${EXCLUDE_REGEX// /}" # Remove spaces after |
-  EXCLUDE_REGEX="${EXCLUDE_REGEX})"
+  # --- NEW: Use printf to join array, more robust than IFS/echo ---
+  # Join all parts with a |
+  EXCLUDE_REGEX=$(printf "|%s" "${final_exclude_pattern_parts[@]}")
+  # The result is "|part1|part2", so we slice off the leading |
+  EXCLUDE_REGEX="(${EXCLUDE_REGEX:1})"
+  # --- End NEW ---
 
   if [ "$INW" = "inotifywait" ]; then INW_ARGS=("-qmr" "-e" "$EVENTS" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS"); else INW_ARGS=("--recursive" "--event" "$EVENTS" "-E" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS"); fi
   # GIT_ADD_ARGS logic moved to _perform_commit
@@ -706,9 +707,11 @@ if [ "$USE_FLOCK" -eq 1 ]; then
     # Use sha256sum if available, md5sum as fallback, or just path chars as last resort
     REPO_HASH=""
     if is_command "sha256sum"; then
-      REPO_HASH=$(echo -n "$GIT_DIR_PATH" | sha256sum | awk '{print $1}')
+      # --- NEW: Use read instead of awk ---
+      REPO_HASH=$(echo -n "$GIT_DIR_PATH" | sha256sum | read -r hash _; echo "$hash")
     elif is_command "md5sum"; then
-      REPO_HASH=$(echo -n "$GIT_DIR_PATH" | md5sum | awk '{print $1}')
+      # --- NEW: Use read instead of awk ---
+      REPO_HASH=$(echo -n "$GIT_DIR_PATH" | md5sum | read -r hash _; echo "$hash")
     else
       # Simple "hash" for POSIX compliance, replaces / with _
       REPO_HASH="${GIT_DIR_PATH//\//_}"
