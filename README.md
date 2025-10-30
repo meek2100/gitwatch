@@ -267,7 +267,8 @@ operating system.
 
 ### Notes for Mac
 
-If running on macOS, you'll need to install the required runtime tools and the **BATS testing framework** via Homebrew:
+If running on macOS, you'll need to install the required runtime tools and
+the **BATS testing framework** via Homebrew:
 
 ```sh
 # Runtime Dependencies
