@@ -81,8 +81,8 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
   +++ b/file_with_color.txt
   @@ -1,2 +1,2 @@
   -${ESC}[31mdeleted line${ESC}[0m
-  +${ESC}[32madded line${ESC}[0m
-  "
++${ESC}[32madded line${ESC}[0m
+"
   run diff-lines <<< "$DIFF_INPUT"
   assert_success
   # The output should contain the ANSI codes exactly as printed in the input
@@ -93,13 +93,13 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
 @test "diff_lines_5_renamed: Handles file rename (with content change)" {
   # Note: A rename with content change is parsed as a delete + add
   local DIFF_INPUT="
-  diff --git a/old_name.txt b/new_name.txt
-  --- a/old_name.txt
-  +++ b/new_name.txt
-  @@ -1,2 +1,2 @@
-  -Initial content
-  +Updated content
-  "
+diff --git a/old_name.txt b/new_name.txt
+--- a/old_name.txt
++++ b/new_name.txt
+@@ -1,2 +1,2 @@
+-Initial content
++Updated content
+"
   run diff-lines <<< "$DIFF_INPUT"
 
   assert_success
@@ -112,11 +112,11 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
 @test "diff_lines_6_trim_spaces: Handles paths with leading/trailing spaces correctly (if diff allows it)" {
   # Although diff usually normalizes this, testing robustness
   local DIFF_INPUT="
-  --- a/  path with spaces.txt
-  +++ b/  path with spaces.txt
-  @@ -1,1 +1,1 @@
-  +content
-  "
+--- a/  path with spaces.txt
++++ b/  path with spaces.txt
+@@ -1,1 +1,1 @@
++content
+"
   run diff-lines <<< "$DIFF_INPUT"
   assert_success
   # Path names should be trimmed by _trim_spaces
@@ -125,10 +125,10 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
 
 @test "diff_lines_7_mode_change: Handles a file mode change" {
   local DIFF_INPUT="
-  diff --git a/script.sh b/script.sh
-  old mode 100644
-  new mode 100755
-  "
+diff --git a/script.sh b/script.sh
+old mode 100644
+new mode 100755
+"
   run diff-lines <<< "$DIFF_INPUT"
   assert_success
   assert_output "script.sh:?: Mode changed to 100755"
@@ -136,15 +136,15 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
 
 @test "diff_lines_8_mode_and_content_change: Handles mode and content change" {
   local DIFF_INPUT="
-  diff --git a/script.sh b/script.sh
-  old mode 100644
-  new mode 100755
-  --- a/script.sh
-  +++ b/script.sh
-  @@ -1,1 +1,1 @@
-  -old content
-  +new content
-  "
+diff --git a/script.sh b/script.sh
+old mode 100644
+new mode 100755
+--- a/script.sh
++++ b/script.sh
+@@ -1,1 +1,1 @@
+-old content
++new content
+"
   run diff-lines <<< "$DIFF_INPUT"
   assert_success
   assert_output "script.sh:?: Mode changed to 100755"
