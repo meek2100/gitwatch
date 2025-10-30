@@ -19,6 +19,7 @@ for testing.
    for `gitwatch` itself, plus the development dependencies for testing and
    linting.
    - **macOS (using Homebrew):**
+
      ```sh
      # Runtime deps
      brew install fswatch flock coreutils
@@ -27,7 +28,9 @@ for testing.
      # Linting deps
      brew install pre-commit shellcheck
      ```
+
    - **Linux (using apt):**
+
      ```sh
      # Runtime deps
      sudo apt-get install inotify-tools util-linux coreutils
