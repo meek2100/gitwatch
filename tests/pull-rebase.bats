@@ -329,3 +329,65 @@ load 'bats-custom/startup-shutdown'
   git checkout master &> /dev/null
   cd /tmp
 }
+
+@test "pull_rebase_detached_head: -R flag correctly pulls/rebases in detached HEAD state" {
+  local output_file
+  output_file=$(mktemp "$testdir/output.XXXXX")
+
+  # 1. Simulate Upstream Change on Remote (Remote is ahead)
+  cd "$testdir"
+  run git clone -q remote local_ahead
+  assert_success "Cloning for local_ahead failed"
+  cd local_ahead
+  echo "Upstream commit" > upstream_file.txt
+  git add .
+  git commit -q -m "Upstream change"
+  run git push -q origin master
+  assert_success "Push from local_ahead failed"
+  local upstream_commit_hash=$(git rev-parse HEAD)
+  cd ..
+  rm -rf local_ahead
+
+  # 2. Go back to gitwatch repo, create local commit, and detach
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+  echo "local detached commit 1" > detached_file.txt
+  git add .
+  git commit -q -m "Local detached commit 1"
+  local local_commit_hash=$(git rev-parse HEAD)
+  run git checkout "$local_commit_hash"
+  assert_success "Failed to checkout into detached HEAD state"
+
+  # 3. Start gitwatch with -R, -r, -b
+  local target_branch="master"
+  echo "# DEBUG: Starting gitwatch in detached HEAD, with -R, pushing to $target_branch" >&3
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -b "$target_branch" -R "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  GITWATCH_PID=$!
+  sleep 1
+
+  # 4. Trigger a new change (will be committed on the detached commit)
+  echo "local detached commit 2" >> detached_file_2.txt
+
+  # 5. Wait for the change to be committed, rebased, and pushed
+  run wait_for_git_change 30 1 git rev-parse origin/master
+  assert_success "Push with detached HEAD and rebase timed out"
+
+  # 6. Assert: Remote hash is the new local commit hash
+  local final_local_hash=$(git rev-parse HEAD)
+  local final_remote_hash=$(git rev-parse origin/master)
+  assert_equal "$final_local_hash" "$final_remote_hash" "Local and remote hashes must match"
+  assert_not_equal "$upstream_commit_hash" "$final_remote_hash" "Remote hash should have changed"
+
+  # 7. Assert: Log output confirms pull/rebase
+  run cat "$output_file"
+  assert_output --partial "Executing pull command:"
+  assert_output --partial "Successfully rebased and updated"
+
+  # 8. Assert: All files are present locally (proving rebase)
+  assert_file_exist "upstream_file.txt"
+  assert_file_exist "detached_file.txt"
+  assert_file_exist "detached_file_2.txt"
+
+  # 9. Cleanup: Go back to master before teardown
+  git checkout master &> /dev/null
+  cd /tmp
+}

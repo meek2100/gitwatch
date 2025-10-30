@@ -12,8 +12,7 @@ load 'bats-custom/startup-shutdown'
 # This test checks that gitwatch exits gracefully when the target it is watching
 # (either a file or a directory) is deleted, as the underlying watcher tool will
 # terminate in this scenario.
-
-@test "target_deletion_file: Exits gracefully when the watched file is deleted" {
+@test "target_deletion_file: Commits deletion and exits gracefully" {
   local output_file
   output_file=$(mktemp "$testdir/output.XXXXX")
   local watch_file="file_to_watch.txt"
@@ -24,9 +23,11 @@ load 'bats-custom/startup-shutdown'
   echo "initial content" > "$watch_file"
   git add "$watch_file"
   git commit -q -m "Initial commit of watched file"
+  local initial_hash
+  initial_hash=$(git log -1 --format=%H)
 
   # 2. Start gitwatch watching the file, logging all output
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$watched_file_path" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 "$watched_file_path" > "$output_file" 2>&1 &
   GITWATCH_PID=$!
   local watch_pid=$GITWATCH_PID
   sleep 1 # Allow watcher to initialize
@@ -36,10 +37,20 @@ load 'bats-custom/startup-shutdown'
   run rm "$watch_file"
   assert_success "Failed to delete watched file"
 
-  # 4. Wait for the main gitwatch process to terminate
+  # 4. Wait for the DELETION COMMIT to appear
+  run wait_for_git_change 10 0.5 git log -1 --format=%H
+  assert_success "Deletion commit timed out"
+  local final_hash=$output
+  assert_not_equal "$initial_hash" "$final_hash" "Commit hash did not change after deletion"
+
+  # 5. Verify the commit message reflects a deletion
+  run git log -1 --pretty=%B
+  assert_output --partial "File deleted."
+
+  # 6. Wait for the main gitwatch process to terminate (should be quick now)
   local max_wait=5
   local wait_count=0
-  # Use 'kill -0' to check if PID is alive, which is cleaner than 'ps'
+  # Use 'kill -0' to check if PID is alive
   while kill -0 "$watch_pid" 2>/dev/null && [ "$wait_count" -lt "$max_wait" ]; do
     echo "# DEBUG: Waiting for gitwatch PID $watch_pid to exit..." >&3
     sleep 1
@@ -51,11 +62,11 @@ load 'bats-custom/startup-shutdown'
     fail "gitwatch process (PID $watch_pid) failed to exit after watched file deletion."
   fi
 
-  # 5. Assert: Check log output confirms loop termination
+  # 7. Assert: Check log output confirms loop termination
   run cat "$output_file"
-  assert_output --partial "File watcher process ended (or failed). Exiting via loop termination." "Did not log graceful exit message."
+  assert_output --partial "File watcher process ended (or failed). Exiting via loop termination."
 
-  # 6. Cleanup: Unset the PID so _common_teardown doesn't try to kill the already dead process
+  # 8. Cleanup: Unset the PID
   unset GITWATCH_PID
   cd /tmp
 }
@@ -100,7 +111,7 @@ load 'bats-custom/startup-shutdown'
 
   # 5. Assert: Check log output confirms loop termination
   run cat "$output_file"
-  assert_output --partial "File watcher process ended (or failed). Exiting via loop termination." "Did not log graceful exit message."
+  assert_output --partial "File watcher process ended (or failed). Exiting via loop termination."
 
   # 6. Cleanup
   unset GITWATCH_PID
@@ -156,7 +167,6 @@ load 'bats-custom/startup-shutdown'
     "The dummy watcher failure message was not captured."
   assert_output --partial "File watcher process ended (or failed). Exiting via loop termination." \
     "Did not log loop termination message."
-
   # 7. Cleanup
   unset GITWATCH_PID
   unset GW_INW_BIN

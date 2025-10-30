@@ -97,3 +97,64 @@ create_watcher_wrapper() {
   unset GW_INW_BIN
   cd /tmp
 }
+
+@test "watcher_behavior_custom_events: -e create only commits on file creation" {
+  # This test is behavior-based and does not need the wrapper
+  unset GW_INW_BIN
+
+  local output_file
+  output_file=$(mktemp "$testdir/output.XXXXX")
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+  local existing_file="existing_file.txt"
+  local new_file="new_file.txt"
+
+  # 1. Create and commit an initial file
+  echo "initial" > "$existing_file"
+  git add "$existing_file"
+  git commit -q -m "Initial file"
+  local initial_hash
+  initial_hash=$(git log -1 --format=%H)
+
+  # 2. Determine platform-specific 'create' event flag
+  local create_event=""
+  if [ "$RUNNER_OS" == "Linux" ]; then
+    create_event="create"
+  else
+    # fswatch numeric flag for "Created" is 2
+    create_event="2"
+  fi
+
+  # 3. Start gitwatch watching ONLY for 'create' events
+  echo "# DEBUG: Starting gitwatch with -e $create_event" >&3
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -e "$create_event" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  GITWATCH_PID=$!
+  sleep 1
+
+  # 4. Modify the existing file (this is NOT a 'create' event)
+  echo "modification" >> "$existing_file"
+
+  # 5. Wait to ensure no commit happens
+  echo "# DEBUG: Waiting ${WAITTIME}s to ensure NO commit happens on 'modify'..." >&3
+  sleep "$WAITTIME"
+
+  # 6. Assert commit hash has NOT changed
+  run git log -1 --format=%H
+  assert_success
+  assert_equal "$initial_hash" "$output" "Commit occurred on 'modify' event but should not have"
+
+  # 7. Create a new file (this IS a 'create' event)
+  echo "new" > "$new_file"
+
+  # 8. Wait for the commit to appear
+  run wait_for_git_change 20 0.5 git log -1 --format=%H
+  assert_success "Commit for 'create' event timed out"
+  local final_hash=$output
+  assert_not_equal "$initial_hash" "$final_hash" "Commit hash did not change after 'create' event"
+
+  # 9. Verify commit log shows only the new file
+  run git log -1 --name-only
+  assert_output --partial "$new_file"
+  refute_output --partial "$existing_file"
+
+  cd /tmp
+}

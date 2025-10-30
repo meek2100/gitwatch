@@ -262,6 +262,7 @@ check_git_config() {
 # --- Signal Trapping ---
 # Note: The trap for EXIT/INT/TERM is redefined later to include PID file cleanup
 trap "cleanup 0" EXIT # Ensure cleanup runs on script exit, for any reason
+verbose_echo "Signal traps set."
 trap "signal_handler INT" INT # Handle Ctrl+C
 trap "signal_handler TERM" TERM # Handle kill/systemd stop
 # ---------------------
@@ -382,10 +383,12 @@ if [ $# -ne 1 ]; then # If no command line arguments are left (that's bad: no ta
   exit                # and exit
 fi
 USER_PATH="$1" # Final user path after shifting options
+verbose_echo "Verbose logging enabled."
 
 # Enable command tracing only if verbose and not using syslog (to avoid flooding syslog)
 if [ "$VERBOSE" -eq 1 ] && [ "$USE_SYSLOG" -eq 0 ]; then
-  set -x
+  # set -x # Removed: Too noisy, replaced with targeted verbose_echo calls
+  verbose_echo "Command tracing disabled in favor of verbose_echo."
 fi
 
 
@@ -477,6 +480,7 @@ or allow multiple gitwatch instances to run on the same repository, potentially 
   errors or duplicate commits."
 fi
 # --- End flock check ---
+verbose_echo "Dependency checks complete."
 
 
 # Determine the appropriate read timeout based on bash version
@@ -1039,22 +1043,23 @@ generate_commit_message() {
 
 # The main commit and push logic
 _perform_commit() {
+  if [ "$SKIP_IF_MERGING" -eq 1 ] && is_merging; then
+    verbose_echo "Skipping commit - repo is merging."
+    return 0
+  fi
+
   # *** NEW PURE BASH STATUS CHECK ***
   local porcelain_output
   # Note: git status --porcelain is fast and does not need timeout
+  verbose_echo "Checking for changes to commit via 'git status --porcelain'..."
   porcelain_output=$(bash -c "$GIT status --porcelain")
 
   if [ -z "$porcelain_output" ]; then
     verbose_echo "No relevant changes detected by git status (porcelain check)."
     return 0
   fi
-  verbose_echo "Relevant changes detected by git status (porcelain check): $porcelain_output"
+  verbose_echo "Changes detected. Staging files..."
   # *** END NEW PURE BASH STATUS CHECK ***
-
-  if [ "$SKIP_IF_MERGING" -eq 1 ] && is_merging; then
-    verbose_echo "Skipping commit - repo is merging"
-    return 0
-  fi
 
   # Add changes
   local add_cmd
@@ -1064,11 +1069,12 @@ _perform_commit() {
     add_cmd=$(printf "%s add --all ." "$GIT")
   fi
   # git add is typically fast and doesn't need a timeout unless a huge repo/slow FS
-  bash -c "$add_cmd" || { stderr "ERROR: 'git add' failed."; return 1; }
   verbose_echo "Running git add command: $add_cmd"
+  bash -c "$add_cmd" || { stderr "ERROR: 'git add' failed."; return 1; }
 
   # *** MODIFIED CHECK: Use git write-tree comparison ***
   # Final check: Only proceed if the staged tree differs from HEAD's tree (meaning content or number of files changed).
+  verbose_echo "Checking for ephemeral changes (comparing staged tree to HEAD)..."
   local staged_tree_hash
   # write-tree is typically fast
   staged_tree_hash=$(bash -c "$GIT write-tree") || {
@@ -1087,13 +1093,14 @@ _perform_commit() {
     return 0
   fi
 
-  verbose_echo "Content or significant file changes detected (staged tree hash differs from HEAD). Committing."
+  verbose_echo "Content or significant file changes detected (staged tree hash differs from HEAD). Generating commit message..."
   # *** END MODIFIED CHECK ***
 
 
   # Generate commit message (reflects staged changes)
   local FINAL_COMMIT_MSG
   FINAL_COMMIT_MSG=$(generate_commit_message)
+  verbose_echo "Generated commit message. Proceeding with commit."
 
   if [ -z "$FINAL_COMMIT_MSG" ]; then
     stderr "Warning: Generated commit message was empty. Using default."
@@ -1106,15 +1113,16 @@ _perform_commit() {
   commit_cmd=$(printf "timeout -s 9 %s %s commit %s -m %q" "$TIMEOUT" "$GIT" "$GIT_COMMIT_ARGS" "$FINAL_COMMIT_MSG")
 
   # Run the commit command and capture its output and exit code
+  verbose_echo "Running git commit command: $commit_cmd"
   commit_output=$(bash -c "$commit_cmd" 2>&1) # Capture stdout and stderr
   commit_exit_code=$? # Capture the exit code immediately
 
   # Check the captured exit code
   if [ "$commit_exit_code" -eq 0 ]; then
     # Commit succeeded
-    verbose_echo "Running git commit command: $commit_cmd"
     # Optional: Log the commit output if verbose and needed for debugging
     # verbose_echo "Commit output: $commit_output"
+    : # Do nothing, success
   elif [ "$commit_exit_code" -eq 124 ]; then
     # Timeout exit code (124 from coreutils timeout)
     stderr "ERROR: 'git commit' timed out after $TIMEOUT seconds."
@@ -1185,6 +1193,7 @@ perform_commit() {
     # Open FD 8 for the subshell, associating it with the lock file
     exec 8>"$COMMIT_LOCKFILE"
     "$FLOCK" -n 8 || {
+      # This is a common and expected event, so it's a good verbose log
       verbose_echo "Commit already in progress (commit lock busy), skipping this trigger."
       exit 0 # Exit subshell gracefully
     }
@@ -1240,6 +1249,7 @@ verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
     [ -z "$drain_line" ] && break # Timeout means buffer is clear
     verbose_echo "Draining event: $drain_line"
   done
+  verbose_echo "Event drain complete. Starting debounce logic..."
 
   # --- DEBOUNCE LOGIC REVISION 3 ---
   # Read the PID from the file if it exists

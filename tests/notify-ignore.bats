@@ -85,7 +85,6 @@ load 'bats-custom/startup-shutdown'
 
   # 2. Assert hash changed (commit happened due to allowed file)
   assert_not_equal "$initial_hash" "$final_commit_hash" "Commit failed on allowed file."
-
   # 3. Assert: Log confirms all events were processed but one commit occurred.
   run cat "$output_file"
   # Should see the conversion happening
@@ -103,4 +102,49 @@ load 'bats-custom/startup-shutdown'
   refute_output --partial "old_config.txt"
   refute_output --partial "app.log"
   refute_output --partial "temp/file.txt"
+}
+
+@test "notify_ignore_gitignore: Ignores files matching .gitignore" {
+  local output_file
+  output_file=$(mktemp "$testdir/output.XXXXX")
+
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+
+  # 1. Create and commit .gitignore
+  echo "*.log" > .gitignore
+  echo "build/" >> .gitignore
+  git add .gitignore
+  git commit -q -m "Add .gitignore"
+  local initial_hash
+  initial_hash=$(git log -1 --format=%H)
+
+  # 2. Start gitwatch
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  GITWATCH_PID=$!
+  sleep 1
+
+  # 3. Create ignored and allowed files
+  mkdir -p build
+  echo "log data" > app.log
+  echo "build artifact" > build/output.bin
+  echo "allowed data" > allowed.txt
+
+  # 4. Wait for the (allowed) commit to appear
+  run wait_for_git_change 20 0.5 git log -1 --format=%H
+  assert_success "Commit for allowed file timed out"
+  local final_hash=$output
+  assert_not_equal "$initial_hash" "$final_hash" "Commit hash did not change"
+
+  # 5. Verify commit message only contains the allowed file
+  run git log -1 --pretty=%B
+  assert_output --partial "allowed.txt"
+  refute_output --partial "app.log"
+  refute_output --partial "build/output.bin"
+
+  # 6. Verify git status shows ignored files are still untracked/ignored
+  run git status --porcelain --ignored
+  assert_output --partial "!! app.log"
+  assert_output --partial "!! build/"
+
+  cd /tmp
 }
