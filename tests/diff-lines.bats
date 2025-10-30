@@ -72,7 +72,7 @@ diff-lines() {
       line=""                   # Reset line number state
       continue
 
-    # Match '--- a/path' or '--- /dev/null' - Capture everything after 'a/' or '/dev/null'
+      # Match '--- a/path' or '--- /dev/null' - Capture everything after 'a/' or '/dev/null'
     elif [[ "$stripped_reply" =~ ^---\ (a/)?(.*) ]]; then
       # Capture the raw path (Group 2). Strip any potential trailing color codes.
       # FIX: Use explicit argument passing to fix SC2119/SC2120 and use pure Bash trim
@@ -99,7 +99,7 @@ diff-lines() {
       line=${BASH_REMATCH[2]:-1} # Set starting line number for additions, default to 1
       continue
 
-    # NEW: Match file mode changes
+      # NEW: Match file mode changes
     elif [[ "$stripped_reply" =~ ^new\ mode\ ([0-9]+) ]]; then
       echo "$current_file_path:?: Mode changed to ${BASH_REMATCH[1]}"
       continue
@@ -160,14 +160,14 @@ diff-lines() {
 # --- Test Cases ---
 
 @test "diff_lines_1_addition: Handles a simple file addition" {
-    local DIFF_INPUT="
---- /dev/null
-+++ b/new_file.txt
-@@ -0,0 +1,3 @@
-+line 1
-+line 2
-+line 3
-"
+  local DIFF_INPUT="
+  --- /dev/null
+  +++ b/new_file.txt
+  @@ -0,0 +1,3 @@
+  +line 1
+  +line 2
+  +line 3
+  "
     run diff-lines <<< "$DIFF_INPUT"
     assert_success
     assert_output --regexp "new_file.txt:1: \+line 1"
@@ -176,14 +176,14 @@ diff-lines() {
 }
 
 @test "diff_lines_2_deletion: Handles a simple file deletion" {
-    local DIFF_INPUT="
---- a/old_file.txt
-+++ /dev/null
-@@ -1,3 +0,0 @@
--line 1
--line 2
--line 3
-"
+  local DIFF_INPUT="
+  --- a/old_file.txt
+  +++ /dev/null
+  @@ -1,3 +0,0 @@
+  -line 1
+  -line 2
+  -line 3
+  "
     run diff-lines <<< "$DIFF_INPUT"
     assert_success
     # For a full file deletion, the original logic tags the line as 'File deleted.'
@@ -191,17 +191,17 @@ diff-lines() {
 }
 
 @test "diff_lines_3_modification: Handles modification with context lines" {
-    local DIFF_INPUT="
---- a/config.yaml
-+++ b/config.yaml
-@@ -10,6 +10,7 @@
+  local DIFF_INPUT="
+  --- a/config.yaml
+  +++ b/config.yaml
+  @@ -10,6 +10,7 @@
   context line 1
--old line to remove
-+new line 1 to add
-+new line 2 to add
+  -old line to remove
+  +new line 1 to add
+  +new line 2 to add
   context line 2
   context line 3
-"
+  "
     run diff-lines <<< "$DIFF_INPUT"
     assert_success
     # Context lines
@@ -218,11 +218,11 @@ diff-lines() {
 @test "diff_lines_4_color_codes: Preserves color in content but strips from paths" {
     local ESC=$'\033'
     # Mock Git diff output with ANSI colors
-    local DIFF_INPUT="
---- a/file_with_color.txt
-+++ b/file_with_color.txt
-@@ -1,2 +1,2 @@
--${ESC}[31mdeleted line${ESC}[0m
+  local DIFF_INPUT="
+  --- a/file_with_color.txt
+  +++ b/file_with_color.txt
+  @@ -1,2 +1,2 @@
+  -${ESC}[31mdeleted line${ESC}[0m
 +${ESC}[32madded line${ESC}[0m
 "
     run diff-lines <<< "$DIFF_INPUT"

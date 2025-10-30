@@ -10,74 +10,74 @@ load 'bats-custom/custom-helpers'
 load 'bats-custom/startup-shutdown'
 
 @test "skip_if_merging_M: -M flag prevents commit during a merge conflict" {
-    local output_file
-    output_file=$(mktemp "$testdir/output.XXXXX")
-    local conflict_file="conflict_file.txt"
-    local initial_commit_hash
-    # We must use git rev-parse to ensure the correct path for asserting MERGE_HEAD
-    cd "$testdir/local/$TEST_SUBDIR_NAME"
-    local GIT_DIR_PATH=$(git rev-parse --absolute-git-dir)
+  local output_file
+  output_file=$(mktemp "$testdir/output.XXXXX")
+  local conflict_file="conflict_file.txt"
+  local initial_commit_hash
+  # We must use git rev-parse to ensure the correct path for asserting MERGE_HEAD
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+  local GIT_DIR_PATH=$(git rev-parse --absolute-git-dir)
 
-    # 1. Create a file and commit it locally (This is the HEAD commit that will be checked against)
-    echo "Initial content" > "$conflict_file"
-    git add "$conflict_file"
-    git commit -q -m "Initial conflict file commit"
-    git push -q origin master
+  # 1. Create a file and commit it locally (This is the HEAD commit that will be checked against)
+  echo "Initial content" > "$conflict_file"
+  git add "$conflict_file"
+  git commit -q -m "Initial conflict file commit"
+  git push -q origin master
 
-    initial_commit_hash=$(git log -1 --format=%H)
-    echo "# Initial hash: $initial_commit_hash" >&3
+  initial_commit_hash=$(git log -1 --format=%H)
+  echo "# Initial hash: $initial_commit_hash" >&3
 
-    # 2. Simulate Upstream Change on Remote to set up the conflict
-    cd "$testdir"
-    run git clone -q remote local2
-    assert_success "Cloning for local2 failed"
-    cd local2
-    echo "Upstream change A" > "$conflict_file"
-    git add "$conflict_file"
-    git commit -q -m "Commit from local2 (upstream change A)"
-    run git push -q origin master
-    assert_success "Push from local2 failed"
-    cd ..
-    run rm -rf local2
-    assert_success "Cleanup of local2 failed"
+  # 2. Simulate Upstream Change on Remote to set up the conflict
+  cd "$testdir"
+  run git clone -q remote local2
+  assert_success "Cloning for local2 failed"
+  cd local2
+  echo "Upstream change A" > "$conflict_file"
+  git add "$conflict_file"
+  git commit -q -m "Commit from local2 (upstream change A)"
+  run git push -q origin master
+  assert_success "Push from local2 failed"
+  cd ..
+  run rm -rf local2
+  assert_success "Cleanup of local2 failed"
 
-    # 3. Go back to gitwatch repo, make a local conflicting change, and stage it
-    cd "$testdir/local/$TEST_SUBDIR_NAME"
-    echo "Local change B" > "$conflict_file"
-    git add "$conflict_file"
+  # 3. Go back to gitwatch repo, make a local conflicting change, and stage it
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+  echo "Local change B" > "$conflict_file"
+  git add "$conflict_file"
 
-    # 4. Trigger the merging state manually
-    # Pull should fail with a conflict, leaving MERGE_HEAD
-    run git pull origin master
-    assert_failure "Git pull should fail with a merge conflict"
-    assert_file_exist "$GIT_DIR_PATH/MERGE_HEAD" "Failed to establish a merge-in-progress state"
+  # 4. Trigger the merging state manually
+  # Pull should fail with a conflict, leaving MERGE_HEAD
+  run git pull origin master
+  assert_failure "Git pull should fail with a merge conflict"
+  assert_file_exist "$GIT_DIR_PATH/MERGE_HEAD" "Failed to establish a merge-in-progress state"
 
-    # 5. Start gitwatch with -M flag, logging all output
-    echo "# DEBUG: Starting gitwatch with -M" >&3
-    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
-    GITWATCH_PID=$!
+  # 5. Start gitwatch with -M flag, logging all output
+  echo "# DEBUG: Starting gitwatch with -M" >&3
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  GITWATCH_PID=$!
 
-    # 6. Make another file change to trigger the watcher loop
-    # Note: We touch a new file AND stage it. gitwatch will see the change event,
-    # then git add all changes, and attempt to commit.
-    echo "Another trigger event" >> some_other_file.txt
-    git add some_other_file.txt
+  # 6. Make another file change to trigger the watcher loop
+  # Note: We touch a new file AND stage it. gitwatch will see the change event,
+  # then git add all changes, and attempt to commit.
+  echo "Another trigger event" >> some_other_file.txt
+  git add some_other_file.txt
 
-    # Wait for the commit attempt to be skipped
-    echo "# DEBUG: Waiting $WAITTIME seconds for the commit attempt to be skipped..." >&3
-    sleep "$WAITTIME"
+  # Wait for the commit attempt to be skipped
+  echo "# DEBUG: Waiting $WAITTIME seconds for the commit attempt to be skipped..." >&3
+  sleep "$WAITTIME"
 
-    # 7. Assert: Commit hash has NOT changed
-    run git log -1 --format=%H
-    assert_success
-    local after_watch_hash=$output
-    assert_equal "$initial_commit_hash" "$after_watch_hash" "Commit hash should NOT change while in merging state"
+  # 7. Assert: Commit hash has NOT changed
+  run git log -1 --format=%H
+  assert_success
+  local after_watch_hash=$output
+  assert_equal "$initial_commit_hash" "$after_watch_hash" "Commit hash should NOT change while in merging state"
 
-    # 8. Assert: Log output confirms the skip
-    run cat "$output_file"
-    assert_output --partial "Skipping commit - repo is merging" "Gitwatch should report skipping the commit due to merge"
+  # 8. Assert: Log output confirms the skip
+  run cat "$output_file"
+  assert_output --partial "Skipping commit - repo is merging" "Gitwatch should report skipping the commit due to merge"
 
-    # 9. Cleanup: Abort the merge so teardown can clean the repo
-    git merge --abort
-    cd /tmp
+  # 9. Cleanup: Abort the merge so teardown can clean the repo
+  git merge --abort
+  cd /tmp
 }

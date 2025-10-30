@@ -21,70 +21,70 @@
 # Outputs:
 #   Debug messages to BATS file descriptor 3 (>&3).
 wait_for_git_change() {
-    local target_output=""
-    local check_for_change=true
+  local target_output=""
+  local check_for_change=true
 
-    if [[ "$1" == "--target" ]]; then
-        target_output="$2"
-        check_for_change=false
-        shift 2 # Consume --target and <expected_output>
+  if [[ "$1" == "--target" ]]; then
+    target_output="$2"
+    check_for_change=false
+    shift 2 # Consume --target and <expected_output>
+  fi
+
+  local max_attempts=$1
+  local delay=$2
+  shift 2 # Remove max_attempts and delay from arguments
+  local attempt=1
+  local initial_output=""
+  local current_output=""
+
+  # Basic input validation
+  if ! [[ "$max_attempts" =~ ^[0-9]+$ ]] || ! [[ "$delay" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    echo "Usage: wait_for_git_change [--target <expected>] <max_attempts> <delay_seconds> <command...>" >&3
+    echo "Error: max_attempts must be an integer and delay_seconds must be a number." >&3
+    return 1
+  fi
+  if [ $# -eq 0 ]; then
+    echo "Error: No command provided to wait_for_git_change." >&3
+    return 1
+  fi
+
+  # Get initial output
+  initial_output=$( "$@" )
+  local initial_status=$?
+  if [ $initial_status -ne 0 ] && [ "$check_for_change" = true ]; then
+    echo "Initial command failed with status $initial_status. Cannot wait for change." >&3
+    # If waiting for a target, failure might be the initial state, so we continue.
+    if [ "$check_for_change" = true ]; then return 1; fi
+  fi
+  echo "Initial output: '$initial_output'" >&3
+  if [ "$check_for_change" = false ]; then echo "Target output: '$target_output'" >&3; fi
+
+
+  while (( attempt <= max_attempts )); do
+    echo "Waiting attempt $attempt/$max_attempts..." >&3
+    sleep "$delay"
+
+    current_output=$( "$@" )
+    local current_status=$?
+    if [ "$check_for_change" = true ]; then
+      # Succeed if output is different from initial AND command was successful
+      if [[ "$current_output" != "$initial_output" ]] && [ $current_status -eq 0 ]; then
+        echo "Output changed to '$current_output'. Success." >&3
+        return 0
+      fi
+    else
+      # Succeed if output matches the target
+      if [[ "$current_output" == "$target_output" ]] && [ $current_status -eq 0 ]; then
+        echo "Output matches target '$target_output'. Success." >&3
+        return 0
+      fi
     fi
 
-    local max_attempts=$1
-    local delay=$2
-    shift 2 # Remove max_attempts and delay from arguments
-    local attempt=1
-    local initial_output=""
-    local current_output=""
+    (( attempt++ ))
+  done
 
-    # Basic input validation
-    if ! [[ "$max_attempts" =~ ^[0-9]+$ ]] || ! [[ "$delay" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-        echo "Usage: wait_for_git_change [--target <expected>] <max_attempts> <delay_seconds> <command...>" >&3
-        echo "Error: max_attempts must be an integer and delay_seconds must be a number." >&3
-        return 1
-    fi
-    if [ $# -eq 0 ]; then
-        echo "Error: No command provided to wait_for_git_change." >&3
-        return 1
-    fi
-
-    # Get initial output
-    initial_output=$( "$@" )
-    local initial_status=$?
-    if [ $initial_status -ne 0 ] && [ "$check_for_change" = true ]; then
-         echo "Initial command failed with status $initial_status. Cannot wait for change." >&3
-         # If waiting for a target, failure might be the initial state, so we continue.
-         if [ "$check_for_change" = true ]; then return 1; fi
-    fi
-     echo "Initial output: '$initial_output'" >&3
-     if [ "$check_for_change" = false ]; then echo "Target output: '$target_output'" >&3; fi
-
-
-    while (( attempt <= max_attempts )); do
-        echo "Waiting attempt $attempt/$max_attempts..." >&3
-        sleep "$delay"
-
-        current_output=$( "$@" )
-        local current_status=$?
-        if [ "$check_for_change" = true ]; then
-            # Succeed if output is different from initial AND command was successful
-            if [[ "$current_output" != "$initial_output" ]] && [ $current_status -eq 0 ]; then
-                echo "Output changed to '$current_output'. Success." >&3
-                return 0
-            fi
-        else
-            # Succeed if output matches the target
-            if [[ "$current_output" == "$target_output" ]] && [ $current_status -eq 0 ]; then
-                 echo "Output matches target '$target_output'. Success." >&3
-                 return 0
-            fi
-        fi
-
-        (( attempt++ ))
-    done
-
-    echo "Timeout reached after $max_attempts attempts. Final output: '$current_output'" >&3
-    return 1 # Timeout
+  echo "Timeout reached after $max_attempts attempts. Final output: '$current_output'" >&3
+  return 1 # Timeout
 }
 
 # create_failing_watcher_bin: Creates a dummy script that mimics the watcher binary
@@ -99,18 +99,18 @@ wait_for_git_change() {
 # Returns:
 #   The absolute path to the created dummy binary (to stdout).
 create_failing_watcher_bin() {
-    local name="$1"
-    local exit_code="$2"
-    local dummy_path="$testdir/bin/$name"
+  local name="$1"
+  local exit_code="$2"
+  local dummy_path="$testdir/bin/$name"
 
-    # Ensure the directory exists
-    mkdir -p "$testdir/bin"
+  # Ensure the directory exists
+  mkdir -p "$testdir/bin"
 
-    echo "#!/usr/bin/env bash" > "$dummy_path"
-    echo "echo \"*** DUMMY WATCHER: $name failed with code $exit_code ***\" >&2" >> "$dummy_path"
-    echo "exit $exit_code" >> "$dummy_path"
-    chmod +x "$dummy_path"
-    echo "$dummy_path"
+  echo "#!/usr/bin/env bash" > "$dummy_path"
+  echo "echo \"*** DUMMY WATCHER: $name failed with code $exit_code ***\" >&2" >> "$dummy_path"
+  echo "exit $exit_code" >> "$dummy_path"
+  chmod +x "$dummy_path"
+  echo "$dummy_path"
 }
 
 # NEW: create_hanging_bin: Creates a dummy script that sleeps for a very long time,
@@ -124,19 +124,19 @@ create_failing_watcher_bin() {
 # Returns:
 #   The absolute path to the created dummy binary (to stdout).
 create_hanging_bin() {
-    local name="$1"
-    local dummy_path="$testdir/bin/$name-hanging"
+  local name="$1"
+  local dummy_path="$testdir/bin/$name-hanging"
 
-    # Ensure the directory exists
-    mkdir -p "$testdir/bin"
+  # Ensure the directory exists
+  mkdir -p "$testdir/bin"
 
-    echo "#!/usr/bin/env bash" > "$dummy_path"
-    # Print signature to indicate the hanging version was called
-    echo "echo \"*** DUMMY HANG: $name called, will sleep 600s ***\" >&2" >> "$dummy_path"
-    # Sleep for 10 minutes (much longer than gitwatch.sh's 60s timeout)
-    echo "sleep 600" >> "$dummy_path"
-    # Exit cleanly if it ever wakes up, though it should be killed by 'timeout'
-    echo "exit 0" >> "$dummy_path"
-    chmod +x "$dummy_path"
-    echo "$dummy_path"
+  echo "#!/usr/bin/env bash" > "$dummy_path"
+  # Print signature to indicate the hanging version was called
+  echo "echo \"*** DUMMY HANG: $name called, will sleep 600s ***\" >&2" >> "$dummy_path"
+  # Sleep for 10 minutes (much longer than gitwatch.sh's 60s timeout)
+  echo "sleep 600" >> "$dummy_path"
+  # Exit cleanly if it ever wakes up, though it should be killed by 'timeout'
+  echo "exit 0" >> "$dummy_path"
+  chmod +x "$dummy_path"
+  echo "$dummy_path"
 }
