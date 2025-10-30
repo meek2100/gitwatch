@@ -9,7 +9,7 @@ load 'bats-custom/custom-helpers'
 # Load setup/teardown
 load 'bats-custom/startup-shutdown'
 
-@test "hook_failure: Git commit hook failure is handled gracefully and push is skipped" {
+@test "hook_failure_commit: Git pre-commit hook failure is handled gracefully and push is skipped" {
   local output_file
   local git_dir_path
   local initial_commit_hash
@@ -93,5 +93,63 @@ load 'bats-custom/startup-shutdown'
   # Verify remote hash has changed and matches local hash
   assert_equal "$second_local_hash" "$output" "Local and remote hashes do not match after successful push"
 
+  cd /tmp
+}
+
+@test "hook_failure_push: Git pre-push hook failure is handled gracefully" {
+  local output_file
+  local git_dir_path
+  local initial_remote_hash
+
+  output_file=$(mktemp "$testdir/output.XXXXX")
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+  git_dir_path=$(git rev-parse --git-path hooks)
+
+  # 1. Get initial remote hash
+  initial_remote_hash=$(git rev-parse origin/master)
+  echo "# Initial remote hash: $initial_remote_hash" >&3
+
+  # 2. Start gitwatch
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  GITWATCH_PID=$!
+  sleep 1 # Allow watcher to initialize
+
+  # 3. Install a failing pre-push hook
+  local hook_file="$git_dir_path/pre-push"
+  echo "#!/bin/bash" > "$hook_file"
+  echo "echo '*** ERROR: Push blocked by pre-push hook for testing. ***' >&2" >> "$hook_file"
+  echo "exit 1" >> "$hook_file"
+  chmod +x "$hook_file"
+  echo "# DEBUG: Installed failing pre-push hook at $hook_file" >&3
+
+  # 4. Trigger a change
+  echo "A change to test pre-push failure" >> push_hook_test.txt
+
+  # 5. Wait for the *local commit* to succeed
+  run wait_for_git_change 20 0.5 git log -1 --format=%H
+  assert_success "Local commit failed to appear"
+  local local_commit_hash=$output
+  assert_not_equal "$initial_remote_hash" "$local_commit_hash" "Local commit did not happen"
+
+  # 6. Wait for the *push attempt* to fail
+  echo "# DEBUG: Waiting $WAITTIME seconds for push to fail..." >&3
+  sleep "$WAITTIME"
+
+  # 7. Assert: Remote hash has NOT changed
+  run git rev-parse origin/master
+  assert_success
+  assert_equal "$initial_remote_hash" "$output" "Remote hash should NOT change due to pre-push hook failure"
+
+  # 8. Assert: Log output shows the push failure and the hook's error message
+  run cat "$output_file"
+  assert_output --partial "ERROR: 'git push' failed." "Should log the push failure"
+  assert_output --partial "Push blocked by pre-push hook" "Should capture hook's stderr message"
+
+  # 9. Assert: Script is still running
+  run kill -0 "$GITWATCH_PID"
+  assert_success "Gitwatch process crashed after 'git push' failure, but it should have continued."
+
+  # 10. Cleanup
+  rm -f "$hook_file"
   cd /tmp
 }
