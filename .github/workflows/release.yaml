@@ -100,16 +100,15 @@ jobs:
 
       - name: Install Formatting Tools
         run: |
-          pip install mdformat mdformat-toc mdformat-gfm mdformat-beautysh
           npm install -g prettier
 
       - name: Format package.json with Prettier
         run: |
           prettier --write package.json
 
-      - name: Format CHANGELOG.md with mdformat
+      - name: Format CHANGELOG.md with Prettier
         run: |
-          mdformat CHANGELOG.md
+          prettier --write CHANGELOG.md
 
       - name: Commit updated files
         id: commit_files

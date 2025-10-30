@@ -74,16 +74,16 @@ jobs:
           mv "${CHANGELOG_FILE}.tmp" "${CHANGELOG_FILE}"
           echo "Processed entry for CHANGELOG.md: ${NEW_ENTRY}"
 
-      - name: Install mdformat
+      - name: Install Prettier
         run: |
-          pip install mdformat mdformat-toc mdformat-gfm mdformat-beautysh # Add relevant mdformat plugins from pre-commit
+          npm install -g prettier
 
-      - name: Format CHANGELOG.md with mdformat
+      - name: Format CHANGELOG.md with Prettier
         run: |
-          mdformat CHANGELOG.md
+          prettier --write CHANGELOG.md
           echo "Formatted CHANGELOG.md"
 
-      - name: Commit and Push Updated Changelog # This step now commits the formatted file
+      - name: Commit and Push Updated Changelog
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
