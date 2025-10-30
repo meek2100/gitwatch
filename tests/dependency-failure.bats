@@ -16,9 +16,9 @@ load 'bats-custom/startup-shutdown'
   # 1. Temporarily remove common binary directories from PATH to simulate 'logger' missing
   # We remove /usr/bin, /usr/sbin, /bin, /sbin, but preserve others.
   local new_path
-  # shellcheck disable=SC2155 # Split assignment to avoid masking error from pipe
+  # shellcheck disable=SC2155,SC2031 # PATH modification is intentional for mocking
   new_path="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr)?/s?bin' | tr '\n' ':')"
-  # shellcheck disable=SC2030,SC2031 # PATH manipulation is intentional for mocking
+  # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
   export PATH="$new_path"
 
   # 2. Assert that 'logger' is not found in the simulated PATH
@@ -39,13 +39,14 @@ load 'bats-custom/startup-shutdown'
 }
 
 @test "dependency_failure_timeout: Exits with code 2 if 'timeout' command is missing" {
+  # shellcheck disable=SC2031 # PATH modification is intentional for mocking
   local path_backup="$PATH"
 
   # 1. Temporarily remove common binary directories from PATH to simulate 'timeout' missing
   # We remove coreutils locations where 'timeout' is usually found
   # Use a conservative filter to remove typical bin directories, but keep others like bats dependencies
   local new_path
-  # shellcheck disable=SC2155 # Split assignment to avoid masking error from pipe
+  # shellcheck disable=SC2155,SC2031 # PATH modification is intentional for mocking
   new_path="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr/local/)?(s)?bin' | tr '\n' ':')"
   # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
   export PATH="$new_path"
@@ -70,10 +71,11 @@ load 'bats-custom/startup-shutdown'
 # --- NEW TESTS ---
 
 @test "dependency_failure_git: Exits with code 2 if 'git' command is missing" {
+  # shellcheck disable=SC2031 # PATH modification is intentional for mocking
   local path_backup="$PATH"
   # 1. Hide 'git'
   local new_path
-  # shellcheck disable=SC2155 # Split assignment to avoid masking error from pipe
+  # shellcheck disable=SC2155,SC2031 # PATH modification is intentional for mocking
   new_path="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr/local/)?(s)?bin' | tr '\n' ':')"
   # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
   export PATH="$new_path"
@@ -94,6 +96,7 @@ load 'bats-custom/startup-shutdown'
 }
 
 @test "dependency_failure_watcher: Exits with code 2 if watcher (inotifywait/fswatch) is missing" {
+  # shellcheck disable=SC2031 # PATH modification is intentional for mocking
   local path_backup="$PATH"
   local watcher_name=""
   local watcher_hint=""
@@ -109,7 +112,7 @@ load 'bats-custom/startup-shutdown'
 
   # 1. Hide the watcher
   local new_path
-  # shellcheck disable=SC2155 # Split assignment to avoid masking error from pipe
+  # shellcheck disable=SC2155,SC2031 # PATH modification is intentional for mocking
   new_path="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr/local/)?(s)?bin' | tr '\n' ':')"
   # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
   export PATH="$new_path"
@@ -132,6 +135,7 @@ load 'bats-custom/startup-shutdown'
 }
 
 @test "dependency_warning_flock: Warns (does not exit) if 'flock' command is missing" {
+  # shellcheck disable=SC2031 # PATH modification is intentional for mocking
   local path_backup="$PATH"
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -139,7 +143,7 @@ load 'bats-custom/startup-shutdown'
 
   # 1. Hide 'flock'
   local new_path
-  # shellcheck disable=SC2155 # Split assignment to avoid masking error from pipe
+  # shellcheck disable=SC2155,SC2031 # PATH modification is intentional for mocking
   new_path="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr/local/)?(s)?bin' | tr '\n' ':')"
   # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
   export PATH="$new_path"
@@ -168,6 +172,7 @@ load 'bats-custom/startup-shutdown'
 }
 
 @test "dependency_warning_flock_race_condition: Proves missing flock causes race condition" {
+  # shellcheck disable=SC2031 # PATH modification is intentional for mocking
   local path_backup="$PATH"
   local output_file_1
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -180,7 +185,7 @@ load 'bats-custom/startup-shutdown'
 
   # 1. Hide 'flock'
   local new_path
-  # shellcheck disable=SC2155 # Split assignment to avoid masking error from pipe
+  # shellcheck disable=SC2155,SC2031 # PATH modification is intentional for mocking
   new_path="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr/local/)?(s)?bin' | tr '\n' ':')"
   # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
   export PATH="$new_path"
