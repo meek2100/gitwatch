@@ -11,8 +11,9 @@ services:
       # IMPORTANT: You must create this directory first (e.g., ./my-notes-repo)
       - ./watched-repo:/app/watched-repo
 
-      # Mount your SSH key for pushing to remote repositories
-      - ~/.ssh/id_rsa:/home/appuser/.ssh/id_rsa:ro
+      # Mount your SSH private key for pushing to remote repositories
+      # Example uses id_ed25519; you might use id_rsa or another key.
+      - ~/.ssh/id_ed25519:/home/appuser/.ssh/id_ed25519:ro
 
       # Mount your git config to use your correct user name and email for commits
       - ~/.gitconfig:/home/appuser/.gitconfig:ro
@@ -21,10 +22,11 @@ services:
       # - /path/to/external/.git:/app/.git
     environment:
       # --- User Configuration (Recommended for host volume mounts) ---
-      # Set to your host user's UID (e.g., '1000' for many Linux/macOS systems)
+      # Set to your host user's UID (run `id -u` on your host)
       PUID: 1000
-      # Set to your host user's GID (e.g., '1000' or '100' for many Linux/macOS systems)
-      PGID: 1000
+      # Set to your host user's GID (run `id -g` on your host)
+      # This is critical for file permissions on mounted volumes.
+      PGID:
 
       # --- Watched Directory ---
       # This should match the container path in the 'volumes' section above

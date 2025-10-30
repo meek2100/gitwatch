@@ -55,7 +55,8 @@ load 'bats-custom/startup-shutdown'
 
     # Generate 10 lines of content (which should exceed the max_lines=5 limit)
     local expected_total_lines=10
-    for i in $(seq 1 $expected_total_lines); do
+    for i in $(seq 1 $expected_total_lines);
+    do
         echo "Line number $i" >> long_file.txt
     done
 
@@ -110,6 +111,43 @@ load 'bats-custom/startup-shutdown'
     assert_success
     assert_output --partial "$script_file:?: Mode changed to 100755" \
         "Commit message did not contain the expected mode change string"
+
+    cd /tmp
+}
+
+# --- NEW TEST ---
+@test "commit_log_no_color_L: -L flag includes plain diffstat" {
+    local output_file
+    output_file=$(mktemp "$testdir/output.XXXXX")
+
+    # Start gitwatch with -L (no color)
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -L 10 "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+    GITWATCH_PID=$!
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+    sleep 1
+
+    # Get initial hash
+    local initial_hash
+    initial_hash=$(git log -1 --format=%H)
+
+    # Make a change
+    echo "A new line for the no-color test" >> file_L_test.txt
+
+    # Wait for commit
+    run wait_for_git_change 20 0.5 git log -1 --format=%H
+    assert_success "Commit timed out for -L test"
+    assert_not_equal "$initial_hash" "$output" "Commit hash did not change"
+
+    # Verify commit message
+    run git log -1 --pretty=%B
+    assert_success
+
+    # 1. Assert the content is present
+    assert_output --partial "file_L_test.txt:1: +A new line for the no-color test"
+
+    # 2. Assert NO ANSI color codes are present (the real test)
+    # This grep will fail if it finds the escape character \x1B (or \033)
+    refute_output --regexp $'\x1B' "Commit message should not contain ANSI escape codes"
 
     cd /tmp
 }

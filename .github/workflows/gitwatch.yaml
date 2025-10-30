@@ -124,7 +124,7 @@ jobs:
           grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
           echo "--- End of verification ---"
 
-      - name: Run tests individually
+      - name: Run tests in parallel
         shell: bash
         # Set BATS_LIB_PATH to include action-installed libraries and our custom module
         env:
@@ -135,48 +135,21 @@ jobs:
 
           cd tests
 
-          echo "Running commitcmd.bats..."
-          bats commitcmd.bats
-          echo "Running commitlog.bats..."
-          bats commitlog.bats
-          echo "Running notify-ignore.bats..."
-          bats notify-ignore.bats
-          echo "Running pull-rebase.bats..."
-          bats pull-rebase.bats
-          echo "Running remotedirs.bats..."
-          bats remotedirs.bats
-          echo "Running spaces.bats..."
-          bats spaces.bats
-          echo "Running sync.bats..."
-          bats sync.bats
-          echo "Running status-change.bats..."
-          bats status-change.bats
-          echo "Running hook-failure.bats..."
-          bats hook-failure.bats
-          echo "Running startup-options.bats..."
-          bats startup-options.bats
-          echo "Running syslog.bats..."
-          bats syslog.bats
-          echo "Running custom-bins.bats..."
-          bats custom-bins.bats
-          echo "Running entrypoint-regex.bats..."
-          bats entrypoint-regex.bats
-          echo "Running bash-compatibility.bats..."
-          bats bash-compatibility.bats
-          echo "Running lockfile-fallback.bats..."
-          bats lockfile-fallback.bats
-          echo "Running perm-check.bats..."
-          bats perm-check.bats
-          echo "Running skip-merging.bats..."
-          bats skip-merging.bats
-          echo "Running target-deletion.bats..."
-          bats target-deletion.bats
-          echo "Running timeout.bats..."
-          bats timeout.bats
-          echo "Running diff-lines.bats..."
-          bats diff-lines.bats
-          echo "Running dependency-failure.bats..."
-          bats dependency-failure.bats
-          echo "Running debounce.bats..."
-          bats debounce.bats
+          # Get the number of available processor cores
+          NPROC=1
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            NPROC=$(nproc)
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            NPROC=$(sysctl -n hw.ncpu)
+          fi
+
+          echo "Running BATS tests in parallel using $NPROC cores..."
+
+          # Use find and xargs to pipe test files to bats
+          # -n1: one file at a time per bats process
+          # -P $NPROC: run up to $NPROC processes in parallel
+          # We add --tap to get a standard output format, which is good for parallel runs
+          # Add the new helpers.bats test to the parallel run
+          find . -name "*.bats" -print0 | xargs -0 -n1 -P "$NPROC" bats --tap
+
           echo "Finished running tests"

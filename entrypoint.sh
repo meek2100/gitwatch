@@ -106,29 +106,9 @@ if [ -n "${RAW_EXCLUDE_REGEX}" ]; then
   cmd+=( -x "${RAW_EXCLUDE_REGEX}" )
 fi
 
-# 2. Convert and pass user-friendly glob pattern to -X
+# 2. Pass user-friendly glob pattern to -X (gitwatch.sh handles conversion)
 if [ -n "${USER_EXCLUDE_PATTERN}" ]; then
-  # Note on pattern conversion: This logic converts comma-separated glob patterns
-  # (e.g., "*.log, tmp/") into a single regex string (e.g., ".*\.log|tmp/").
-
-  # 1. Replace commas with spaces to treat as separate words.
-  PATTERNS_AS_WORDS=${USER_EXCLUDE_PATTERN//,/ }
-  # 2. Use an array to store and automatically trim whitespace from each pattern.
-  read -r -a PATTERN_ARRAY <<< "$PATTERNS_AS_WORDS"
-  # 3. Join the array elements with the regex OR pipe `|`.
-  PROCESSED_PATTERN=$(IFS=\|; echo "${PATTERN_ARRAY[*]}")
-
-  # 4. Escape periods to treat them as literal dots in regex
-  PROCESSED_PATTERN=${PROCESSED_PATTERN//./\\.}
-
-  # 5. Convert glob stars `*` into the regex equivalent `.*`
-  PROCESSED_PATTERN=${PROCESSED_PATTERN//\*/.*}
-
-  # 6. NEW: Convert glob question mark `?` into regex single-char wildcard `.`
-  PROCESSED_PATTERN=${PROCESSED_PATTERN//\?/.}
-
-  # Pass the CONVERTED PATTERN using the NEW -X (Glob Exclude) flag
-  cmd+=( -X "${PROCESSED_PATTERN}" )
+  cmd+=( -X "${USER_EXCLUDE_PATTERN}" )
 fi
 
 
