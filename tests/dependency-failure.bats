@@ -141,3 +141,63 @@ load 'bats-custom/startup-shutdown'
     export PATH="$path_backup"
     cd /tmp
 }
+
+@test "dependency_warning_flock_race_condition: Proves missing flock causes race condition" {
+    local path_backup="$PATH"
+    local output_file_1
+    output_file_1=$(mktemp "$testdir/output1.XXXXX")
+    local output_file_2
+    output_file_2=$(mktemp "$testdir/output2.XXXXX")
+    local pid_1
+    local pid_2
+
+    # 1. Hide 'flock'
+    export PATH="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr/local/)?(s)?bin' | tr '\n' ':')"
+    run command -v flock
+    refute_success "Failed to simulate missing 'flock' command"
+
+    # 2. Start two gitwatch processes
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -s 1 "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file_1" 2>&1 &
+    pid_1=$!
+
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -s 1 "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file_2" 2>&1 &
+    pid_2=$!
+
+    sleep 1 # Allow them to start
+
+    # 3. Assert both are running
+    run kill -0 "$pid_1"
+    assert_success "Gitwatch process 1 failed to start"
+    run kill -0 "$pid_2"
+    assert_success "Gitwatch process 2 failed to start"
+
+    # 4. Assert both warned about missing flock
+    run cat "$output_file_1"
+    assert_output --partial "Warning: 'flock' command not found."
+    run cat "$output_file_2"
+    assert_output --partial "Warning: 'flock' command not found."
+
+    # 5. Trigger a single change
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+    echo "race condition change" >> race_file.txt
+
+    # 6. Wait for both processes to see the change and commit
+    sleep 3 # Wait for sleep (1s) + commit time
+
+    # 7. Assert: Check commit count. Expected: 1 (setup) + 2 (race) = 3
+    run git rev-list --count HEAD
+    assert_success
+    echo "# DEBUG: Commit count found: $output" >&3
+    # Note: On some very fast systems, the race might be so fast that one 'git add'
+    # finishes before the other, and the second one finds 'nothing to commit'.
+    # A more robust check is to ensure *at least* 2 commits (1 setup + 1 race).
+    # But for this test, we'll assert 3 to prove the race.
+    assert_equal "$output" "3" "Expected 3 commits (1 setup + 2 race), but found $output"
+
+    # 8. Cleanup
+    kill "$pid_1" &>/dev/null || true
+    kill "$pid_2" &>/dev/null || true
+    unset GITWATCH_PID # Prevent global teardown from failing
+    export PATH="$path_backup"
+    cd /tmp
+}

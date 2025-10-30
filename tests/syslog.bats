@@ -10,14 +10,26 @@ load 'bats-custom/custom-helpers'
 load 'bats-custom/startup-shutdown'
 
 # This test requires a functioning 'logger' command and a way to read system logs.
-# It will be skipped if the OS is not Linux or if 'logger' is not found.
+# It will be skipped if 'logger' is not found or no common log utility/file is found.
 # Note: This test's reliability depends heavily on the runner environment's syslog configuration.
 @test "syslog_S: -S flag routes output to syslog (daemon.info/daemon.error)" {
-    if [ "$RUNNER_OS" != "Linux" ]; then
-        skip "Syslog test skipped: only runs on Linux runners."
-    fi
     if ! command -v logger &>/dev/null; then
         skip "Syslog test skipped: 'logger' command not found."
+    fi
+
+    local SYSLOG_CHECK_CMD=""
+    if command -v journalctl &>/dev/null; then
+        SYSLOG_CHECK_CMD="journalctl --since '1 minute ago'"
+        echo "# DEBUG: Using journalctl for syslog check" >&3
+    elif [ -r "/var/log/syslog" ]; then
+        # Use tail to get recent lines. Using sudo just in case.
+        SYSLOG_CHECK_CMD="sudo tail -n 200 /var/log/syslog"
+        echo "# DEBUG: Using /var/log/syslog for syslog check" >&3
+    elif [ -r "/var/log/messages" ]; then
+        SYSLOG_CHECK_CMD="sudo tail -n 200 /var/log/messages"
+        echo "# DEBUG: Using /var/log/messages for syslog check" >&3
+    else
+        skip "Syslog test skipped: No journalctl or readable /var/log/syslog or /var/log/messages found."
     fi
 
     local output_file
@@ -44,6 +56,7 @@ load 'bats-custom/startup-shutdown'
     local git_dir_path
     git_dir_path=$(git rev-parse --git-path hooks)
     local hook_file="$git_dir_path/pre-commit"
+
     echo "#!/bin/bash" > "$hook_file"
     echo "exit 1" >> "$hook_file"
     chmod +x "$hook_file"
@@ -58,11 +71,13 @@ load 'bats-custom/startup-shutdown'
 
     # 4. Check that the error message exists in the log (this confirms syslog routing worked)
     # We expect the critical ERROR message for hook failure:
-    run journalctl --since "1 minute ago" | grep "ERROR: 'git commit' failed with exit code 1."
-    assert_success "Did not find expected 'git commit failed' error in journalctl (syslog check failed)."
+    run bash -c "$SYSLOG_CHECK_CMD | grep \"ERROR: 'git commit' failed with exit code 1.\""
+    assert_success "Did not find expected 'git commit failed' error in syslog."
+
     # Also check for a verbose message, which confirms daemon.info routing
-    run journalctl --since "1 minute ago" | grep "Starting file watch. Command: inotifywait"
-    assert_success "Did not find expected 'Starting file watch' info message in journalctl (syslog check failed)."
+    # Note: The watcher command may differ (inotifywait vs fswatch), so we check for a generic startup message
+    run bash -c "$SYSLOG_CHECK_CMD | grep \"Starting file watch. Command:\""
+    assert_success "Did not find expected 'Starting file watch' info message in syslog."
 
     # 5. Check that STDOUT/STDERR capture file is empty (or near-empty)
     run cat "$output_file"
