@@ -2,7 +2,7 @@
 #
 # gitwatch - watch file or directory and git commit all changes as they happen
 #
-# Copyright (C) 2013-2025  Patrick Lehner
+# Copyright (C) 2013-2025 Patrick Lehner
 #   with modifications and contributions by:
 #   - Matthew McGowan
 #   - Dominik D. Geyer
@@ -67,6 +67,8 @@ SKIP_IF_MERGING=0
 VERBOSE=0
 COMMIT_ON_START=0
 EVENTS="" # User-defined events
+EXCLUDE_PATTERN="" # Raw regex from -x
+GLOB_EXCLUDE_PATTERN="" # Glob list from -X
 USE_SYSLOG=0
 USE_FLOCK=1 # Default to on, check for command availability below
 
@@ -76,7 +78,7 @@ shelp() {
   echo ""
   echo "Usage:"
   echo "${0##*/} [-s <secs>] [-d <fmt>] [-r <remote> [-b <branch>]]"
-  echo "          [-m <msg>] [-l|-L <lines>] [-x <pattern>] [-M] [-S] [-v] [-f] [-V] <target>"
+  echo "          [-m <msg>] [-l|-L <lines>] [-x <regex>] [-X <glob/list>] [-M] [-S] [-v] [-f] [-V] <target>"
   echo ""
   echo "Where <target> is the file or folder which should be watched. The target needs"
   echo "to be in a Git repository, or in the case of a folder, it may also be the top"
@@ -126,7 +128,8 @@ shelp() {
   echo " -S               Log all messages to syslog (daemon mode)."
   echo " -v               Run in verbose mode for debugging. Enables informational messages and command tracing (set -x)."
   echo " -V               Print version information and exit."
-  echo " -x <pattern>     Pattern to exclude from inotifywait"
+  echo " -x <regex>       Raw regex pattern to exclude files/directories from being monitored. The .git folder is always excluded."
+  echo " -X <glob/list>   A comma-separated list of glob patterns to exclude (e.g., '*.log,tmp/'). Converted to regex internally."
   echo ""
   echo "As indicated, several conditions are only checked once at launch of the"
   echo "script. You can make changes to the repo state and configurations even while"
@@ -300,7 +303,7 @@ fi
 # --- End Preliminary Path ---
 
 
-while getopts b:d:h:g:L:l:m:c:C:p:r:s:e:x:MRvSfV option; do # Process command line options
+while getopts b:d:h:g:L:l:m:c:C:p:r:s:e:x:X:MRvSfV option; do # Process command line options
   case "${option}" in
     b) BRANCH=${OPTARG} ;;
     d) DATE_FMT=${OPTARG} ;;
@@ -356,6 +359,7 @@ while getopts b:d:h:g:L:l:m:c:C:p:r:s:e:x:MRvSfV option; do # Process command li
       exit 0
       ;;
     x) EXCLUDE_PATTERN=${OPTARG} ;;
+    X) GLOB_EXCLUDE_PATTERN=${OPTARG} ;; # New flag for glob patterns
     e) EVENTS=${OPTARG} ;;
     *)
       stderr "Error: Option '${option}' does not exist."
@@ -498,6 +502,31 @@ verbose_echo "Using read timeout: $READ_TIMEOUT seconds (Bash version: ${bash_ma
 
 ###############################################################################
 
+# --- Convert User-Friendly Exclude Pattern (glob/comma-sep) to Regex (for -X) ---
+if [ -n "${GLOB_EXCLUDE_PATTERN:-}" ]; then
+  verbose_echo "Converting glob exclude pattern '$GLOB_EXCLUDE_PATTERN' from glob/comma-separated list to regex."
+  # 1. Replace commas with spaces to treat as separate words.
+  PATTERNS_AS_WORDS=${GLOB_EXCLUDE_PATTERN//,/ }
+  # 2. Use an array to store and automatically trim whitespace from each pattern.
+  read -r -a PATTERN_ARRAY <<< "$PATTERNS_AS_WORDS"
+  # 3. Join the array elements with the regex OR pipe `|`.
+  PROCESSED_GLOB_PATTERN=$(IFS=\|; echo "${PATTERN_ARRAY[*]}")
+
+  # 4. Escape periods to treat them as literal dots in regex
+  PROCESSED_GLOB_PATTERN=${PROCESSED_GLOB_PATTERN//./\\.}
+
+  # 5. Convert glob stars `*` into the regex equivalent `.*`
+  PROCESSED_GLOB_PATTERN=${PROCESSED_GLOB_PATTERN//\*/.*}
+
+  # If there was a raw -x pattern, prepend the OR, otherwise just use the glob pattern.
+  if [ -n "${EXCLUDE_PATTERN:-}" ]; then
+    EXCLUDE_PATTERN="${EXCLUDE_PATTERN}|${PROCESSED_GLOB_PATTERN}"
+  else
+    EXCLUDE_PATTERN="${PROCESSED_GLOB_PATTERN}"
+  fi
+fi
+# --- End Conversion ---
+
 # --- Determine Absolute Paths (Final) ---
 # Resolve the user path now that options are processed
 TARGETDIR_ABS=""
@@ -510,8 +539,18 @@ if [ -d "$USER_PATH" ]; then
   TARGETDIR_ABS=$(cd "$TARGETDIR" && pwd -P) || { stderr "Error resolving path for '$TARGETDIR'"; exit 5; }
 
   # GIT_DIR_PATH logic moved AFTER getopts, handled below
-  EXCLUDE_REGEX='(\.git/|\.git$)'
-  if [ -n "${EXCLUDE_PATTERN:-}" ]; then EXCLUDE_REGEX="(\.git/|\.git$|$EXCLUDE_PATTERN)"; fi
+  # Combine default exclude, -x (raw regex), and -X (converted glob)
+  local final_exclude_pattern=""
+  if [ -n "${EXCLUDE_PATTERN:-}" ]; then
+    # Add the .git directory to the custom pattern
+    final_exclude_pattern="(\.git/|\.git$|$EXCLUDE_PATTERN)"
+  else
+    # Only use the default .git directory pattern
+    final_exclude_pattern='(\.git/|\.git$)'
+  fi
+  EXCLUDE_REGEX="$final_exclude_pattern"
+
+
   if [ "$INW" = "inotifywait" ]; then INW_ARGS=("-qmr" "-e" "$EVENTS" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS"); else INW_ARGS=("--recursive" "--event" "$EVENTS" "-E" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS"); fi
   # GIT_ADD_ARGS logic moved to _perform_commit
   GIT_COMMIT_ARGS=""
@@ -741,7 +780,9 @@ if [ -n "${REMOTE:-}" ]; then        # are we pushing to a remote?
       PUSH_CMD=$(printf "%s push %q %s:%q" "$GIT" "$REMOTE" "${HEADREF#refs/heads/}" "$BRANCH")
     else # HEAD is detached
       verbose_echo "Push branch selected: $BRANCH, HEAD is detached."
-      PUSH_CMD=$(printf "%s push %q %q" "$GIT" "$REMOTE" "$BRANCH")
+      # This needs to get the current commit hash and push it to the target branch name
+      # Since we only want to push the *current* HEAD, we use HEAD:branch
+      PUSH_CMD=$(printf "%s push %q HEAD:%q" "$GIT" "$REMOTE" "$BRANCH")
     fi
   fi
   if [[ $PULL_BEFORE_PUSH -eq 1 ]]; then
@@ -751,8 +792,13 @@ if [ -n "${REMOTE:-}" ]; then        # are we pushing to a remote?
     if [ -n "$CURRENT_BRANCH_FOR_PULL" ]; then
       PULL_CMD=$(printf "%s pull --rebase %q %q" "$GIT" "$REMOTE" "$CURRENT_BRANCH_FOR_PULL")
     else
-      stderr "Warning: Cannot determine current branch for pull (detached HEAD?). Using default pull."
+      # When in detached HEAD state, pull fails to determine which branch to pull/rebase
+      # We still attempt to pull the remote/master/main just in case the user wants to bring in remote changes
+      # However, for rebase to work correctly, a branch name is usually required.
+      # A safe fallback is to try pulling the remote's HEAD, or simply warn/skip.
+      # Let's use the explicit pull/rebase on a detached head commit, relying on git's behavior.
       PULL_CMD=$(printf "%s pull --rebase %q" "$GIT" "$REMOTE")
+      stderr "Warning: Cannot determine current branch for pull (detached HEAD?). Using default 'git pull --rebase <remote>'."
     fi
   fi
 else
@@ -938,16 +984,30 @@ generate_commit_message() {
   fi
 
   if [ -n "${COMMITCMD:-}" ]; then
+    local final_cmd_string=""
     if [ "$PASSDIFFS" -eq 1 ]; then
       # Use process substitution and pipe to custom command
-      # Use bash -c for safer execution of complex commands
-      local pipe_cmd
       # Pipe staged files diff
-      pipe_cmd=$(printf "%s diff --staged --name-only | %s" "$GIT" "$COMMITCMD")
-      local_commit_msg=$(bash -c "$pipe_cmd" || { stderr "ERROR: Custom commit command '$COMMITCMD' with pipe failed."; echo "Custom command failed"; } )
+      final_cmd_string=$(printf "timeout -s 9 %s %s diff --staged --name-only | %s" "$TIMEOUT" "$GIT" "$COMMITCMD")
     else
-      # Use bash -c for safer execution of complex commands
-      local_commit_msg=$(bash -c "$COMMITCMD" || { stderr "ERROR: Custom commit command '$COMMITCMD' failed."; echo "Custom command failed"; } )
+      final_cmd_string=$(printf "timeout -s 9 %s %s" "$TIMEOUT" "$COMMITCMD")
+    fi
+
+    # Run the custom command with timeout
+    commit_output=$(bash -c "$final_cmd_string" 2>&1)
+    commit_exit_code=$?
+
+    if [ "$commit_exit_code" -eq 0 ]; then
+      # Command succeeded
+      local_commit_msg="$commit_output"
+    elif [ "$commit_exit_code" -eq 124 ]; then
+      stderr "ERROR: Custom commit command '$COMMITCMD' timed out after $TIMEOUT seconds."
+      local_commit_msg="Custom commit command timed out" # Fallback message
+    else
+      # Command failed
+      stderr "ERROR: Custom commit command '$COMMITCMD' failed with exit code $commit_exit_code."
+      stderr "Command output: $commit_output"
+      local_commit_msg="Custom command failed" # Fallback message
     fi
   fi
 
@@ -1119,7 +1179,7 @@ perform_commit() {
   return $commit_status
 }
 
-# ... (rest of the file is unchanged) ...
+
 # If -f is specified, perform an initial commit before starting to watch
 if [ "$COMMIT_ON_START" -eq 1 ]; then
   verbose_echo "Performing initial commit check..."
