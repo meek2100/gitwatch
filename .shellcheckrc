@@ -3,7 +3,7 @@
 # See: https://www.shellcheck.net/wiki/ConfigurationFiles
 
 # Set the default shell variant to bash for improved accuracy.
-shell = bash
+shell=bash
 
 # Specific warnings are handled via inline comments in individual files.
 
