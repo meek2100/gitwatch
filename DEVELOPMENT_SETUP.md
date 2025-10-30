@@ -28,7 +28,6 @@ If you use Vim or NeoVim, installing a Language Server Protocol (LSP) client and
 plugin is the recommended path for seamless integration.
 
 1.  **Linter (`shellcheck`):**
-
     - Install a Language Server client (e.g., `coc.nvim`, `vim-lsp`, native LSP)
       configured to use a tool that calls `shellcheck` (such as `bash-language-server`).
     - Ensure your setup respects the project's local **`.shellcheckrc`** file.
