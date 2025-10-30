@@ -3,14 +3,14 @@ FROM alpine:3.20
 # Create a non-root user and group first
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Consolidate RUN commands, pin package versions
-# Replace 'gosu' with 'su-exec' (Alpine-native alternative)
+# Consolidate RUN commands, remove all version pins
+# This allows apk to resolve dependencies correctly.
 RUN apk add --no-cache \
-        bash=5.2.26-r0 \
-        git=2.45.4-r0 \
-        inotify-tools=4.23.9.0-r0 \
-        openssh=9.7_p1-r5 \
-        su-exec=0.2-r3 \
+        bash \
+        git \
+        inotify-tools \
+        openssh \
+        su-exec \
     && mkdir -p /app \
     && chown appuser:appgroup /app
 
