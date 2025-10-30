@@ -60,3 +60,31 @@ load 'bats-custom/startup-shutdown'
 
     cd /tmp
 }
+
+# --- NEW TEST ---
+@test "bash_compatibility: Environment variable GW_READ_TIMEOUT overrides default" {
+    local output_file
+    output_file=$(mktemp "$testdir/output.XXXXX")
+
+    # 1. Set environment variable to override the timeout
+    export GW_READ_TIMEOUT="5.5"
+    # Also set mock bash version to 4 to prove the override works even on modern bash
+    export MOCK_BASH_MAJOR_VERSION="4"
+
+    # 2. Run gitwatch in verbose mode
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+    GITWATCH_PID=$!
+    sleep 1 # Allow gitwatch to initialize and print the output
+
+    # 3. Assert: Check log output for the *overridden* timeout
+    run cat "$output_file"
+    assert_output --partial "Using read timeout: 5.5 seconds (Bash version: 4)" \
+        "The script failed to use the GW_READ_TIMEOUT override value"
+    refute_output --partial "Using read timeout: 0.1 seconds" # Should not use the default
+
+    # 4. Cleanup environment variable
+    unset GW_READ_TIMEOUT
+    unset MOCK_BASH_MAJOR_VERSION
+
+    cd /tmp
+}

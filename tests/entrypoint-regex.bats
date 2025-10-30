@@ -18,7 +18,8 @@ run_conversion() {
     read -r -a PATTERN_ARRAY <<< "$PATTERNS_AS_WORDS"
     local PROCESSED_PATTERN=$(IFS=\|; echo "${PATTERN_ARRAY[*]}")
     PROCESSED_PATTERN=${PROCESSED_PATTERN//./\\.}
-    PROCESSED_PATTERN=${PROCESSED_PATTERN//\*/.*} # The corrected line
+    PROCESSED_PATTERN=${PROCESSED_PATTERN//\*/.*}
+    PROCESSED_PATTERN=${PROCESSED_PATTERN//\?/.} # MODIFIED: Added '?' conversion
 
     echo "$PROCESSED_PATTERN"
 }
@@ -44,4 +45,8 @@ run_conversion() {
     # Case 5: Empty string
     run run_conversion ""
     assert_output "" "Empty string conversion failed"
+
+    # Case 6: NEW - Test '?' glob
+    run run_conversion "file?.log,data*"
+    assert_output "file.\.log|data.*" "Glob '?' conversion failed: file?.log,data* -> file.\.log|data.*"
 }

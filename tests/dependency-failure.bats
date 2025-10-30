@@ -28,6 +28,7 @@ load 'bats-custom/startup-shutdown'
     assert_failure "Gitwatch should exit with non-zero status on missing dependency"
     assert_exit_code 2 "Gitwatch should exit with code 2 (Missing required command)"
     assert_output --partial "Error: Required command 'logger' not found (for -S syslog option)."
+
     # 5. Cleanup
     export PATH="$path_backup" # Restore PATH
     cd /tmp
@@ -52,7 +53,91 @@ load 'bats-custom/startup-shutdown'
     assert_failure "Gitwatch should exit with non-zero status on missing dependency"
     assert_exit_code 2 "Gitwatch should exit with code 2 (Missing required command)"
     assert_output --partial "Error: Required command 'timeout' not found."
+
     # 5. Cleanup
     export PATH="$path_backup" # Restore PATH
+    cd /tmp
+}
+
+# --- NEW TESTS ---
+
+@test "dependency_failure_git: Exits with code 2 if 'git' command is missing" {
+    local path_backup="$PATH"
+    # 1. Hide 'git'
+    export PATH="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr/local/)?(s)?bin' | tr '\n' ':')"
+    run command -v git
+    refute_success "Failed to simulate missing 'git' command"
+
+    # 2. Run gitwatch
+    run "${BATS_TEST_DIRNAME}/../gitwatch.sh" "$testdir/local/$TEST_SUBDIR_NAME"
+
+    # 3. Assert exit code 2 and the error message
+    assert_failure
+    assert_exit_code 2
+    assert_output --partial "Error: Required command 'git' not found."
+
+    # 4. Cleanup
+    export PATH="$path_backup"
+    cd /tmp
+}
+
+@test "dependency_failure_watcher: Exits with code 2 if watcher (inotifywait/fswatch) is missing" {
+    local path_backup="$PATH"
+    local watcher_name=""
+    local watcher_hint=""
+
+    if [ "$RUNNER_OS" == "Linux" ]; then
+        watcher_name="inotifywait"
+        watcher_hint="inotify-tools"
+    else
+        watcher_name="fswatch"
+        watcher_hint="brew install fswatch"
+    fi
+
+    # 1. Hide the watcher
+    export PATH="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr/local/)?(s)?bin' | tr '\n' ':')"
+    run command -v "$watcher_name"
+    refute_success "Failed to simulate missing '$watcher_name' command"
+
+    # 2. Run gitwatch
+    run "${BATS_TEST_DIRNAME}/../gitwatch.sh" "$testdir/local/$TEST_SUBDIR_NAME"
+
+    # 3. Assert exit code 2 and the error message
+    assert_failure
+    assert_exit_code 2
+    assert_output --partial "Error: Required command '$watcher_name' not found."
+    assert_output --partial "$watcher_hint" # Check for the platform-specific hint
+
+    # 4. Cleanup
+    export PATH="$path_backup"
+    cd /tmp
+}
+
+@test "dependency_warning_flock: Warns (does not exit) if 'flock' command is missing" {
+    local path_backup="$PATH"
+    local output_file
+    output_file=$(mktemp "$testdir/output.XXXXX")
+
+    # 1. Hide 'flock'
+    export PATH="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr/local/)?(s)?bin' | tr '\n' ':')"
+    run command -v flock
+    refute_success "Failed to simulate missing 'flock' command"
+
+    # 2. Run gitwatch *in the background*
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+    GITWATCH_PID=$!
+    sleep 1 # Allow script to initialize and print warning
+
+    # 3. Assert: Check log output for the warning
+    run cat "$output_file"
+    assert_output --partial "Warning: 'flock' command not found."
+    assert_output --partial "Proceeding without file locking."
+
+    # 4. Assert: Process is *still running*
+    run kill -0 "$GITWATCH_PID"
+    assert_success "Gitwatch process exited when it should have continued without flock"
+
+    # 5. Cleanup
+    export PATH="$path_backup"
     cd /tmp
 }

@@ -124,6 +124,9 @@ if [ -n "${USER_EXCLUDE_PATTERN}" ]; then
   # 5. Convert glob stars `*` into the regex equivalent `.*`
   PROCESSED_PATTERN=${PROCESSED_PATTERN//\*/.*}
 
+  # 6. NEW: Convert glob question mark `?` into regex single-char wildcard `.`
+  PROCESSED_PATTERN=${PROCESSED_PATTERN//\?/.}
+
   # Pass the CONVERTED PATTERN using the NEW -X (Glob Exclude) flag
   cmd+=( -X "${PROCESSED_PATTERN}" )
 fi

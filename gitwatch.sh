@@ -50,6 +50,8 @@ GITWATCH_VERSION="%%GITWATCH_VERSION%%"
 
 # --- Global Configuration Constants ---
 TIMEOUT=${GW_TIMEOUT:-60} # Timeout for critical Git operations (commit, pull, push). Default is 60s.
+# NEW: Configurable line length for diff-lines output
+LOG_LINE_LENGTH=${GW_LOG_LINE_LENGTH:-150}
 # --------------------------------------
 
 REMOTE=""
@@ -147,6 +149,7 @@ shelp() {
   echo "define replacements in the environment variables GW_GIT_BIN, GW_INW_BIN, and"
   echo "GW_FLOCK_BIN for git, inotifywait/fswatch, and flock, respectively."
   echo "The read timeout for the drain loop can be set using the GW_READ_TIMEOUT environment variable."
+  echo "The line length for diffs in commit logs can be set with GW_LOG_LINE_LENGTH (default 150)."
 }
 
 # print all arguments to stderr
@@ -891,7 +894,8 @@ diff-lines() {
         # 5. Handle all other lines (Addition, Modification, Context)
       elif [[ -n "$line" ]]; then
         # Apply width limit *after* capturing full content
-        local display_content=${raw_content_match:0:150}
+        # MODIFIED: Use $LOG_LINE_LENGTH variable instead of 150
+        local display_content=${raw_content_match:0:$LOG_LINE_LENGTH}
 
         # Output: path:line: [COLOR_CODES]+/-content
         # FIX: Quoting $stripped_reply to fix SC2295
