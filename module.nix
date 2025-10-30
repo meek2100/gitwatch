@@ -26,6 +26,7 @@ let
         dateFmtArg = getvar "-d" "dateFmt" cfg;
         sleepTimeArg = getvar "-s" "sleepTime" cfg;
         excludePatternArg = getvar "-x" "excludePattern" cfg;
+        globExcludePatternArg = getvar "-X" "globExcludePattern" cfg;
         eventsArg = getvar "-e" "events" cfg;
         gitDirArg = getvar "-g" "gitDir" cfg;
 
@@ -53,7 +54,7 @@ let
 
         # Combine all arguments into a single string
         allArgs = lib.strings.concatStringsSep " " (lib.lists.filter (s: s != "") [
-          remoteArg branchArg dateFmtArg sleepTimeArg excludePatternArg eventsArg gitDirArg logDiffLinesArg
+          remoteArg branchArg dateFmtArg sleepTimeArg excludePatternArg globExcludePatternArg eventsArg gitDirArg logDiffLinesArg
           pullBeforePushFlag skipIfMergingFlag commitOnStartFlag useSyslogFlag verboseFlag
           # Special handling for commit message: custom command overrides -m
           (if cfg.customCommand != null then customCommandArgs else messageArg)
@@ -111,6 +112,7 @@ in
         verbose = true;
         logDiffLines = 10;
         gitDir = "/mnt/data/.git";
+        globExcludePattern = "*.log,temp/";
       };
       disabled-repo = {
         enable = false;
@@ -194,7 +196,12 @@ in
           default = null;
         };
         excludePattern = lib.mkOption {
-          description = "Pattern to exclude from watching (-x <pattern>).";
+          description = "Raw regex pattern to exclude from watching (-x <pattern>).";
+          type = nullOr str;
+          default = null;
+        };
+        globExcludePattern = lib.mkOption {
+          description = "Comma-separated list of glob patterns to exclude (-X <pattern>).";
           type = nullOr str;
           default = null;
         };
