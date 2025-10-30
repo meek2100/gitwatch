@@ -20,6 +20,7 @@
     - [Docker Compose (Recommended)](#docker-compose-recommended)
     - [Using the Dockerfile](#using-the-dockerfile)
   - [Requirements](#requirements)
+  - [Local Testing](#local-testing)
     - [Notes for Mac](#notes-for-mac)
   - [What it does](#what-it-does)
   - [Usage](#usage)
@@ -264,6 +265,32 @@ To run this script, you must have installed and globally available:
 
 The script automatically detects the appropriate watcher tool based on your
 operating system.
+
+## Local Testing
+
+To run the BATS tests locally (highly recommended for development), you
+must install the `bats-core` CLI tool and the required helper libraries.
+The repository uses a custom module path (`tests/bats-custom`) which must
+be registered with BATS.
+
+1. **Install Dependencies**: Ensure you have `bats-core`, `bats-support`,
+   `bats-assert`, and `bats-file` installed via your system's package
+   manager.
+
+2. **Set Environment Variable**: When executing tests, you must set the
+   `BATS_LIB_PATH` environment variable to include two paths: a. The path
+   where your system installs the official BATS libraries (e.g.,
+   `/usr/local/lib/bats` on many systems). b. The root path containing your
+   custom module (`./tests`).
+
+   This allows BATS to locate both the official helper libraries and your
+   new custom scripts (e.g., `bats-custom/startup-shutdown`).
+
+   ```sh
+   # Example: Run BATS, setting the necessary library paths
+   # You may need to adjust the first path segment to match your system's installation.
+   BATS_LIB_PATH="/usr/local/lib/bats:./tests" bats tests/
+   ```
 
 ### Notes for Mac
 
