@@ -41,6 +41,10 @@
 
 # gitwatch
 
+[![Gitwatch QA](https://github.com/gitwatch/gitwatch/actions/workflows/gitwatch.yaml/badge.svg)](https://github.com/gitwatch/gitwatch/actions/workflows/gitwatch.yaml)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/gitwatch/gitwatch)](https://github.com/gitwatch/gitwatch/releases/latest)
+[![Docker Image](https://img.shields.io/badge/ghcr.io-gitwatch%2Fgitwatch-blue)](https://github.com/gitwatch/gitwatch/pkgs/container/gitwatch)
+
 A Bash script to watch a file or folder and commit changes to a Git
 repository
 
@@ -162,9 +166,10 @@ Here's a breakdown of the important parts of the `docker-compose.yml` file:
     computer (the "host") into the container.
     - You **must** change `./watched-repo` to the path of the local Git
       repository you want `gitwatch` to monitor.
-  - `~/.ssh/id_rsa:/root/.ssh/id_rsa:ro`: This securely mounts your SSH
-    private key into the container in read-only mode (`ro`). This is
-    necessary for `gitwatch` to push changes to your remote repository.
+  - `~/.ssh/id_ed25519:/root/.ssh/id_ed25519:ro`: This securely mounts your
+    SSH private key (e.g., `id_ed25519` or `id_rsa`) into the container in
+    read-only mode (`ro`). This is necessary for `gitwatch` to push changes
+    to your remote repository.
   - `~/.gitconfig:/root/.gitconfig:ro`: This mounts your Git configuration
     into the container. This ensures that the commits made by `gitwatch`
     are attributed to you with the correct name and email.
@@ -178,7 +183,7 @@ The following environment variables are available for configuring the
 | Variable           | Default Value          | Description                                                                                                                       |
 | :----------------- | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------------- |
 | `PUID`             | `1000`                 | **Optional.** Sets the User ID (UID) for the container's non-root user to match the host user, preventing file permission issues. |
-| `PGID`             | `1000`                 | **Optional.** Sets the Group ID (GID) for the container's user. Use in conjunction with `PUID`.                                   |
+| `PGID`             | `(blank)`              | **Optional but Recommended.** Sets the Group ID (GID) for the container's user. Run `id -g` on your host to find this value.      |
 | `GIT_WATCH_DIR`    | `/app/watched-repo`    | The directory inside the container to watch for changes. This must match the container path you set in the `volumes` section.     |
 | `GIT_REMOTE`       | `origin`               | The name of the remote repository to push to.                                                                                     |
 | `GIT_BRANCH`       | `main`                 | The branch to push to.                                                                                                            |
