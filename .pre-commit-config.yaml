@@ -72,12 +72,12 @@ repos:
       - id: shellcheck
         files: ^[^\.].*\.sh$
         args: [--shell, bash]
-  - repo: https://github.com/hadolint/hadolint
+  - repo: https://github.com/AleksaC/hadolint-py
     rev: v2.14.0
     hooks:
       - id: hadolint
         name: Lint Dockerfiles
-        types: [dockerfile]
+        # args: [--ignore, DL3025]
   - repo: https://github.com/NixOS/nixfmt
     rev: v1.1.0
     hooks:
