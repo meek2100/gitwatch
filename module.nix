@@ -232,7 +232,6 @@ in
             default = null;
           };
           timeout = lib.mkOption {
-            Timeout option
             description = "Timeout in seconds for critical Git operations (commit, pull, push) (-t <secs>).";
             type = nullOr (oneOf [
               str
