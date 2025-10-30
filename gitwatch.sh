@@ -517,10 +517,10 @@ if [ -n "${GLOB_EXCLUDE_PATTERN:-}" ]; then
   PROCESSED_GLOB_PATTERN=$(IFS=\|; echo "${PATTERN_ARRAY[*]}")
 
   # 4. Escape periods to treat them as literal dots in regex
-  PROCESSED_PATTERN=${PROCESSED_PATTERN//./\\.}
+  PROCESSED_GLOB_PATTERN=${PROCESSED_GLOB_PATTERN//./\\.}
 
   # 5. Convert glob stars `*` into the regex equivalent `.*`
-  PROCESSED_PATTERN=${PROCESSED_PATTERN//\*/.*}
+  PROCESSED_GLOB_PATTERN=${PROCESSED_GLOB_PATTERN//\*/.*}
 fi
 # --- End Conversion ---
 

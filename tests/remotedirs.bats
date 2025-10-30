@@ -11,8 +11,7 @@ load 'bats-custom/custom-helpers'
 # Use standard echo to output debug info to avoid relying on bats-support inside teardown
 _remotedirs_cleanup() {
   echo "# Running custom cleanup for remotedirs" >&3
-  if [ -n "${dotgittestdir:-}" ] && [ -d "$dotgittestdir" ];
-  then
+  if [ -n "${dotgittestdir:-}" ] && [ -d "$dotgittestdir" ]; then
     echo "# Removing external git dir: $dotgittestdir" >&3
     rm -rf "$dotgittestdir"
   fi
@@ -79,7 +78,6 @@ teardown() {
     # Start gitwatch directly in the background with -r and -g
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -g "$dotgittestdir/.git" "$testdir/local/$TEST_SUBDIR_NAME" &
     GITWATCH_PID=$!
-
     # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
     cd "$testdir/local/$TEST_SUBDIR_NAME"
     sleep 1
@@ -143,4 +141,29 @@ teardown() {
     assert_output --partial "Change to the single file"
 
     cd /tmp # Move out before teardown
+}
+
+# --- NEW TEST: -g suspicious path warning ---
+@test "remote_git_dirs_g_warning: -g flag warns on suspicious relative path input" {
+    local output_file
+    output_file=$(mktemp "$testdir/output.XXXXX")
+
+    # 1. Start gitwatch with a non-absolute path for -g (e.g., just a name)
+    # The script should try to resolve it and issue a warning.
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -g "mygitdir" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+    GITWATCH_PID=$!
+    sleep 1 # Allow watcher to initialize
+
+    # 2. Assert: Check log output for the expected warning
+    run cat "$output_file"
+    assert_output --partial "Warning: GIT_DIR 'mygitdir' specified with -g looks like a relative name, not a full path. Proceeding..." \
+        "The script failed to issue the expected warning for a suspicious -g path."
+
+    # 3. Assert: The script is running (not a fatal error)
+    if ! kill -0 "$GITWATCH_PID" 2>/dev/null; then
+         fail "Gitwatch exited unexpectedly after the -g warning."
+    fi
+
+    # 4. Cleanup
+    cd /tmp
 }

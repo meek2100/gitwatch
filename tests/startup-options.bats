@@ -38,7 +38,6 @@ load 'bats-custom/startup-shutdown'
     assert_success
     assert_output --partial "Scripted auto-commit on change"
 
-
     cd /tmp
 }
 
@@ -71,6 +70,62 @@ load 'bats-custom/startup-shutdown'
     assert_success
     assert_output --partial "Scripted auto-commit on change"
 
+    cd /tmp
+}
+
+# --- NEW TEST: -f with staged and unstaged changes ---
+@test "startup_commit_f_staged_and_unstaged: -f commits staged changes and leaves unstaged/untracked" {
+    local output_file
+    output_file=$(mktemp "$testdir/output.XXXXX")
+
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+
+    # 1. Create a file and STAGE it
+    echo "staged change" > staged_file.txt
+    git add staged_file.txt
+
+    # 2. Create an UNSTAGED change (modification)
+    echo "unstaged modification" >> initial_file.txt
+
+    # 3. Create an UNTRACKED file
+    echo "untracked content" > untracked_file.txt
+
+    # Get the initial commit hash
+    local initial_commit_hash
+    initial_commit_hash=$(git log -1 --format=%H)
+    echo "# Initial hash: $initial_commit_hash" >&3
+
+    # 4. Run gitwatch with -f, logging all output
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -f "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+    GITWATCH_PID=$!
+
+    # 5. Wait for the new commit to appear (it should be immediate)
+    run wait_for_git_change 20 0.5 git log -1 --format=%H
+    assert_success "Initial commit on start timed out"
+
+    # 6. Verify the hash has changed
+    local startup_commit_hash=$output
+    assert_not_equal "$initial_commit_hash" "$startup_commit_hash" "Commit hash should change after startup commit"
+
+    # 7. Verify only the STAGED file was committed
+    run git log -1 --pretty=%B
+    assert_success
+    assert_output --partial "staged_file.txt"
+    refute_output --partial "initial_file.txt" # This file was only modified/unstaged
+
+    # 8. Verify the local status after the commit:
+    # - staged_file.txt is committed (clean)
+    # - initial_file.txt has an UNSTAGED change (M)
+    # - untracked_file.txt is still UNTRACKED (?)
+    run git status --porcelain
+    assert_success
+    assert_output --regexp "^ M initial_file\.txt" "Unstaged modification should remain unstaged (M)"
+    assert_output --partial "?? untracked_file.txt" "Untracked file should remain untracked"
+    refute_output --partial "staged_file.txt" "Staged file should be clean after commit"
+
+    # 9. Cleanup the remaining files manually for teardown
+    git reset --hard HEAD -q
+    rm -f untracked_file.txt
 
     cd /tmp
 }
@@ -89,8 +144,6 @@ load 'bats-custom/startup-shutdown'
 
     # 1. Start gitwatch with -f, logging all output
     # Note: Using WAITTIME from bats-custom/startup-shutdown.bash for the sleep duration
-
-
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -f "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
     GITWATCH_PID=$!
     # 2. Wait longer than the script's default commit/debounce time
@@ -104,12 +157,44 @@ load 'bats-custom/startup-shutdown'
 
     # 4. Verify log output confirms no commit was made
     run cat "$output_file"
-    assert_output --partial "No relevant changes detected by git status (porcelain check)."
-    "Gitwatch should report no changes detected"
+    assert_output --partial "No relevant changes detected by git status (porcelain check)." "Gitwatch should report no changes detected"
     refute_output --partial "Running git commit command:" "Should not show a commit command run"
 
     cd /tmp
 }
+
+
+# --- NEW TEST: check_git_config warning ---
+@test "startup_git_config_check: Warns if git config user.name or user.email is missing" {
+    local output_file
+    output_file=$(mktemp "$testdir/output.XXXXX")
+
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+
+    # 1. Unset the local user.name/user.email settings. The global ones (set in setup)
+    # must also be unset for the warning to trigger.
+    git config --local --unset user.name || true
+    git config --local --unset user.email || true
+    git config --global --unset user.name || true
+    git config --global --unset user.email || true
+
+    # 2. Run gitwatch, expecting the warning to be printed to stderr/output_file
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+    GITWATCH_PID=$!
+    sleep 1 # Allow initialization
+
+    # 3. Assert the warning is present
+    run cat "$output_file"
+    assert_output --partial "Warning: 'user.name' or 'user.email' is not set in your Git config."
+    assert_output --partial "To set them globally, run:"
+
+    # 4. Cleanup: Restore original global config before teardown runs
+    git config --global user.name 'test user'
+    git config --global user.email 'test@email.com'
+
+    cd /tmp
+}
+
 
 # Test 3: Version flag
 @test "startup_version_V: -V flag prints version and exits" {
@@ -144,8 +229,7 @@ load 'bats-custom/startup-shutdown'
     local original_perms
 
     # 1. Get original permissions of the target directory
-    if [ "$RUNNER_OS" == "Linux" ];
-    then
+    if [ "$RUNNER_OS" == "Linux" ]; then
         original_perms=$(stat -c "%a" "$target_dir")
     else
         # Use stat -f "%A" for macOS/BSD permissions
@@ -158,7 +242,6 @@ load 'bats-custom/startup-shutdown'
 
     # 3. Run gitwatch on the now unwritable target directory
     run "${BATS_TEST_DIRNAME}/../gitwatch.sh" "$target_dir"
-
 
     # 4. Assert exit code 7 and the critical permission error message
     assert_failure "Gitwatch should exit with non-zero status on permission error"
