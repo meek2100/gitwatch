@@ -10,6 +10,7 @@ load 'bats-custom/custom-helpers'
 load 'bats-custom/startup-shutdown'
 
 @test "symlinks: Modifying a file via a symlink triggers commit" {
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
   # 1. Create target file and symlink, commit them
@@ -21,7 +22,9 @@ load 'bats-custom/startup-shutdown'
   initial_hash=$(git log -1 --format=%H)
 
   # 2. Start gitwatch
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1
 
@@ -43,6 +46,8 @@ load 'bats-custom/startup-shutdown'
 }
 
 @test "symlinks: Changing a symlink's target triggers commit" {
+
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
   # 1. Create target files and symlink, commit them
@@ -55,7 +60,9 @@ load 'bats-custom/startup-shutdown'
   initial_hash=$(git log -1 --format=%H)
 
   # 2. Start gitwatch
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1
 
@@ -76,15 +83,19 @@ load 'bats-custom/startup-shutdown'
 }
 
 @test "symlinks: Adding a new symlink triggers commit" {
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
   # 1. Create a target file (but don't commit it)
   echo "target 3" > real_file_3.txt
+
   local initial_hash
   initial_hash=$(git log -1 --format=%H)
 
   # 2. Start gitwatch
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1
 

@@ -18,7 +18,9 @@ setup() {
   # Start gitwatch directly in the background - paths need careful quoting
   # BATS_TEST_DIRNAME should handle spaces if the script itself is in such a path
   # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   echo "# Testdir with spaces: $testdir" >&3
   echo "# Local clone dir: $testdir/local/$TEST_SUBDIR_NAME" >&3
@@ -31,7 +33,9 @@ setup() {
   run wait_for_git_change 20 0.5 git log -1 --format=%H
   assert_success "First commit timed out"
   # Now get the hash *after* the wait succeeded
+  # shellcheck disable=SC2034 # Not used in this test, but retained for clarity
   local first_commit_hash
+  # shellcheck disable=SC2034 # Not used in this test, but retained for clarity
   first_commit_hash=$(git log -1 --format=%H)
 
   echo "line2" >> "file with space.txt"

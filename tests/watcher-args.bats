@@ -13,30 +13,42 @@ load 'bats-custom/startup-shutdown'
 create_watcher_wrapper() {
   local watcher_name="$1"
   local real_path="$2"
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   local dummy_path="$testdir/bin/${watcher_name}_wrapper"
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   mkdir -p "$testdir/bin"
-  echo "#!/usr/bin/env bash" > "$dummy_path"
-  echo "echo \"*** ${watcher_name}_CALLED ***\" >&2" >> "$dummy_path"
-  # Print arguments to stderr for assertion, using printf %q for safe quoting
-  echo "echo \"*** ARGS: \$(printf '%q ' \"\$@\") ***\" >&2" >> "$dummy_path"
-  # Execute the real binary with a minimal set of non-blocking arguments, piping to true to prevent indefinite blocking
-  echo "exec $real_path \"\$@\" | true" >> "$dummy_path"
+
+  # shellcheck disable=SC2129 # Fix SC2129: Use single redirect to pipe commands
+  {
+    echo "#!/usr/bin/env bash"
+    echo "echo \"*** ${watcher_name}_CALLED ***\" >&2"
+    # Print arguments to stderr for assertion, using printf %q for safe quoting
+    echo "echo \"*** ARGS: \$(printf '%q ' \"\$@\") ***\" >&2"
+    # Execute the real binary with a minimal set of non-blocking arguments, piping to true to prevent indefinite blocking
+    echo "exec $real_path \"\$@\" | true"
+  } > "$dummy_path"
+
   chmod +x "$dummy_path"
   echo "$dummy_path"
 }
 
 @test "watcher_args_linux: Verifies correct arguments for inotifywait" {
+
   if [ "$RUNNER_OS" != "Linux" ]; then
     skip "Test skipped: only runs on Linux runners."
   fi
 
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Setup Environment: Use a dummy inotifywait to capture arguments
   local real_inw_path
   real_inw_path=$(command -v inotifywait)
-  local dummy_inw=$(create_watcher_wrapper "inotifywait" "$real_inw_path")
+  local dummy_inw
+  # shellcheck disable=SC2155 # Declared on previous line
+  dummy_inw=$(create_watcher_wrapper "inotifywait" "$real_inw_path")
+  # shellcheck disable=SC2030,SC2031 # Exporting variable to be read by child process
   export GW_INW_BIN="$dummy_inw"
 
   # The expected default events string
@@ -46,7 +58,9 @@ create_watcher_wrapper() {
 
   # 2. Start gitwatch (should use inotifywait syntax and arguments)
   # Expected args: -qmr -e <events> --exclude <regex> <path>
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow watcher to start
 
@@ -63,17 +77,22 @@ create_watcher_wrapper() {
 }
 
 @test "watcher_args_macos: Verifies correct arguments for fswatch" {
-  if [ "$RUNNER_OS" != "macOS" ]; then
+  if [ "$RUNNER_OS" != "macOS" ];
+  then
     skip "Test skipped: only runs on macOS runners."
   fi
 
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Setup Environment: Use a dummy fswatch to capture arguments
   local real_fswatch_path
   real_fswatch_path=$(command -v fswatch)
-  local dummy_fswatch=$(create_watcher_wrapper "fswatch" "$real_fswatch_path")
+  local dummy_fswatch
+  # shellcheck disable=SC2155 # Declared on previous line
+  dummy_fswatch=$(create_watcher_wrapper "fswatch" "$real_fswatch_path")
+  # shellcheck disable=SC2030,SC2031 # Exporting variable to be read by child process
   export GW_INW_BIN="$dummy_fswatch"
 
   # The expected default events number (414)
@@ -83,7 +102,9 @@ create_watcher_wrapper() {
 
   # 2. Start gitwatch (should use fswatch syntax and arguments)
   # Expected args: --recursive --event <number> -E --exclude <regex> <path>
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow watcher to start
 

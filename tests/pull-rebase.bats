@@ -11,7 +11,9 @@ load 'bats-custom/startup-shutdown'
 
 @test "pulling_and_rebasing_correctly: Handles upstream changes with -R flag" {
   # Start gitwatch directly in the background with pull-rebase enabled
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -R "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   sleep 1
@@ -24,21 +26,22 @@ load 'bats-custom/startup-shutdown'
   sleep 0.2
 
   # Now verify the state *after* the wait
-  run git rev-parse origin/master
-  assert_success "Git rev-parse origin/master failed after file1 add (post-wait verification)"
-
   run git rev-parse master
   assert_success "Git rev-parse master failed after file1 add (post-wait verification)"
-  local commit1=$output
+  local commit1
+  commit1=$output
   run git rev-parse origin/master # Re-run to capture for assert_equal
 
-  local remote_commit1=$output
+  local remote_commit1
+  # shellcheck disable=SC2155 # Declared on previous line
+  remote_commit1=$output
   assert_equal "$commit1" "$remote_commit1" "Push after adding file1 failed"
 
 
   # Simulate another user cloning and pushing (file2)
   cd "$testdir"
   run git clone -q remote local2
+
   assert_success "Cloning for local2 failed"
   cd local2
   echo "line2" >> file2.txt
@@ -46,7 +49,9 @@ load 'bats-custom/startup-shutdown'
   git commit -q -m "Commit from local2 (file2)"
   run git push -q origin master
   assert_success "Push from local2 failed"
-  local remote_commit2=$(git rev-parse HEAD) # Get the hash of the commit pushed by local2
+  local remote_commit2
+  # shellcheck disable=SC2155 # Declared on previous line
+  remote_commit2=$(git rev-parse HEAD) # Get the hash of the commit pushed by local2
 
 
   # Go back to the first local repo and make another change (file3)
@@ -63,10 +68,13 @@ load 'bats-custom/startup-shutdown'
   # Verify push happened after rebase
   run git rev-parse master
   assert_success "Git rev-parse master failed after file3 add/rebase (post-wait verification)"
-  local commit3=$output
+  local commit3
+  commit3=$output
   run git rev-parse origin/master # Re-run to capture for assert_equal
   assert_success "Git rev-parse origin/master failed after file3 add/rebase (post-wait verification)"
-  local remote_commit3=$output
+  local remote_commit3
+  # shellcheck disable=SC2155 # Declared on previous line
+  remote_commit3=$output
   assert_equal "$commit3" "$remote_commit3" "Push after adding file3 and rebase failed"
   assert_not_equal "$remote_commit2" "$remote_commit3" "Remote hash should have changed after gitwatch rebase/push"
 
@@ -92,13 +100,17 @@ load 'bats-custom/startup-shutdown'
 
 @test "pull_rebase_on_fresh_repo: Handles upstream changes when local history is one commit behind remote" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Start with the initial setup commit (which exists at this point)
   cd "$testdir/local/$TEST_SUBDIR_NAME"
-  local initial_commit_hash=$(git log -1 --format=%H)
+  local initial_commit_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  initial_commit_hash=$(git log -1 --format=%H)
 
   # 2. Simulate Upstream Change on Remote (Remote is now ahead of local)
+  # shellcheck disable=SC2103 # cd is necessary here to manage clone/cleanup
   cd "$testdir"
   run git clone -q remote local_ahead
   assert_success "Cloning for local_ahead failed"
@@ -106,9 +118,12 @@ load 'bats-custom/startup-shutdown'
   echo "Upstream commit" > upstream_file.txt
   git add upstream_file.txt
   git commit -q -m "Upstream change (commit 2)"
+
   run git push -q origin master
   assert_success "Push from local_ahead failed"
-  local upstream_commit_hash=$(git rev-parse HEAD)
+  local upstream_commit_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  upstream_commit_hash=$(git rev-parse HEAD)
   run rm -rf local_ahead
 
 
@@ -124,7 +139,9 @@ load 'bats-custom/startup-shutdown'
   # 4. Start gitwatch with -R and -r flag
   echo "# DEBUG: Starting gitwatch with -R on a stale repo" >&3
 
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -R "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow watcher to initialize
 
@@ -140,8 +157,12 @@ load 'bats-custom/startup-shutdown'
   assert_file_exist "upstream_file.txt" "Upstream file was not pulled/rebased"
 
   # 8. Assert: Verify the history is correct (Local HEAD should be the last commit)
-  local final_local_hash=$(git rev-parse HEAD)
-  local final_remote_hash=$(git rev-parse origin/master)
+  local final_local_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  final_local_hash=$(git rev-parse HEAD)
+  local final_remote_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  final_remote_hash=$(git rev-parse origin/master)
   assert_equal "$final_local_hash" "$final_remote_hash" "Local and remote hashes do not match after rebase/push"
   assert_not_equal "$upstream_commit_hash" "$final_local_hash" "Final hash should be the new local commit"
 
@@ -163,12 +184,15 @@ load 'bats-custom/startup-shutdown'
 @test "pull_rebase_conflict: Handles merge conflict with -R flag gracefully" {
   # Use a shorter sleep time to speed up the test
   local test_sleep_time=0.5
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   local output_file="$testdir/pull-rebase-conflict-output.txt"
   local initial_file="conflict_file.txt"
 
   # Start gitwatch with pull-rebase enabled, shorter sleep, and redirect output for error analysis
 
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -s "$test_sleep_time" -r origin -R "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   sleep 1
@@ -178,12 +202,17 @@ load 'bats-custom/startup-shutdown'
   run wait_for_git_change 20 0.5 git rev-parse origin/master
   assert_success "Initial commit+push timed out"
 
-  local commit1=$(git rev-parse HEAD)
-  local remote_commit1=$(git rev-parse origin/master)
+  local commit1
+  # shellcheck disable=SC2155 # Declared on previous line
+  commit1=$(git rev-parse HEAD)
+  local remote_commit1
+  # shellcheck disable=SC2155 # Declared on previous line
+  remote_commit1=$(git rev-parse origin/master)
   assert_equal "$commit1" "$remote_commit1" "Push after initial change failed"
 
   # --- Setup Conflict (File is on same line in both branches) ---
   # 1. Simulate Upstream change (local2)
+  # shellcheck disable=SC2103 # cd is necessary here to manage clone/cleanup
   cd "$testdir"
 
 
@@ -195,7 +224,9 @@ load 'bats-custom/startup-shutdown'
   git commit -q -m "Commit from local2 (upstream change)"
   run git push -q origin master
   assert_success "Push from local2 failed"
-  local remote_commit2=$(git rev-parse HEAD)
+  local remote_commit2
+  # shellcheck disable=SC2155 # Declared on previous line
+  remote_commit2=$(git rev-parse HEAD)
 
   # 2. Simulate Local change (gitwatch repo)
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -206,7 +237,9 @@ load 'bats-custom/startup-shutdown'
   # Wait for the local commit to happen (which precedes the failing pull)
   run wait_for_git_change 30 1 git log -1 --format=%H
   assert_success "Gitwatch commit timed out after local change"
-  local local_commit_after_local_change=$(git rev-parse HEAD)
+  local local_commit_after_local_change
+  # shellcheck disable=SC2155 # Declared on previous line
+  local_commit_after_local_change=$(git rev-parse HEAD)
   assert_not_equal "$commit1" "$local_commit_after_local_change" "Local commit didn't happen"
 
   # Wait an extra few seconds for the pull/rebase to attempt and fail
@@ -217,7 +250,8 @@ load 'bats-custom/startup-shutdown'
   # 1. Verify push DID NOT happen
   run git rev-parse origin/master
   assert_success
-  local remote_commit_final=$output
+  local remote_commit_final
+  remote_commit_final=$output
   # Remote should still be at remote_commit2, not the new local commit
   assert_equal "$remote_commit2" "$remote_commit_final" "Remote push should have been skipped due to rebase conflict"
 
@@ -238,13 +272,18 @@ load 'bats-custom/startup-shutdown'
 
 @test "pull_rebase_R_without_remote: -R flag without -r is ignored (no pull/push)" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   cd "$testdir/local/$TEST_SUBDIR_NAME"
-  local initial_hash=$(git log -1 --format=%H)
+  local initial_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  initial_hash=$(git log -1 --format=%H)
 
   # 1. Start gitwatch with -R but NO -r
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -R "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
 
 
@@ -256,7 +295,8 @@ load 'bats-custom/startup-shutdown'
   # Wait for the local commit to happen
   run wait_for_git_change 20 0.5 git log -1 --format=%H
   assert_success "Local commit failed"
-  local local_commit_hash=$output
+  local local_commit_hash
+  local_commit_hash=$output
   assert_not_equal "$initial_hash" "$local_commit_hash" "Local commit didn't happen"
 
   # 3. Wait a bit longer to ensure no push happens
@@ -264,7 +304,9 @@ load 'bats-custom/startup-shutdown'
 
   # 4. Assert: Remote hash has NOT changed (still points to initial commit hash)
   # The initial commit pushed by setup should be the parent of the local hash
-  local parent_hash=$(git rev-parse HEAD^)
+  local parent_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  parent_hash=$(git rev-parse HEAD^)
   run git rev-parse origin/master
   assert_success
   assert_equal "$parent_hash" "$output" "Remote should NOT have changed (push should have been skipped)"
@@ -280,6 +322,7 @@ load 'bats-custom/startup-shutdown'
 
 @test "pull_rebase_detached_head_push: Handles push correctly when in detached HEAD state with -b" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
   local initial_remote_hash
 
@@ -292,7 +335,9 @@ load 'bats-custom/startup-shutdown'
   echo "local commit 1" > detached_file.txt
   git add detached_file.txt
   git commit -q -m "Local commit before detaching"
-  local local_commit_hash=$(git rev-parse HEAD)
+  local local_commit_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  local_commit_hash=$(git rev-parse HEAD)
 
   # 3. Detach HEAD to the new commit
   run git checkout "$local_commit_hash"
@@ -301,7 +346,9 @@ load 'bats-custom/startup-shutdown'
   # 4. Start gitwatch in detached HEAD state, targeting the master branch
   local target_branch="master" # The branch we want to push *to*
   echo "# DEBUG: Starting gitwatch in detached HEAD state, pushing to $target_branch" >&3
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -b "$target_branch" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow watcher to initialize and detect state
 
@@ -314,8 +361,12 @@ load 'bats-custom/startup-shutdown'
   assert_success "Push with detached HEAD timed out"
 
   # 7. Assert: Remote hash is the new local commit hash
-  local final_local_hash=$(git rev-parse HEAD)
-  local final_remote_hash=$(git rev-parse origin/master)
+  local final_local_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  final_local_hash=$(git rev-parse HEAD)
+  local final_remote_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  final_remote_hash=$(git rev-parse origin/master)
   assert_equal "$final_local_hash" "$final_remote_hash" "Local and remote hashes must match after detached push"
   assert_not_equal "$initial_remote_hash" "$final_remote_hash" "Remote hash should have changed"
 
@@ -332,9 +383,11 @@ load 'bats-custom/startup-shutdown'
 
 @test "pull_rebase_detached_head: -R flag correctly pulls/rebases in detached HEAD state" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Simulate Upstream Change on Remote (Remote is ahead)
+  # shellcheck disable=SC2103 # cd is necessary here to manage clone/cleanup
   cd "$testdir"
   run git clone -q remote local_ahead
   assert_success "Cloning for local_ahead failed"
@@ -344,7 +397,10 @@ load 'bats-custom/startup-shutdown'
   git commit -q -m "Upstream change"
   run git push -q origin master
   assert_success "Push from local_ahead failed"
-  local upstream_commit_hash=$(git rev-parse HEAD)
+  local upstream_commit_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  upstream_commit_hash=$(git rev-parse HEAD)
+  # shellcheck disable=SC2103 # cd is necessary here to manage clone/cleanup
   cd ..
   rm -rf local_ahead
 
@@ -353,14 +409,18 @@ load 'bats-custom/startup-shutdown'
   echo "local detached commit 1" > detached_file.txt
   git add .
   git commit -q -m "Local detached commit 1"
-  local local_commit_hash=$(git rev-parse HEAD)
+  local local_commit_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  local_commit_hash=$(git rev-parse HEAD)
   run git checkout "$local_commit_hash"
   assert_success "Failed to checkout into detached HEAD state"
 
   # 3. Start gitwatch with -R, -r, -b
   local target_branch="master"
   echo "# DEBUG: Starting gitwatch in detached HEAD, with -R, pushing to $target_branch" >&3
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -b "$target_branch" -R "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1
 
@@ -372,8 +432,12 @@ load 'bats-custom/startup-shutdown'
   assert_success "Push with detached HEAD and rebase timed out"
 
   # 6. Assert: Remote hash is the new local commit hash
-  local final_local_hash=$(git rev-parse HEAD)
-  local final_remote_hash=$(git rev-parse origin/master)
+  local final_local_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  final_local_hash=$(git rev-parse HEAD)
+  local final_remote_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  final_remote_hash=$(git rev-parse origin/master)
   assert_equal "$final_local_hash" "$final_remote_hash" "Local and remote hashes must match"
   assert_not_equal "$upstream_commit_hash" "$final_remote_hash" "Remote hash should have changed"
 

@@ -12,6 +12,7 @@ load 'bats-custom/startup-shutdown'
 # Test to ensure the SECOND critical permission check (on the .git directory)
 # exits gracefully with the critical permission error (Exit Code 7) when Read/Execute fail.
 @test "git_dir_perm_rx: Exits with code 7 when .git directory is unreadable or unexecutable" {
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
   cd "$target_dir"
   local GIT_DIR_PATH
@@ -20,7 +21,8 @@ load 'bats-custom/startup-shutdown'
   local original_perms
 
   # 1. Get original permissions of the .git directory
-  if [ "$RUNNER_OS" == "Linux" ]; then
+  if [ "$RUNNER_OS" == "Linux" ];
+  then
     original_perms=$(stat -c "%a" "$GIT_DIR_PATH")
   else
     original_perms=$(stat -f "%A" "$GIT_DIR_PATH")
@@ -48,11 +50,13 @@ load 'bats-custom/startup-shutdown'
 # Test to ensure the FIRST critical permission check (on the target directory itself)
 # exits gracefully with the critical permission error (Exit Code 7) when Read/Execute fail.
 @test "target_dir_perm_rx: Exits with code 7 when target directory is unreadable or unexecutable" {
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
   local original_perms
 
   # 1. Get original permissions of the target directory
-  if [ "$RUNNER_OS" == "Linux" ]; then
+  if [ "$RUNNER_OS" == "Linux" ];
+  then
     original_perms=$(stat -c "%a" "$target_dir")
   else
     original_perms=$(stat -f "%A" "$target_dir")

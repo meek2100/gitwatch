@@ -11,6 +11,7 @@ load 'bats-custom/startup-shutdown'
 
 # Test 1: Commit on start successfully commits staged changes
 @test "startup_commit_f: -f flag commits staged changes on startup" {
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
   # 1. Create a file and stage it, but DO NOT commit it
@@ -23,7 +24,9 @@ load 'bats-custom/startup-shutdown'
   echo "# Initial hash: $initial_commit_hash" >&3
 
   # 2. Start gitwatch with -f
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -f "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   # 3. Wait for the new commit to appear (it should be immediate)
   run wait_for_git_change 20 0.5 git log -1 --format=%H
@@ -42,6 +45,7 @@ load 'bats-custom/startup-shutdown'
 }
 
 @test "startup_commit_f_with_push: -f flag also pushes the initial commit to remote" {
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
   # 1. Create a file and stage it, but DO NOT commit it
@@ -54,9 +58,10 @@ load 'bats-custom/startup-shutdown'
   echo "# Initial remote hash: $initial_remote_hash" >&3
 
   # 2. Start gitwatch with -f and -r origin
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -f -r origin "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
-
   # 3. Wait for the remote hash to change (push success)
   run wait_for_git_change 20 0.5 git rev-parse origin/master
   assert_success "Initial commit push timed out"
@@ -76,8 +81,10 @@ load 'bats-custom/startup-shutdown'
 # --- NEW TEST: -f with staged and unstaged changes ---
 @test "startup_commit_f_staged_and_unstaged: -f commits staged changes and leaves unstaged/untracked" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
   # 1. Create a file and STAGE it
@@ -96,9 +103,10 @@ load 'bats-custom/startup-shutdown'
   echo "# Initial hash: $initial_commit_hash" >&3
 
   # 4. Run gitwatch with -f, logging all output
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -f "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
-
   # 5. Wait for the new commit to appear (it should be immediate)
   run wait_for_git_change 20 0.5 git log -1 --format=%H
   assert_success "Initial commit on start timed out"
@@ -133,8 +141,10 @@ load 'bats-custom/startup-shutdown'
 # Test 2: Commit on start does nothing if no changes are pending
 @test "startup_commit_no_change: -f flag does nothing if no changes are pending" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
   # Get the initial commit hash from the setup
@@ -144,7 +154,9 @@ load 'bats-custom/startup-shutdown'
 
   # 1. Start gitwatch with -f, logging all output
   # Note: Using WAITTIME from bats-custom/startup-shutdown.bash for the sleep duration
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -f "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   # 2. Wait longer than the script's default commit/debounce time
   sleep "$WAITTIME"
@@ -167,8 +179,10 @@ load 'bats-custom/startup-shutdown'
 # --- NEW TEST: check_git_config warning ---
 @test "startup_git_config_check: Warns if git config user.name or user.email is missing" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
   # 1. Unset the local user.name/user.email settings. The global ones (set in setup)
@@ -179,7 +193,9 @@ load 'bats-custom/startup-shutdown'
   git config --global --unset user.email || true
 
   # 2. Run gitwatch, expecting the warning to be printed to stderr/output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow initialization
 
@@ -200,7 +216,9 @@ load 'bats-custom/startup-shutdown'
 @test "startup_version_V: -V flag prints version and exits" {
   # 1. Get the expected version number dynamically from the VERSION file
   local version_file="${BATS_TEST_DIRNAME}/../VERSION"
-  local expected_version_number=$(cat "$version_file")
+  local expected_version_number
+  # shellcheck disable=SC2155 # Declared on previous line
+  expected_version_number=$(cat "$version_file")
 
   # 2. Run gitwatch with -V and verify output/exit status
   run "${BATS_TEST_DIRNAME}/../gitwatch.sh" -V
@@ -225,11 +243,13 @@ load 'bats-custom/startup-shutdown'
 }
 
 @test "startup_permission_check_target: Exits with code 7 when target directory is unwritable" {
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
   local original_perms
 
   # 1. Get original permissions of the target directory
-  if [ "$RUNNER_OS" == "Linux" ]; then
+  if [ "$RUNNER_OS" == "Linux" ];
+  then
     original_perms=$(stat -c "%a" "$target_dir")
   else
     # Use stat -f "%A" for macOS/BSD permissions
@@ -256,10 +276,12 @@ load 'bats-custom/startup-shutdown'
 
 @test "startup_commit_f_pull_rebase_conflict: -f flag fails commit gracefully and skips push on pull-rebase conflict" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
   local conflict_file="conflict_file.txt"
   local initial_remote_hash
 
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
   # 1. Create a file with conflicting content to be staged by -f
@@ -267,6 +289,7 @@ load 'bats-custom/startup-shutdown'
   git add "$conflict_file"
 
   # 2. Simulate Upstream Change on Remote
+  # shellcheck disable=SC2103 # cd is necessary here to manage clone/cleanup
   cd "$testdir"
   run git clone -q remote local_ahead
   assert_success "Cloning for local_ahead failed"
@@ -285,14 +308,15 @@ load 'bats-custom/startup-shutdown'
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
   # 4. Run gitwatch with -f, -r, and -R flags (expecting initial commit to succeed, but the subsequent pull-rebase to fail)
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -f -r origin -R "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 2 # Give time for initial commit (succeeds) and pull-rebase (fails)
 
   # 5. Assert: Local commit hash *has* changed (due to -f)
   run git log -1 --format=%H
   assert_success
-  local local_commit_hash=$output
   refute_output --partial "$(git rev-parse HEAD^)" "Local commit hash should not be the setup commit"
 
   # 6. Assert: Repo is in a MERGE/REBASE state
@@ -301,6 +325,7 @@ load 'bats-custom/startup-shutdown'
 
   # 7. Assert: Remote hash has NOT changed (Push skipped due to pull failure)
   run git rev-parse origin/master
+
   assert_success
   assert_equal "$initial_remote_hash" "$output" "Remote hash should NOT change (push should have been skipped)"
 

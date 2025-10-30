@@ -6,30 +6,35 @@ load 'bats-assert/load'
 load 'bats-file/load'
 
 # Source the main script to test functions directly
-# Note: This brings in all functions, including generate_commit_message and its dependency, diff-lines
+# shellcheck disable=SC1091 # gitwatch.sh is intentionally sourced for unit testing
 source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
 
 # --- Mock Git Command ---
 mock_git() {
-  if [[ "$*" == "diff --staged -U0 --color=always" ]]; then
+  if [[ "$*" == "diff --staged -U0 --color=always" ]];
+  then
     # Mock for -l
     echo "--- a/file.txt"
     echo "+++ b/file.txt"
     echo "@@ -1 +1 @@"
     echo "+added line"
-  elif [[ "$*" == "diff --staged -U0 " ]]; then
+  elif [[ "$*" == "diff --staged -U0 " ]];
+  then
     # Mock for -L
     echo "--- a/file.txt"
     echo "+++ b/file.txt"
     echo "@@ -1 +1 @@"
     echo "+added line (no color)"
-  elif [[ "$*" == "diff --staged --stat" ]]; then
+  elif [[ "$*" == "diff --staged --stat" ]];
+  then
     # Mock for truncation summary
     echo " file.txt | 10 ++++++++++"
-  elif [[ "$*" == "status -s" ]]; then
+  elif [[ "$*" == "status -s" ]];
+  then
     # Mock for empty diff
     echo " M file.txt"
-  elif [[ "$*" == "diff --staged --name-only" ]]; then
+  elif [[ "$*" == "diff --staged --name-only" ]];
+  then
     # Mock for -C pipe
     echo "file_a.txt"
     echo "file_b.txt"
@@ -55,7 +60,8 @@ setup() {
   COMMITCMD=""
   PASSDIFFS=0
   FORMATTED_COMMITMSG="" # This gets set by the script
-  if [[ "$COMMITMSG" != *%d* ]]; then
+  if [[ "$COMMITMSG" != *%d* ]];
+  then
     DATE_FMT=""
     FORMATTED_COMMITMSG="$COMMITMSG"
   else
@@ -66,8 +72,8 @@ setup() {
 
 @test "commitmsg_unit: Default message with date" {
   export DATE_FMT="+%Y" # Use just year for predictable test
+  # shellcheck disable=SC2030,SC2031 # Modifying global variable in subshell to be read by sourced function
   export COMMITMSG="Commit: %d"
-  FORMATTED_COMMITMSG="$COMMITMSG" # Re-init
   LISTCHANGES=-1
   COMMITCMD=""
 
@@ -77,8 +83,8 @@ setup() {
 }
 
 @test "commitmsg_unit: Custom message with no date" {
+  # shellcheck disable=SC2030,SC2031 # Modifying global variable in subshell to be read by sourced function
   export COMMITMSG="Static message"
-  FORMATTED_COMMITMSG="$COMMITMSG" # Re-init
   DATE_FMT="" # Re-init
   LISTCHANGES=-1
   COMMITCMD=""
@@ -89,7 +95,9 @@ setup() {
 }
 
 @test "commitmsg_unit: -l flag (color) uses diff-lines" {
+  # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   LISTCHANGES=10 # Enable diff
+  # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   LISTCHANGES_COLOR="--color=always"
 
   run generate_commit_message
@@ -98,7 +106,9 @@ setup() {
 }
 
 @test "commitmsg_unit: -L flag (no color) uses diff-lines" {
+  # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   LISTCHANGES=10 # Enable diff
+  # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   LISTCHANGES_COLOR="" # No color
 
   run generate_commit_message
@@ -107,21 +117,24 @@ setup() {
 }
 
 @test "commitmsg_unit: -l flag truncates long diff" {
+  # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   LISTCHANGES=0 # Set limit to *less than* line count
   # Mock wc -l to return 10 lines
-  # This is tricky, we'll mock 'git diff --staged --stat' instead
   # The diff-lines mock will return 1 line, so we set limit to 0
   # generate_commit_message will see length (1) > limit (0)
 
   run generate_commit_message
   assert_success
-  assert_output --partial "Too many lines changed (1 > 0). Summary:"
+  assert_output --partial "Too many lines changed (1 > 0).
+Summary:"
   assert_output --partial "file.txt | 10 ++++++++++"
 }
 
 @test "commitmsg_unit: -c custom command overrides others" {
+  # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   LISTCHANGES=10 # Set this to prove it gets ignored
   COMMITMSG="Ignored: %d"
+  # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   COMMITCMD="echo 'Custom command output'"
 
   run generate_commit_message
@@ -132,7 +145,9 @@ setup() {
 }
 
 @test "commitmsg_unit: -C flag pipes files to custom command" {
+  # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   COMMITCMD="wc -l" # Command that reads from stdin
+  # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   PASSDIFFS=1
 
   run generate_commit_message
@@ -141,7 +156,9 @@ setup() {
 }
 
 @test "commitmsg_unit: -c command failure uses fallback" {
+  # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   COMMITCMD="command_that_fails_zz"
+  # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   PASSDIFFS=0
 
   run generate_commit_message
@@ -154,7 +171,9 @@ setup() {
 @test "commitmsg_unit: -c command timeout uses fallback" {
   # Override global TIMEOUT for this test
   export TIMEOUT=1
+  # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   COMMITCMD="sleep 3"
+  # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   PASSDIFFS=0
 
   run generate_commit_message

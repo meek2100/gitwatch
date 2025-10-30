@@ -11,7 +11,9 @@ load 'bats-custom/startup-shutdown'
 
 @test "syncing_correctly: Commits and pushes adds, subdir adds, and removals" {
   # Start gitwatch directly in the background
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
@@ -34,9 +36,11 @@ load 'bats-custom/startup-shutdown'
   local lastcommit=$commit1
   local lastremotecommit=$remote_commit1
   mkdir subdir
+
   sleep 0.5 # Small delay
   cd subdir
   echo "line2" >> file2.txt
+  # shellcheck disable=SC2103 # cd is necessary here to manage nested folder operation
   cd .. # Back to repo root
 
   # Wait for commit+push (by checking that remote hash has changed)
@@ -51,6 +55,7 @@ load 'bats-custom/startup-shutdown'
   run git rev-parse origin/master
   assert_success "Git rev-parse origin/master failed after file2 add"
   local remote_commit2=$output
+
   assert_equal "$commit2" "$remote_commit2" "Push after adding file2 failed"
   assert_not_equal "$lastremotecommit" "$remote_commit2" "Remote commit hash did not change after file2 add"
 

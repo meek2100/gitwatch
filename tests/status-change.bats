@@ -11,13 +11,16 @@ load 'bats-custom/startup-shutdown'
 
 @test "commit_only_when_git_status_change: Does not commit if only timestamp changes (touch)" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   ## NEW ##
   echo "# DEBUG: Starting gitwatch, log at $output_file" >&3
 
   # Start gitwatch directly in the background, redirecting output
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   sleep 1
@@ -57,6 +60,7 @@ load 'bats-custom/startup-shutdown'
   local second_commit_hash=$output
 
   ## NEW ##
+
   echo "# DEBUG: Second commit hash is $second_commit_hash" >&3
   assert_equal "$first_commit_hash" "$second_commit_hash" "Commit occurred after touch, but shouldn't have"
 
@@ -68,7 +72,6 @@ load 'bats-custom/startup-shutdown'
   # Verify verbose output indicates no changes were detected by the final diff check
   run cat "$output_file"
   assert_output --partial "No relevant changes detected by git status (porcelain check)."
-
   # Verify only one commit command was run
   #local commit_count
 

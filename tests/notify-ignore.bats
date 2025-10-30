@@ -11,9 +11,12 @@ load 'bats-custom/startup-shutdown'
 
 @test "notify_ignore_raw_regex_x: -x ignores changes using raw regex" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
   # Start gitwatch directly in the background, ignoring test_subdir/ (raw regex pattern)
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -x "(test_subdir/|\.bak$)" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   mkdir test_subdir
@@ -51,6 +54,7 @@ load 'bats-custom/startup-shutdown'
 
 @test "notify_ignore_glob_X_combined: -X ignores files matching glob patterns and combines correctly with -x" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # Raw Regex (-x): Ignore anything starting with 'old_'
@@ -60,7 +64,9 @@ load 'bats-custom/startup-shutdown'
   local initial_hash
 
   # 1. Start gitwatch, combining exclusion patterns
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -x "$raw_regex" -X "$glob_list" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   mkdir temp # The directory to be ignored
@@ -106,6 +112,7 @@ load 'bats-custom/startup-shutdown'
 
 @test "notify_ignore_gitignore: Ignores files matching .gitignore" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -113,13 +120,16 @@ load 'bats-custom/startup-shutdown'
   # 1. Create and commit .gitignore
   echo "*.log" > .gitignore
   echo "build/" >> .gitignore
+
   git add .gitignore
   git commit -q -m "Add .gitignore"
   local initial_hash
   initial_hash=$(git log -1 --format=%H)
 
   # 2. Start gitwatch
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1
 

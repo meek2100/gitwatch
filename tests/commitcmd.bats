@@ -11,7 +11,9 @@ load 'bats-custom/startup-shutdown'
 
 @test "commit_command_single: Uses simple custom command output as commit message" {
   # Start gitwatch directly in the background
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c "uname" "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   sleep 1 # Allow gitwatch to potentially initialize
@@ -29,7 +31,10 @@ load 'bats-custom/startup-shutdown'
 
 @test "commit_command_format: Uses complex custom command with substitutions" {
   # Start gitwatch directly in the background
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  # shellcheck disable=SC2016 # Intentional: expression must be preserved for remote bash -c execution
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c 'echo "$(uname) is the uname of this device, the time is $(date)"' "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   sleep 1
@@ -49,7 +54,9 @@ load 'bats-custom/startup-shutdown'
 
 @test "commit_command_overwrite: -c flag overrides -l, -L, -d flags" {
   # Start gitwatch directly in the background
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c "uname" -l 123 -L 0 -d "+%Y" "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   sleep 1
@@ -68,10 +75,13 @@ load 'bats-custom/startup-shutdown'
 }
 
 @test "commit_command_pipe_C: -c and -C flags pipe list of changed files to command" {
+  # shellcheck disable=SC2016 # Intentional: variable expansion must be deferred to command execution time
   local custom_cmd='while IFS= read -r file; do echo "Changed: $file"; done'
 
   # Start gitwatch with custom command and the pipe flag -C
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -c "$custom_cmd" -C "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   sleep 1
@@ -95,12 +105,15 @@ load 'bats-custom/startup-shutdown'
 
 @test "commit_command_failure: -c failure uses fallback message and logs error" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   local failing_cmd='exit 1' # Simple command that fails
 
   # Start gitwatch with custom command that fails, logging all output
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -c "$failing_cmd" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   sleep 1 # Allow gitwatch to initialize
@@ -128,13 +141,16 @@ load 'bats-custom/startup-shutdown'
 
 @test "commit_command_timeout: -c hanging command uses timeout fallback message and logs error" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Create a hanging command that exceeds the script's internal timeout (60s)
   local hanging_cmd='sleep 100'
 
   # 2. Start gitwatch with the hanging custom command, logging all output
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -c "$hanging_cmd" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   sleep 1 # Allow gitwatch to initialize
@@ -142,7 +158,8 @@ load 'bats-custom/startup-shutdown'
   # 3. Trigger a change
   echo "line1" >> file_hang.txt
 
-  # 4. Wait for the internal timeout (60s) plus a buffer. Wait for 5 seconds to catch the instant log message.
+  # 4. Wait for the internal timeout (60s) plus a buffer.
+  # Wait for 5 seconds to catch the instant log message.
   local total_wait_time=5
   echo "# DEBUG: Waiting ${total_wait_time}s for hanging command to be terminated." >&3
   # The command will run in a subshell with a 'timeout 60' wrapper.
@@ -160,6 +177,5 @@ load 'bats-custom/startup-shutdown'
   # 7. Verify log output contains the timeout error message
   run cat "$output_file"
   assert_output --partial "ERROR: Custom commit command '$hanging_cmd' timed out after 60 seconds."
-
   cd /tmp
 }

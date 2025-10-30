@@ -18,6 +18,7 @@ load 'bats-custom/startup-shutdown'
   fi
 
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Determine the .git path from the test repo
@@ -40,6 +41,7 @@ load 'bats-custom/startup-shutdown'
 
   # 3. Temporarily hide hash commands to force the *fallback name* logic.
   # Create a dummy bin directory that will override the system's /bin, /usr/bin for this run
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   local DUMMY_BIN="$testdir/dummy-bin"
   mkdir -p "$DUMMY_BIN"
   local path_backup="$PATH"
@@ -55,9 +57,10 @@ load 'bats-custom/startup-shutdown'
   echo "# DEBUG: Successfully hid hash commands via PATH manipulation." >&3
 
   # 4. Start gitwatch, which should fall back because of unwritable .git AND missing hash tools
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
-
   # 5. Wait for initialization and check log
   sleep 2
 

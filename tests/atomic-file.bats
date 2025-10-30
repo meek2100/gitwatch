@@ -11,6 +11,7 @@ load 'bats-custom/startup-shutdown'
 
 @test "atomic_file_watch: Watching a single file only commits that file" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
   local watched_file_path="$testdir/local/$TEST_SUBDIR_NAME/watched.txt"
   local unwatched_file_path="$testdir/local/$TEST_SUBDIR_NAME/unwatched.txt"
@@ -26,6 +27,7 @@ load 'bats-custom/startup-shutdown'
 
   # 2. Start gitwatch watching ONLY watched.txt
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 "$watched_file_path" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1
 

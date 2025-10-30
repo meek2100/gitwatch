@@ -13,19 +13,23 @@ load 'bats-custom/startup-shutdown'
 # It will be skipped if 'logger' is not found or no common log utility/file is found.
 # Note: This test's reliability depends heavily on the runner environment's syslog configuration.
 @test "syslog_S: -S flag routes output to syslog (daemon.info/daemon.error)" {
-  if ! command -v logger &>/dev/null; then
+  if ! command -v logger &>/dev/null;
+  then
     skip "Syslog test skipped: 'logger' command not found."
   fi
 
   local SYSLOG_CHECK_CMD=""
-  if command -v journalctl &>/dev/null; then
+  if command -v journalctl &>/dev/null;
+  then
     SYSLOG_CHECK_CMD="journalctl --since '1 minute ago'"
     echo "# DEBUG: Using journalctl for syslog check" >&3
-  elif [ -r "/var/log/syslog" ]; then
+  elif [ -r "/var/log/syslog" ];
+  then
     # Use tail to get recent lines. Using sudo just in case.
     SYSLOG_CHECK_CMD="sudo tail -n 200 /var/log/syslog"
     echo "# DEBUG: Using /var/log/syslog for syslog check" >&3
-  elif [ -r "/var/log/messages" ]; then
+  elif [ -r "/var/log/messages" ];
+  then
     SYSLOG_CHECK_CMD="sudo tail -n 200 /var/log/messages"
     echo "# DEBUG: Using /var/log/messages for syslog check" >&3
   else
@@ -33,15 +37,18 @@ load 'bats-custom/startup-shutdown'
   fi
 
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
+  # shellcheck disable=SC2034 # Retain for debug clarity, even if currently unused
   local log_tag="${BATS_TEST_FILENAME##*/}" # Use the test file name as a log tag marker
 
   # --- Setup: Check Initial Log Status (Optional, depends on runner) ---
   # We will rely on a very recent log entry being unique.
-
   # 1. Start gitwatch in the background with -S (syslog) and -v (verbose)
   # Redirect STDOUT/STDERR to a file anyway, but this output should be minimal
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -S "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   sleep 1 # Allow watcher to initialize
@@ -71,12 +78,14 @@ load 'bats-custom/startup-shutdown'
 
   # 4. Check that the error message exists in the log (this confirms syslog routing worked)
   # We expect the critical ERROR message for hook failure:
-  run bash -c "$SYSLOG_CHECK_CMD | grep \"ERROR: 'git commit' failed with exit code 1.\""
+  run bash -c "$SYSLOG_CHECK_CMD |
+grep \"ERROR: 'git commit' failed with exit code 1.\""
   assert_success "Did not find expected 'git commit failed' error in syslog."
 
   # Also check for a verbose message, which confirms daemon.info routing
   # Note: The watcher command may differ (inotifywait vs fswatch), so we check for a generic startup message
-  run bash -c "$SYSLOG_CHECK_CMD | grep \"Starting file watch. Command:\""
+  run bash -c "$SYSLOG_CHECK_CMD |
+grep \"Starting file watch. Command:\""
   assert_success "Did not find expected 'Starting file watch' info message in syslog."
 
   # 5. Check that STDOUT/STDERR capture file is empty (or near-empty)

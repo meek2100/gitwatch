@@ -11,7 +11,9 @@ load 'bats-custom/startup-shutdown'
 
 @test "commit_log_messages_working: -l flag includes diffstat in commit message" {
   # Start gitwatch directly in the background
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   sleep 1
@@ -20,7 +22,9 @@ load 'bats-custom/startup-shutdown'
   # Wait for the first commit
   run wait_for_git_change 20 0.5 git log -1 --format=%H
   assert_success "First commit timed out"
+  # shellcheck disable=SC2034 # Not used in this test, can be removed but kept as local
   local first_commit_hash
+  # shellcheck disable=SC2034 # Not used in this test, can be removed but kept as local
   first_commit_hash=$(git log -1 --format=%H) # Get hash after wait succeeds
 
   echo "line2" >> file1.txt
@@ -41,10 +45,13 @@ load 'bats-custom/startup-shutdown'
 @test "commit_log_truncation: -l flag truncates long diffs and uses summary" {
   local max_lines=5
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # Start gitwatch directly in the background with a low line limit
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l "$max_lines" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   sleep 1
@@ -55,7 +62,8 @@ load 'bats-custom/startup-shutdown'
 
   # Generate 10 lines of content (which should exceed the max_lines=5 limit)
   local expected_total_lines=10
-  for i in $(seq 1 $expected_total_lines); do
+  for i in $(seq 1 $expected_total_lines);
+  do
     echo "Line number $i" >> long_file.txt
   done
 
@@ -82,6 +90,7 @@ load 'bats-custom/startup-shutdown'
 
 # --- NEW TEST ---
 @test "commit_log_mode_change: -l flag logs file mode changes" {
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
   # 1. Create a file and commit it
@@ -93,7 +102,9 @@ load 'bats-custom/startup-shutdown'
   initial_hash=$(git log -1 --format=%H)
 
   # 2. Start gitwatch with -l
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow watcher to initialize
 
@@ -117,10 +128,13 @@ load 'bats-custom/startup-shutdown'
 # --- NEW TEST ---
 @test "commit_log_no_color_L: -L flag includes plain diffstat" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # Start gitwatch with -L (no color)
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -L 10 "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   sleep 1
@@ -161,7 +175,9 @@ load 'bats-custom/startup-shutdown'
   local initial_hash
 
   # 2. Start gitwatch. We use -l 0 to prove the env var overrides the flag logic's default.
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 0 "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   sleep 1

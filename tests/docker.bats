@@ -41,7 +41,8 @@ teardown_file() {
   docker rmi gitwatch:test >/dev/null 2>&1 || true
 
   # 2. Remove the host repo volume
-  if [ -n "$TEST_REPO_DIR" ]; then
+  if [ -n "$TEST_REPO_DIR" ];
+  then
     rm -rf "$TEST_REPO_DIR"
     echo "# DEBUG: Cleaned up host repo volume: $TEST_REPO_DIR" >&3
   fi
@@ -107,6 +108,7 @@ teardown() {
   # 3. Assert: Check the container logs
   run docker logs "$CONTAINER_NAME"
 
+
   # 4. Check for flags in the entrypoint startup message
   assert_output --partial "Starting gitwatch with the following arguments:"
   assert_output --partial " -v " # VERBOSE=true -> -v
@@ -137,6 +139,7 @@ teardown() {
 
   # 3. Trigger a change on the host to make gitwatch commit
   touch "$TEST_REPO_DIR/file_for_commit_cmd.txt"
+
 
   # 4. Wait for debounce (1s) + commit time
   sleep 3

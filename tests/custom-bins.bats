@@ -7,14 +7,19 @@ load 'bats-file/load'
 # Load custom helpers
 load 'bats-custom/custom-helpers'
 # Load setup/teardown
-load 'bats-custom/bats-custom/startup-shutdown'
+load 'bats-custom/startup-shutdown'
 
 # Helper function to create a dummy binary
 create_dummy_bin() {
   local name="$1"
   local real_path="$2"
   local signature="$3"
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   local dummy_path="$testdir/bin/$name"
+
+  # Ensure the directory exists
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  mkdir -p "$testdir/bin"
 
   echo "#!/usr/bin/env bash" > "$dummy_path"
   echo "echo \"*** DUMMY BIN: $signature ***\" >&2" >> "$dummy_path"
@@ -30,20 +35,27 @@ create_dummy_bin() {
     skip "Custom bins test skipped: requires Linux environment for simple inotifywait setup."
   fi
 
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   mkdir "$testdir/bin"
 
   # 1. Create dummy binaries
   local real_git_path
   real_git_path=$(command -v git)
-  local dummy_git=$(create_dummy_bin "git" "$real_git_path" "GIT_OK")
+  local dummy_git
+  # shellcheck disable=SC2155 # Declared on previous line
+  dummy_git=$(create_dummy_bin "git" "$real_git_path" "GIT_OK")
 
   local real_inw_path
   real_inw_path=$(command -v inotifywait)
-  local dummy_inw=$(create_dummy_bin "inotifywait" "$real_inw_path" "INW_OK")
+  local dummy_inw
+  # shellcheck disable=SC2155 # Declared on previous line
+  dummy_inw=$(create_dummy_bin "inotifywait" "$real_inw_path" "INW_OK")
 
   local real_flock_path
   real_flock_path=$(command -v flock)
-  local dummy_flock=$(create_dummy_bin "flock" "$real_flock_path" "FLOCK_OK")
+  local dummy_flock
+  # shellcheck disable=SC2155 # Declared on previous line
+  dummy_flock=$(create_dummy_bin "flock" "$real_flock_path" "FLOCK_OK")
 
   # 2. Set environment variables
   export GW_GIT_BIN="$dummy_git"
@@ -51,10 +63,13 @@ create_dummy_bin() {
   export GW_FLOCK_BIN="$dummy_flock"
 
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 3. Start gitwatch (should use the dummy binaries)
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   sleep 1

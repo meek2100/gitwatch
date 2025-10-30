@@ -11,23 +11,28 @@ load 'bats-custom/startup-shutdown'
 
 @test "skip_if_merging_M: -M flag prevents commit during a merge conflict" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
   local conflict_file="conflict_file.txt"
   local initial_commit_hash
   # We must use git rev-parse to ensure the correct path for asserting MERGE_HEAD
   cd "$testdir/local/$TEST_SUBDIR_NAME"
-  local GIT_DIR_PATH=$(git rev-parse --absolute-git-dir)
+  local GIT_DIR_PATH
+  # shellcheck disable=SC2155 # Declared on previous line
+  GIT_DIR_PATH=$(git rev-parse --absolute-git-dir)
 
   # 1. Create a file and commit it locally (This is the HEAD commit that will be checked against)
   echo "Initial content" > "$conflict_file"
   git add "$conflict_file"
   git commit -q -m "Initial conflict file commit"
+
   git push -q origin master
 
   initial_commit_hash=$(git log -1 --format=%H)
   echo "# Initial hash: $initial_commit_hash" >&3
 
   # 2. Simulate Upstream Change on Remote to set up the conflict
+  # shellcheck disable=SC2103 # cd is necessary here to manage clone/cleanup
   cd "$testdir"
   run git clone -q remote local2
   assert_success "Cloning for local2 failed"
@@ -37,7 +42,6 @@ load 'bats-custom/startup-shutdown'
   git commit -q -m "Commit from local2 (upstream change A)"
   run git push -q origin master
   assert_success "Push from local2 failed"
-  cd ..
   run rm -rf local2
   assert_success "Cleanup of local2 failed"
 
@@ -54,7 +58,9 @@ load 'bats-custom/startup-shutdown'
 
   # 5. Start gitwatch with -M flag, logging all output
   echo "# DEBUG: Starting gitwatch with -M" >&3
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
 
   # 6. Make another file change to trigger the watcher loop

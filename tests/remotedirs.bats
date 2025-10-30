@@ -11,7 +11,8 @@ load 'bats-custom/custom-helpers'
 # Use standard echo to output debug info to avoid relying on bats-support inside teardown
 _remotedirs_cleanup() {
   echo "# Running custom cleanup for remotedirs" >&3
-  if [ -n "${dotgittestdir:-}" ] && [ -d "$dotgittestdir" ]; then
+  if [ -n "${dotgittestdir:-}" ] && [ -d "$dotgittestdir" ];
+  then
     echo "# Removing external git dir: $dotgittestdir" >&3
     rm -rf "$dotgittestdir"
   fi
@@ -30,14 +31,18 @@ teardown() {
 
 
 @test "remote_git_dirs_working_with_commit_logging: -g flag works with external .git dir" {
+  local dotgittestdir
   dotgittestdir=$(mktemp -d)
   # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   run mv "$testdir/local/$TEST_SUBDIR_NAME/.git" "$dotgittestdir/"
   assert_success
 
   # Start gitwatch directly in the background
   # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 -g "$dotgittestdir/.git" "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -47,7 +52,9 @@ teardown() {
   # Wait for first commit using the external git dir
   wait_for_git_change 20 0.5 git --git-dir="$dotgittestdir/.git" log -1 --format=%H
   assert_success "First commit timed out"
-  local lastcommit=$(git --git-dir="$dotgittestdir/.git" log -1 --format=%H)
+  local lastcommit
+  # shellcheck disable=SC2155 # Declared on previous line
+  lastcommit=$(git --git-dir="$dotgittestdir/.git" log -1 --format=%H)
 
 
   echo "line2" >> file1.txt
@@ -57,7 +64,10 @@ teardown() {
   assert_success "Second commit timed out"
 
   # Verify that new commit hash is different
-  local currentcommit=$(git --git-dir="$dotgittestdir/.git" log -1 --format=%H)
+
+  local currentcommit
+  # shellcheck disable=SC2155 # Declared on previous line
+  currentcommit=$(git --git-dir="$dotgittestdir/.git" log -1 --format=%H)
   assert_not_equal "$lastcommit" "$currentcommit" "Commit hash should be different after second change"
 
   # Verify commit message content
@@ -70,13 +80,17 @@ teardown() {
 }
 
 @test "remote_git_dirs_working_with_commit_and_push: -g flag works with external .git dir and -r push" {
+  local dotgittestdir
   dotgittestdir=$(mktemp -d)
   # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   run mv "$testdir/local/$TEST_SUBDIR_NAME/.git" "$dotgittestdir/"
   assert_success
 
   # Start gitwatch directly in the background with -r and -g
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -g "$dotgittestdir/.git" "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -89,8 +103,12 @@ teardown() {
 
   # Verify that the local and remote hashes match (indicating successful push)
   # Use the external .git dir for the local check
-  local local_commit_hash=$(git --git-dir="$dotgittestdir/.git" rev-parse master)
-  local remote_commit_hash=$(git rev-parse origin/master)
+  local local_commit_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  local_commit_hash=$(git --git-dir="$dotgittestdir/.git" rev-parse master)
+  local remote_commit_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  remote_commit_hash=$(git rev-parse origin/master)
   assert_equal "$local_commit_hash" "$remote_commit_hash" "Local and remote hashes do not match after -g push"
 
   # Verify commit message content
@@ -103,7 +121,9 @@ teardown() {
 
 @test "remote_git_dirs_file_target: -g flag works with external .git dir and single file target" {
   local target_file="single_watched_file.txt"
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   local watched_file_path="$testdir/local/$TEST_SUBDIR_NAME/$target_file"
+  local dotgittestdir
   dotgittestdir=$(mktemp -d)
 
   # 1. Create the target file and commit it locally (needed for setup)
@@ -112,16 +132,20 @@ teardown() {
   git add "$target_file"
   git commit -q -m "Initial commit for single file test"
 
+
   # 2. Move the .git directory externally
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   run mv "$testdir/local/$TEST_SUBDIR_NAME/.git" "$dotgittestdir/"
   assert_success
 
   # 3. Get the initial commit hash using the external git dir
   local initial_hash
+  # shellcheck disable=SC2155 # Declared on previous line
   initial_hash=$(git --git-dir="$dotgittestdir/.git" log -1 --format=%H)
 
   # 4. Start gitwatch targeting the file AND specifying the external git dir
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -g "$dotgittestdir/.git" "$watched_file_path" &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1
 
@@ -133,7 +157,9 @@ teardown() {
   assert_success "Commit timed out, suggesting -g with file target failed"
 
   # 7. Verify the hash changed
-  local final_hash=$(git --git-dir="$dotgittestdir/.git" log -1 --format=%H)
+  local final_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  final_hash=$(git --git-dir="$dotgittestdir/.git" log -1 --format=%H)
   assert_not_equal "$initial_hash" "$final_hash" "Commit hash should change after modifying single file"
 
   # 8. Verify the file content is in the index (proving the 'git add' used the correct work-tree)
@@ -146,11 +172,14 @@ teardown() {
 # --- NEW TEST: -g suspicious path warning ---
 @test "remote_git_dirs_g_warning: -g flag warns on suspicious relative path input" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Start gitwatch with a non-absolute path for -g (e.g., just a name)
   # The script should try to resolve it and issue a warning.
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -g "mygitdir" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow watcher to initialize
 
@@ -158,9 +187,9 @@ teardown() {
   run cat "$output_file"
   assert_output --partial "Warning: GIT_DIR 'mygitdir' specified with -g looks like a relative name, not a full path. Proceeding..." \
     "The script failed to issue the expected warning for a suspicious -g path."
-
   # 3. Assert: The script is running (not a fatal error)
-  if ! kill -0 "$GITWATCH_PID" 2>/dev/null; then
+  if ! kill -0 "$GITWATCH_PID" 2>/dev/null;
+  then
     fail "Gitwatch exited unexpectedly after the -g warning."
   fi
 

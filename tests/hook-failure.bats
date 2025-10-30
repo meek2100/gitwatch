@@ -16,6 +16,7 @@ load 'bats-custom/startup-shutdown'
   local initial_remote_hash
 
   # Create a temporary file to capture gitwatch output
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Initial push to ensure remote is up-to-date and get initial hashes
@@ -31,7 +32,9 @@ load 'bats-custom/startup-shutdown'
   echo "# Initial local hash: $initial_commit_hash" >&3
 
   # Start gitwatch in the background with verbose logging and remote push
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow watcher to initialize
 
@@ -98,9 +101,7 @@ load 'bats-custom/startup-shutdown'
 
 @test "hook_failure_push: Git pre-push hook failure is handled gracefully" {
   local output_file
-  local git_dir_path
-  local initial_remote_hash
-
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   git_dir_path=$(git rev-parse --git-path hooks)
@@ -110,7 +111,9 @@ load 'bats-custom/startup-shutdown'
   echo "# Initial remote hash: $initial_remote_hash" >&3
 
   # 2. Start gitwatch
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow watcher to initialize
 
@@ -148,7 +151,6 @@ load 'bats-custom/startup-shutdown'
   # 9. Assert: Script is still running
   run kill -0 "$GITWATCH_PID"
   assert_success "Gitwatch process crashed after 'git push' failure, but it should have continued."
-
   # 10. Cleanup
   rm -f "$hook_file"
   cd /tmp

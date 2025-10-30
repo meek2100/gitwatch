@@ -1,23 +1,31 @@
+#!/usr/bin/env bash
+
 # Provides setup (default) and setup_with_spaces.
 
 # Common teardown function used by both setups
 _common_teardown() {
   echo '# Teardown started' >&3
   # Move out of test directory first to avoid issues with removal
+  # shellcheck disable=SC2103 # Moving out of test dir is intentional cleanup step
   cd /tmp
 
   # --- More Robust Process Termination ---
   # Use pkill with the stored PID. Send TERM first, then KILL.
-  if [ -n "${GITWATCH_PID:-}" ]; then
+  if [ -n "${GITWATCH_PID:-}" ];
+  then
     echo "# Attempting to terminate gitwatch process PID: $GITWATCH_PID" >&3
     # Check if the process exists before trying to kill
-    if ps -p "$GITWATCH_PID" > /dev/null; then
-      pkill -15 -P "$GITWATCH_PID" || true # Try TERM first for graceful shutdown
+    if ps -p "$GITWATCH_PID" > /dev/null;
+    then
+      # Send TERM to the process group (children too) for graceful shutdown
+      pkill -15 -P "$GITWATCH_PID" || true
       # Give it a moment to shut down gracefully
       sleep 0.5
       # Force KILL if it's still running
-      if ps -p "$GITWATCH_PID" > /dev/null; then
+      if ps -p "$GITWATCH_PID" > /dev/null;
+      then
         echo "# gitwatch process $GITWATCH_PID still running, sending KILL" >&3
+        # Send KILL to the process group
         pkill -9 -P "$GITWATCH_PID" || true
       else
         echo "# gitwatch process $GITWATCH_PID terminated gracefully" >&3
@@ -41,7 +49,8 @@ _common_teardown() {
   pkill -9 fswatch || true
 
   # Remove test directory (ensure quoting handles spaces)
-  if [ -n "$testdir" ] && [ -d "$testdir" ]; then
+  if [ -n "$testdir" ] && [ -d "$testdir" ];
+  then
     echo "# Removing test directory: $testdir" >&3
     rm -rf "$testdir"
   fi
@@ -54,43 +63,46 @@ _common_setup() {
   local use_spaces=$1 # Argument: 1 for spaces, 0 for no spaces
 
   # Time to wait for gitwatch to respond
-  # shellcheck disable=SC2034
+  # shellcheck disable=SC2034 # Used by tests
   WAITTIME=4
 
   # Set up directory structure and initialize remote
-  if [ "$use_spaces" -eq 1 ]; then
+  if [ "$use_spaces" -eq 1 ];
+  then
     testdir=$(mktemp -d "/tmp/temp space.XXXXX")
     # Ensure the test knows the correct relative path to the repo with spaces
     # Define a global variable Bats tests can use, e.g., TEST_SUBDIR_NAME
     # shellcheck disable=SC2034 # Used by tests
     TEST_SUBDIR_NAME="rem with spaces"
-    initial_setup_dir="initial-setup-spaces"
-    initial_commit_msg="Initial commit for space test setup"
-    initial_file_content="initial setup with spaces"
+    local initial_setup_dir="initial-setup-spaces"
+    local initial_commit_msg="Initial commit for space test setup"
+    local initial_file_content="initial setup with spaces"
   else
+    local testdir
     testdir=$(mktemp -d)
     # shellcheck disable=SC2034 # Used by tests
     TEST_SUBDIR_NAME="remote" # Standard clone dir name
-    initial_setup_dir="initial-setup"
-    initial_commit_msg="Initial commit for test setup"
-    initial_file_content="initial setup"
+    local initial_setup_dir="initial-setup"
+    local initial_commit_msg="Initial commit for test setup"
+    local initial_file_content="initial setup"
   fi
 
   echo "# Using test directory: $testdir" >&3
   echo "# Local clone directory name will be: $TEST_SUBDIR_NAME" >&3
 
-  # shellcheck disable=SC2164
+  # shellcheck disable=SC2164 # Intentional directory change for setup
   cd "$testdir"
   mkdir remote
-  # shellcheck disable=SC2164
+  # shellcheck disable=SC2164 # Intentional directory change for setup
   cd remote
   git init -q --bare
-  # shellcheck disable=SC2103
+  # shellcheck disable=SC2103 # cd is intentional part of setup flow
   cd ..
 
   # --- Add initial commit directly to the bare remote ---
   # Clone the bare repo temporarily
   git clone -q remote "$initial_setup_dir"
+  # shellcheck disable=SC2164 # Intentional directory change for setup
   cd "$initial_setup_dir"
   # Create and commit an initial file
   echo "$initial_file_content" > initial_file.txt
@@ -99,14 +111,15 @@ _common_setup() {
   # Push back to the bare remote
   git push -q origin master
   # Go back up and remove the temporary clone
+  # shellcheck disable=SC2103 # cd is intentional part of setup flow
   cd ..
   rm -rf "$initial_setup_dir"
   # --- End initial commit ---
 
   # Now set up the local repo for the test
-  # shellcheck disable=SC2164
+  # shellcheck disable=SC2164 # Intentional directory change for setup
   mkdir local
-  # shellcheck disable=SC2164
+  # shellcheck disable=SC2164 # Intentional directory change for setup
   cd local
   # Clone into the potentially space-containing directory
   git clone -q ../remote "$TEST_SUBDIR_NAME"

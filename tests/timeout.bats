@@ -14,6 +14,7 @@ DEFAULT_TIMEOUT=60
 
 @test "timeout_git_push: Ensures hung git push command is terminated and logged" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Setup: Create a hanging dummy 'git' binary
@@ -22,16 +23,19 @@ DEFAULT_TIMEOUT=60
   dummy_git_path=$(create_hanging_bin "git")
 
   # 2. Set environment variable to force gitwatch to use the hanging binary
+  # shellcheck disable=SC2030,SC2031 # Exporting variable to be read by child process
   export GW_GIT_BIN="$dummy_git_path"
 
   # 3. Start gitwatch with a remote, short sleep time, and explicit default timeout
   local test_sleep_time=1
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
 
   echo "# DEBUG: Starting gitwatch with hanging git binary and sleep=${test_sleep_time}s and -t ${DEFAULT_TIMEOUT}" >&3
 
 
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -s "$test_sleep_time" -t "$DEFAULT_TIMEOUT" -r origin "$target_dir" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$target_dir"
   sleep 1 # Allow watcher to initialize
@@ -58,6 +62,7 @@ DEFAULT_TIMEOUT=60
 
 @test "timeout_git_pull_rebase: Ensures hung git pull command is terminated and logged" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Setup: Create a hanging dummy 'git' binary
@@ -65,15 +70,18 @@ DEFAULT_TIMEOUT=60
   dummy_git_path=$(create_hanging_bin "git")
 
   # 2. Set environment variable
+  # shellcheck disable=SC2030,SC2031 # Exporting variable to be read by child process
   export GW_GIT_BIN="$dummy_git_path"
 
   # 3. Start gitwatch with remote and PULL_BEFORE_PUSH (-R), and explicit default timeout
   local test_sleep_time=1
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
 
 
   echo "# DEBUG: Starting gitwatch with hanging git binary and -R and -t ${DEFAULT_TIMEOUT}" >&3
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -s "$test_sleep_time" -t "$DEFAULT_TIMEOUT" -r origin -R "$target_dir" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$target_dir"
   sleep 1 # Allow watcher to initialize
@@ -99,6 +107,7 @@ DEFAULT_TIMEOUT=60
 
 @test "timeout_git_commit: Ensures hung git commit command is terminated and logged" {
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Setup: Create a hanging dummy 'git' binary
@@ -108,10 +117,12 @@ DEFAULT_TIMEOUT=60
 
   # 2. Set environment variable to force gitwatch to use the hanging binary
   # We must use the full path to the hanging binary here.
+  # shellcheck disable=SC2030,SC2031 # Exporting variable to be read by child process
   export GW_GIT_BIN="$dummy_git_path"
 
   # 3. Start gitwatch
   local test_sleep_time=1
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
   local initial_hash
 
@@ -120,6 +131,7 @@ DEFAULT_TIMEOUT=60
   echo "# DEBUG: Starting gitwatch with hanging commit binary and -t ${DEFAULT_TIMEOUT}" >&3
 
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -s "$test_sleep_time" -t "$DEFAULT_TIMEOUT" "$target_dir" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow watcher to initialize
 

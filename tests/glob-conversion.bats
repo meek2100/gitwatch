@@ -11,7 +11,6 @@ load 'bats-custom/startup-shutdown'
 
 # This test file units tests the glob-to-regex conversion logic
 # that is used inside gitwatch.sh for the -X flag.
-
 # Test utility to run the regex conversion logic
 run_conversion() {
   local USER_EXCLUDE_PATTERN="$1"
@@ -19,11 +18,11 @@ run_conversion() {
   # Core logic copied from gitwatch.sh
   local PATTERNS_AS_WORDS=${USER_EXCLUDE_PATTERN//,/ }
   read -r -a PATTERN_ARRAY <<< "$PATTERNS_AS_WORDS"
-  local PROCESSED_PATTERN=$(IFS=\|; echo "${PATTERN_ARRAY[*]}")
+  local PROCESSED_PATTERN
+  PROCESSED_PATTERN=$(IFS=\|; echo "${PATTERN_ARRAY[*]}")
   PROCESSED_PATTERN=${PROCESSED_PATTERN//./\\.}
   PROCESSED_PATTERN=${PROCESSED_PATTERN//\*/.*}
-  PROCESSED_PATTERN=${PROCESSED_PATTERN//\?/.} # MODIFIED: Added '?'
-  conversion
+  PROCESSED_PATTERN=${PROCESSED_PATTERN//\?/.} # MODIFIED: Added '?' conversion
 
   echo "$PROCESSED_PATTERN"
 }
@@ -44,15 +43,13 @@ run_conversion() {
 
   # Case 4: Multiple spaces/comma handling (ensure proper splitting)
   run run_conversion "*.bak,  test .txt , .git/"
-
   assert_output ".*\.bak|test\ \.txt|\.git/" "Whitespace and multiple patterns failed"
 
   # Case 5: Empty string
   run run_conversion ""
   assert_output "" "Empty string conversion failed"
 
-  # Case 6: NEW - Test '?'
-  glob
+  # Case 6: NEW - Test '?' glob
   run run_conversion "file?.log,data*"
   assert_output "file.\.log|data.*" "Glob '?' conversion failed: file?.log,data* -> file.\.log|data.*"
 }

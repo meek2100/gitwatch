@@ -11,6 +11,7 @@ load 'bats-custom/startup-shutdown'
 
 # Source the main script to test functions directly
 # This brings in diff-lines and its dependencies (_strip_color, _trim_spaces, stderr)
+# shellcheck disable=SC1091 # Shellcheck can't follow this relative path
 source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
 
 # --- Test Cases ---

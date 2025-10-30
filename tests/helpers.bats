@@ -13,13 +13,13 @@ load 'bats-custom/custom-helpers'
 
 setup() {
   # This file will store the "output" of our mock command
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   export MOCK_OUTPUT_FILE="$testdir/mock_output.txt"
   echo "initial_state" > "$MOCK_OUTPUT_FILE"
 }
 
 # This is our mock command. It's not 'git', it's just 'cat'.
 # We are testing the helper's logic, not git.
-
 @test "wait_for_git_change: Succeeds when output changes" {
   # In 0.5s, we will change the file *in the background*
   (sleep 0.5 && echo "new_state" > "$MOCK_OUTPUT_FILE") &
@@ -59,6 +59,7 @@ setup() {
 
 @test "wait_for_git_change: Handles initial command failure" {
   # Test if the *initial* command fails (e.g., file not found)
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   run wait_for_git_change 3 0.1 cat "$testdir/non_existent_file.txt"
   assert_failure
   assert_output --partial "Initial command failed with status 1. Cannot wait for change."
@@ -69,8 +70,10 @@ setup() {
   # We are waiting for the *target* state, which might be "success"
 
   # In 0.5s, create the file (making the command succeed)
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   (sleep 0.5 && echo "target_state" > "$testdir/non_existent_file.txt") &
 
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   run wait_for_git_change --target "target_state" 10 0.1 cat "$testdir/non_existent_file.txt"
   assert_success
   assert_output --partial "Output matches target 'target_state'. Success."

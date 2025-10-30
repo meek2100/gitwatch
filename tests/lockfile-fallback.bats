@@ -11,7 +11,6 @@ load 'bats-custom/startup-shutdown'
 
 # This test simulates an unwritable .git directory to ensure the lockfile logic
 # correctly falls back to using a lockfile in /tmp based on a repo hash.
-
 @test "lockfile_fallback: Falls back to /tmp lockfile when .git is unwritable" {
   # Skip if 'flock' is not available, as this test relies on flock-based locking.
   if ! command -v flock &>/dev/null; then
@@ -19,11 +18,13 @@ load 'bats-custom/startup-shutdown'
   fi
 
   # Skip if neither sha256sum nor md5sum is available, as the fallback logic depends on them for a unique name
-  if ! command -v sha256sum &>/dev/null && ! command -v md5sum &>/dev/null; then
+  if ! command -v sha256sum &>/dev/null && ! command -v md5sum &>/dev/null;
+  then
     skip "Test skipped: Neither 'sha256sum' nor 'md5sum' found, cannot verify hashed lockfile name."
   fi
 
   local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Determine the .git path from the test repo
@@ -41,7 +42,8 @@ load 'bats-custom/startup-shutdown'
   # 2. Simulate unwritable .git directory (chmod -w)
   local ORIGINAL_PERMS
   # Use a stat command that works on both Linux and macOS
-  if [ "$RUNNER_OS" == "Linux" ]; then
+  if [ "$RUNNER_OS" == "Linux" ];
+  then
     ORIGINAL_PERMS=$(stat -c "%a" "$GIT_DIR_PATH")
   else
     ORIGINAL_PERMS=$(stat -f "%A" "$GIT_DIR_PATH")
@@ -53,15 +55,17 @@ load 'bats-custom/startup-shutdown'
   assert_success "Failed to change permissions on .git directory"
 
   # 3. Start gitwatch, which should fail to touch the lockfile in GIT_DIR_PATH and fall back
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
-
   # 4. Wait for initialization and check log
   sleep 2
 
   # 5. Assert: Check log output confirms fallback and the unique name format
   run cat "$output_file"
-  assert_output --partial "Warning: Cannot write lockfile to $GIT_DIR_PATH. Falling back to temporary directory." "Did not log the expected fallback warning"
+  assert_output --partial "Warning: Cannot write lockfile to $GIT_DIR_PATH. Falling back to temporary directory." \
+    "Did not log the expected fallback warning"
 
   # Assert that the path contains /tmp/gitwatch- and a hash (which ensures uniqueness per repo)
   assert_output --regexp "/tmp/gitwatch-[0-9a-f]{32,64}\\.lock" "Did not log a temporary lockfile path with a hash"
