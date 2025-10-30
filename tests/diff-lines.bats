@@ -35,6 +35,7 @@ _trim_spaces() {
 
 # --- diff-lines function (copied from gitwatch.sh for explicit unit testing) ---
 # Note: This version relies on the mocked functions above.
+# beautysh-disable
 diff-lines() {
   local path=""           # Current file path (for additions/modifications)
   local line=""           # Current line number in the new file (for additions)
@@ -157,6 +158,7 @@ diff-lines() {
     fi
   done
 }
+# beautysh-enable
 # --- Test Cases ---
 
 @test "diff_lines_1_addition: Handles a simple file addition" {
