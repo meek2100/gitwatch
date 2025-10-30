@@ -267,11 +267,17 @@ operating system.
 
 ### Notes for Mac
 
-If running on macOS, you'll need to install the required tools via
-Homebrew:
+If running on macOS, you'll need to install the required runtime tools and the **BATS testing framework** via Homebrew:
 
 ```sh
+# Runtime Dependencies
 brew install fswatch flock
+```
+
+```sh
+# Testing Dependencies (Required to run .bats files locally)
+# bats-core and its helper libraries are now explicitly required.
+brew install bats-core bats-support bats-assert bats-file
 ```
 
 ## What it does
