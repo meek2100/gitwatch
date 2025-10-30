@@ -11,7 +11,6 @@ load 'bats-custom/startup-shutdown'
 
 @test "dependency_failure_syslog: -S flag exits with code 2 if 'logger' command is missing" {
     # This test temporarily manipulates the PATH environment variable to simulate a missing 'logger' command.
-
     local path_backup="$PATH"
 
     # 1. Temporarily remove common binary directories from PATH to simulate 'logger' missing
@@ -29,7 +28,29 @@ load 'bats-custom/startup-shutdown'
     assert_failure "Gitwatch should exit with non-zero status on missing dependency"
     assert_exit_code 2 "Gitwatch should exit with code 2 (Missing required command)"
     assert_output --partial "Error: Required command 'logger' not found (for -S syslog option)."
+    # 5. Cleanup
+    export PATH="$path_backup" # Restore PATH
+    cd /tmp
+}
 
+@test "dependency_failure_timeout: Exits with code 2 if 'timeout' command is missing" {
+    local path_backup="$PATH"
+
+    # 1. Temporarily remove common binary directories from PATH to simulate 'timeout' missing
+    # We remove coreutils locations where 'timeout' is usually found
+    export PATH="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr)?/s?bin' | tr '\n' ':')"
+
+    # 2. Assert that 'timeout' is not found in the simulated PATH
+    run command -v timeout
+    refute_success "Failed to simulate missing 'timeout' command (command was still found in simulated PATH)"
+
+    # 3. Run gitwatch, expecting it to fail the dependency check and exit
+    run "${BATS_TEST_DIRNAME}/../gitwatch.sh" "$testdir/local/$TEST_SUBDIR_NAME"
+
+    # 4. Assert exit code 2 and the error message
+    assert_failure "Gitwatch should exit with non-zero status on missing dependency"
+    assert_exit_code 2 "Gitwatch should exit with code 2 (Missing required command)"
+    assert_output --partial "Error: Required command 'timeout' not found."
     # 5. Cleanup
     export PATH="$path_backup" # Restore PATH
     cd /tmp

@@ -1,20 +1,18 @@
 { lib, pkgs, config, ... }:
 let
   gitwatch = pkgs.callPackage ./gitwatch.nix { };
-
   # Helper to generate flag arguments for options that have values (e.g., -s 2)
   getvar = flag: var: cfg:
-    # Check for null, empty string, and false for flexibility. Escape value for shell safety.
+    # Check for null, empty string, and false for flexibility.
+    # Escape value for shell safety.
     if cfg."${var}" != null && cfg."${var}" != "" && cfg."${var}" != false
     then "${flag} ${lib.strings.escapeShellArg (toString cfg."${var}")}"
     else "";
-
   # Helper to generate flag arguments for boolean options (e.g., -R)
   getflag = flag: var: cfg:
     if cfg."${var}"
     then "${flag}"
     else "";
-
   mkSystemdService = name: cfg: lib.nameValuePair
     "gitwatch-${name}"
     (
@@ -25,6 +23,7 @@ let
         messageArg = getvar "-m" "message" cfg;
         dateFmtArg = getvar "-d" "dateFmt" cfg;
         sleepTimeArg = getvar "-s" "sleepTime" cfg;
+        timeoutArg = getvar "-t" "timeout" cfg; # NEW: Timeout argument
         excludePatternArg = getvar "-x" "excludePattern" cfg;
         globExcludePatternArg = getvar "-X" "globExcludePattern" cfg;
         eventsArg = getvar "-e" "events" cfg;
@@ -42,7 +41,6 @@ let
         useSyslogFlag = getflag "-S" "useSyslog" cfg;
         verboseFlag = getflag "-v" "verbose" cfg;
         passDiffsFlag = getflag "-C" "passDiffs" cfg;
-
         # Custom command args (special handling to use -c and override -m/-l if present)
         customCommandArgs = if cfg.customCommand != null
           then lib.strings.concatStringsSep " " (lib.lists.filter (s: s != "") [
@@ -50,18 +48,15 @@ let
             passDiffsFlag
           ])
           else "";
-
-
         # Combine all arguments into a single string
         allArgs = lib.strings.concatStringsSep " " (lib.lists.filter (s: s != "") [
-          remoteArg branchArg dateFmtArg sleepTimeArg excludePatternArg globExcludePatternArg eventsArg gitDirArg logDiffLinesArg
+          remoteArg branchArg dateFmtArg sleepTimeArg timeoutArg excludePatternArg globExcludePatternArg eventsArg gitDirArg logDiffLinesArg # NEW: timeoutArg
           pullBeforePushFlag skipIfMergingFlag commitOnStartFlag useSyslogFlag verboseFlag
           # Special handling for commit message: custom command overrides -m
           (if cfg.customCommand != null then customCommandArgs else messageArg)
           # The path must be the last argument
           (lib.strings.escapeShellArg cfg.path)
         ]);
-
         # Determine initial fetch command (git clone)
         # Only include branchArg if it's set and we are cloning
         cloneBranchArg = if cfg.branch != null then "-b ${lib.strings.escapeShellArg cfg.branch}" else "";
@@ -78,11 +73,17 @@ let
         inherit (cfg) enable;
         # Use simple for service type, as gitwatch handles backgrounding if necessary
         serviceConfig.Type = "simple";
-
         after = [ "network-online.target" ];
         wantedBy = [ "multi-user.target" ];
         description = "gitwatch for ${name}";
-        path = with pkgs; [ gitwatch git openssh ];
+        path = with pkgs;
+        [
+          gitwatch git openssh
+          # NEW: Add coreutils (for timeout), flock, and watcher tools
+          coreutils # Provides 'timeout'
+          flock # For robust locking
+        ] ++ lib.optionals pkgs.stdenv.isLinux [ inotify-tools ]
+          ++ lib.optionals pkgs.stdenv.isDarwin [ fswatch ];
         script = ''
           ${fetcher}
           gitwatch ${allArgs}
@@ -108,6 +109,7 @@ in
         pullBeforePush = true;
         skipIfMerging = true;
         sleepTime = 5;
+        timeout = 120;
         useSyslog = true;
         verbose = true;
         logDiffLines = 10;
@@ -187,6 +189,11 @@ in
         };
         sleepTime = lib.mkOption {
           description = "Time in seconds to wait after change detection (-s <secs>).";
+          type = nullOr (oneOf [ str int ]);
+          default = null;
+        };
+        timeout = lib.mkOption { # NEW: Timeout option
+          description = "Timeout in seconds for critical Git operations (commit, pull, push) (-t <secs>).";
           type = nullOr (oneOf [ str int ]);
           default = null;
         };

@@ -45,6 +45,7 @@ GIT_WATCH_DIR=${GIT_WATCH_DIR:-/app/watched-repo}
 GIT_REMOTE=${GIT_REMOTE:-origin}
 GIT_BRANCH=${GIT_BRANCH:-main}
 GIT_EXTERNAL_DIR=${GIT_EXTERNAL_DIR:-} # Path to the external .git directory (e.g., /app/.git)
+TIMEOUT=${GIT_TIMEOUT:-60} # New: Git operation timeout
 
 # Gitwatch behavior
 SLEEP_TIME=${SLEEP_TIME:-2}
@@ -77,6 +78,7 @@ cmd=( )
 cmd+=( -r "${GIT_REMOTE}" )
 cmd+=( -b "${GIT_BRANCH}" )
 cmd+=( -s "${SLEEP_TIME}" )
+cmd+=( -t "${TIMEOUT}" ) # NEW: Timeout flag
 cmd+=( -d "${DATE_FMT}" )
 
 # Add custom commit command (-c) which overrides -m and -d

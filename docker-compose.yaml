@@ -38,6 +38,8 @@ services:
       # The path to an external .git directory (used with -g flag in gitwatch.sh)
       # If your .git folder is mounted separately, set this to the container path (e.g., /app/.git)
       GIT_EXTERNAL_DIR: ""
+      # NEW: Timeout in seconds for critical Git operations (commit, pull, push) (-t)
+      GIT_TIMEOUT: 60
       # Set to "true" to run 'git pull --rebase' before every push (-R)
       PULL_BEFORE_PUSH: "false"
 

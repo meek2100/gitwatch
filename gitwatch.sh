@@ -22,7 +22,7 @@
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
-#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#    along with this program. If not, see <http://www.gnu.org/licenses/>.
 #############################################################################
 #
 #   Idea and original code taken from http://stackoverflow.com/a/965274
@@ -49,7 +49,7 @@ GITWATCH_VERSION="%%GITWATCH_VERSION%%"
 # --- End Version Info ---
 
 # --- Global Configuration Constants ---
-TIMEOUT=60 # Timeout for critical Git operations (commit, pull, push)
+TIMEOUT=${GW_TIMEOUT:-60} # Timeout for critical Git operations (commit, pull, push). Default is 60s.
 # --------------------------------------
 
 REMOTE=""
@@ -77,7 +77,7 @@ shelp() {
   echo "gitwatch - watch file or directory and git commit all changes as they happen"
   echo ""
   echo "Usage:"
-  echo "${0##*/} [-s <secs>] [-d <fmt>] [-r <remote> [-b <branch>]]"
+  echo "${0##*/} [-s <secs>] [-t <secs>] [-d <fmt>] [-r <remote> [-b <branch>]]"
   echo "          [-m <msg>] [-l|-L <lines>] [-x <regex>] [-X <glob/list>] [-M] [-S] [-v] [-f] [-V] <target>"
   echo ""
   echo "Where <target> is the file or folder which should be watched. The target needs"
@@ -87,6 +87,8 @@ shelp() {
   echo " -s <secs>        After detecting a change to the watched file or directory,"
   echo "                  wait <secs> seconds until committing, to allow for more"
   echo "                  write actions of the same batch to finish; default is 2sec"
+  echo " -t <secs>        Timeout for critical Git operations (commit, pull, push)."
+  echo "                  Can also be set via GW_TIMEOUT environment variable; default is 60sec"
   echo " -d <fmt>         The format string used for the timestamp in the commit"
   echo "                  message; see 'man date' for details; default is "
   echo '                  "+%Y-%m-%d %H:%M:%S"'
@@ -199,7 +201,7 @@ cleanup() {
   verbose_echo "Cleanup function called. Exiting."
   # The lockfile descriptors (8 and 9) will be auto-released on exit
   # shellcheck disable=SC2317 # Code is reachable via trap
-  exit 0
+  exit "$1" # Pass the exit code from the caller (or 0 if unset)
 }
 
 # shellcheck disable=SC2329 # Function is used via trap
@@ -208,7 +210,7 @@ signal_handler() {
   # shellcheck disable=SC2317 # Code is reachable via trap
   stderr "Signal $1 received, shutting down."
   # shellcheck disable=SC2317 # Code is reachable via trap
-  exit 0 # This will trigger the EXIT trap
+  exit 0 # This will trigger the EXIT trap with status 0
 }
 
 # Tests for the availability of a command
@@ -256,7 +258,7 @@ check_git_config() {
 
 # --- Signal Trapping ---
 # Note: The trap for EXIT/INT/TERM is redefined later to include PID file cleanup
-trap "cleanup" EXIT # Ensure cleanup runs on script exit, for any reason
+trap "cleanup 0" EXIT # Ensure cleanup runs on script exit, for any reason
 trap "signal_handler INT" INT # Handle Ctrl+C
 trap "signal_handler TERM" TERM # Handle kill/systemd stop
 # ---------------------
@@ -303,7 +305,7 @@ fi
 # --- End Preliminary Path ---
 
 
-while getopts b:d:h:g:L:l:m:c:C:p:r:s:e:x:X:MRvSfV option; do # Process command line options
+while getopts b:d:h:g:L:l:m:c:C:p:r:s:t:e:x:X:MRvSfV option; do # Process command line options
   case "${option}" in
     b) BRANCH=${OPTARG} ;;
     d) DATE_FMT=${OPTARG} ;;
@@ -349,6 +351,7 @@ while getopts b:d:h:g:L:l:m:c:C:p:r:s:e:x:X:MRvSfV option; do # Process command 
     p | r) REMOTE=${OPTARG} ;;
     R) PULL_BEFORE_PUSH=1 ;;
     s) SLEEP_TIME=${OPTARG} ;;
+    t) TIMEOUT=${OPTARG} ;; # New: Set timeout
     S) USE_SYSLOG=1 ;;
     v)
       VERBOSE=1
@@ -514,10 +517,10 @@ if [ -n "${GLOB_EXCLUDE_PATTERN:-}" ]; then
   PROCESSED_GLOB_PATTERN=$(IFS=\|; echo "${PATTERN_ARRAY[*]}")
 
   # 4. Escape periods to treat them as literal dots in regex
-  PROCESSED_GLOB_PATTERN=${PROCESSED_GLOB_PATTERN//./\\.}
+  PROCESSED_PATTERN=${PROCESSED_PATTERN//./\\.}
 
   # 5. Convert glob stars `*` into the regex equivalent `.*`
-  PROCESSED_GLOB_PATTERN=${PROCESSED_GLOB_PATTERN//\*/.*}
+  PROCESSED_PATTERN=${PROCESSED_PATTERN//\*/.*}
 fi
 # --- End Conversion ---
 
@@ -757,7 +760,7 @@ fi
 
 # --- Prepare Pull/Push Command Strings (No eval needed here) ---
 PULL_CMD="" # Ensure PULL_CMD is initialized for set -u
-PUSH_CMD="" # Ensure PUSH_CMD is initialized for set -u
+PUSH_CMD="" # Ensure PULL_CMD is initialized for set -u
 
 if [ -n "${REMOTE:-}" ]; then        # are we pushing to a remote?
   verbose_echo "Push remote selected: $REMOTE"
@@ -784,11 +787,14 @@ if [ -n "${REMOTE:-}" ]; then        # are we pushing to a remote?
     if [ -n "$CURRENT_BRANCH_FOR_PULL" ]; then
       PULL_CMD=$(printf "%s pull --rebase %q %q" "$GIT" "$REMOTE" "$CURRENT_BRANCH_FOR_PULL")
     else
-      # When in detached HEAD state, pull fails to determine which branch to pull/rebase
-      # We still attempt to pull the remote's HEAD, or simply warn/skip.
-      # Let's use the explicit pull/rebase on a detached head commit, relying on git's behavior.
-      PULL_CMD=$(printf "%s pull --rebase %q" "$GIT" "$REMOTE")
-      stderr "Warning: Cannot determine current branch for pull (detached HEAD?). Using default 'git pull --rebase <remote>'."
+      # When in detached HEAD state, determine the most sensible branch to pull against
+      # 1. Use the branch specified by -b (since that's the push target)
+      # 2. Fallback to just the remote name (e.g., 'origin')
+      PULL_TARGET="${BRANCH:-}"
+      if [ -z "$PULL_TARGET" ]; then PULL_TARGET="$REMOTE"; fi
+
+      PULL_CMD=$(printf "%s pull --rebase %q %q" "$GIT" "$REMOTE" "$PULL_TARGET")
+      stderr "Warning: Cannot determine current branch for pull (detached HEAD?). Using explicit 'git pull --rebase %s %s'." "$REMOTE" "$PULL_TARGET"
     fi
   fi
 else
@@ -1190,7 +1196,7 @@ fi
 
 # Cleanup PID file on exit
 # Redefine trap to include PID file removal
-trap 'rm -f "$TIMER_PID_FILE"; cleanup' EXIT INT TERM
+trap 'rm -f "$TIMER_PID_FILE"; cleanup "$?"' EXIT INT TERM
 
 
 # main program loop: wait for changes and commit them
@@ -1263,7 +1269,9 @@ verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
 
 done
 
-verbose_echo "File watcher process ended (or failed). Exiting via loop termination."
+WATCHER_EXIT_CODE=$?
+verbose_echo "File watcher process ended (or failed) with exit code $WATCHER_EXIT_CODE. Exiting via loop termination."
 # Ensure PID file is removed if loop terminates unexpectedly
 rm -f "$TIMER_PID_FILE"
-exit 0 # Explicit exit to ensure cleanup trap runs
+# Exit with the watcher's exit code to signal failure if not 0
+exit "$WATCHER_EXIT_CODE"
