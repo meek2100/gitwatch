@@ -11,15 +11,28 @@
 #   any violations you want
 #   <!-- markdownlint-restore -->
 
-# Unordered list style
-MD004: false
+# Default state for all rules
+default: true
 
+# --- Rules to Disable ---
+# MD004: Unordered list style
+MD004: false
+# MD033: Inline HTML
+MD033: false
+# MD024: Allow duplicate headings (for CHANGELOG.md)
+MD024: false
+
+# --- Rules to Configure ---
+# MD007: Set unordered list indentation to 2 spaces
 MD007:
-  # Unordered list indentation
   indent: 2
 
-# We don't care about inline HTML
-MD033: false
+# MD013: Set line length to 90 (matches .editorconfig)
+# and disable line length checks for tables (for README.md)
+MD013:
+  line_length: 90
+  tables: false
 
-# Removing eval as recommended broke code; might fix later, but not now
-SC2294: false
+# MD049: Set emphasis style to UNDERSCORE (to match Prettier/existing files)
+MD049:
+  style: underscore

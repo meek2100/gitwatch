@@ -108,8 +108,8 @@ incorporating all changes **after** commit `5cdaeb49dc`._
 
 ### New Contributors (Since v0.5)
 
-- @meek2100 (Darin Theurer) performed the major refactor. *(Note: List any
-  other *new* contributors specifically to the v0.6 changes if applicable)*
+- @meek2100 (Darin Theurer) performed the major refactor. _(Note: List any
+  other \_new_ contributors specifically to the v0.6 changes if applicable)\_
 
 ## [0.5] - YYYY-MM-DD (Unreleased)
 
