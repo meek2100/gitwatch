@@ -32,6 +32,9 @@ repos:
       - id: debug-statements
       - id: end-of-file-fixer
       - id: trailing-whitespace
+      - id: fix-line-endings
+        types: [text]
+        exclude: \.md$
       - id: check-json
       - id: mixed-line-ending
       - id: check-merge-conflict
@@ -78,9 +81,6 @@ repos:
     hooks:
       - id: hadolint
         name: Lint Dockerfiles
-        # --- THIS IS THE FIX ---
-        # Ignore the "Pin versions" rule, which conflicts with
-        # the build process in Alpine 3.20+
         args: [--ignore, DL3018]
   - repo: https://github.com/NixOS/nixfmt
     rev: v1.1.0
