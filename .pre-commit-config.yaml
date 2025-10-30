@@ -1,9 +1,9 @@
 ---
 # REMOVED global 'files:' regex to expand coverage to all file types.
-exclude: ^(\.[^/]*cache/.*|demo/.*|debug/.*)$ # Kept your exclude regex
+exclude: ^(\.[^/]*cache/.*|demo/.*|debug/.*)$
 repos:
-  - repo: https://github.com/prettier/prettier
-    rev: "3.6.2"
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: "v3.6.2"
     hooks:
       - id: prettier
         types_or: [javascript, json, markdown, yaml, html, css]
@@ -40,7 +40,7 @@ repos:
       - id: fix-byte-order-marker
       - id: check-case-conflict
       - id: check-added-large-files
-        args: ["--maxkb=500"] # Safety net
+        args: ["--maxkb=500"]
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.37.1
     hooks:
