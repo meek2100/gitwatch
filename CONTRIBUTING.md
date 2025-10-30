@@ -18,7 +18,6 @@ for testing.
 2. **Install Core Dependencies:** You will need the runtime dependencies
    for `gitwatch` itself, plus the development dependencies for testing and
    linting.
-
    - **macOS (using Homebrew):**
      ```sh
      # Runtime deps
