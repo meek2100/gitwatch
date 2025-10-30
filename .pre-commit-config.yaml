@@ -42,7 +42,6 @@ repos:
     hooks:
       - id: yamllint
         args:
-          - "--no-warnings"
           - "-d {extends: relaxed, rules: {line-length: {max: 90}}}"
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
@@ -62,13 +61,12 @@ repos:
         args: ["-i", "2"]
         additional_dependencies:
           - setuptools
-        # Exclude diff-lines.bats as it keeps failing due to indentation errors, I haven't been able to solve yet.
-        exclude: ^tests/diff-lines.bats$
+        # exclude: ^tests/diff-lines.bats$
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
-        files: \.(sh|bats)$
+        files: \.(sh|bats|bash)$
         args: [--shell, bash]
   - repo: https://github.com/AleksaC/hadolint-py
     rev: v2.14.0
