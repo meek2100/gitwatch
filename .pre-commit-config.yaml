@@ -6,7 +6,7 @@ repos:
     rev: "v3.6.2"
     hooks:
       - id: prettier
-        # Configuration now handled entirely in .prettierrc.yaml
+        # Configuration is handled entirely in auto-discovered .prettierrc.yaml
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.45.0
     hooks:
@@ -41,12 +41,12 @@ repos:
     rev: v1.37.1
     hooks:
       - id: yamllint
-        # Removed complex inline arguments, relying on the existing .yamllint.yaml file
+        # Configuration is handled by auto-discovered .yamllint.yaml
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:
       - id: codespell
-        # Configuration now handled entirely in .codespellrc
+        # Configuration is handled by .codespellrc
         args:
           - --config
           - .codespellrc
@@ -58,7 +58,8 @@ repos:
     rev: v6.2.1
     hooks:
       - id: beautysh
-        args: ["--config", ".beautyshrc"]
+        # Configuration is handled by auto-discovered .beautyshrc.
+        args: []
         additional_dependencies:
           - setuptools
         exclude: ^tests/diff-lines.bats$
@@ -67,7 +68,8 @@ repos:
     hooks:
       - id: shellcheck
         files: \.(sh|bats|bash)$
-        args: ["--external-config", ".shellcheckrc"]
+        # Using the standard '--rcfile' flag which works with the .shellcheckrc file.
+        args: ["--rcfile", ".shellcheckrc"]
   - repo: https://github.com/AleksaC/hadolint-py
     rev: v2.14.0
     hooks:
