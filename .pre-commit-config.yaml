@@ -22,7 +22,7 @@ repos:
         additional_dependencies:
           - mdformat-toc
           - mdformat-beautysh
-          # - mdformat-config
+          - mdformat-config
           - mdformat-gfm
           - setuptools
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -46,11 +46,11 @@ repos:
       - id: check-docstring-first
       - id: fix-byte-order-marker
       - id: check-case-conflict
-      # REMOVE the pretty-format-json hook:
-      # - id: pretty-format-json
-      #   exclude: ^(.vscode|.devcontainer)
-      #   args:
-      #     - --no-sort-keys
+      - id: pretty-format-json
+        exclude: ^(.vscode|.devcontainer)
+        args:
+          # order of keys in manifest.json is "special"
+          - --no-sort-keys
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v4.0.0-alpha.8
     hooks:
@@ -61,18 +61,17 @@ repos:
       - id: yamllint
         args:
           - --no-warnings
-          # Correctly quoted rule string disabling braces and setting line length
-          - "-d {extends: relaxed, rules: {line-length: {max: 90}, braces: disable}}"
+          - -d
+          - "{extends: relaxed, rules: {line-length: {max: 90}}}"
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:
       - id: codespell
         # exclude: (\.md|apps.yaml|translations/.*.yaml)$
-  # Disabled docker-compose check
-  # - repo: https://github.com/IamTheFij/docker-pre-commit
-  #   rev: v3.0.1
-  #   hooks:
-  #     - id: docker-compose-check
+  - repo: https://github.com/IamTheFij/docker-pre-commit
+    rev: v3.0.1
+    hooks:
+      - id: docker-compose-check
   - repo: https://github.com/lovesegfault/beautysh.git
     rev: v6.2.1
     hooks:
