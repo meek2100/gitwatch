@@ -48,6 +48,7 @@ load 'bats-custom/startup-shutdown'
     assert_success "Push from local2 failed"
     local remote_commit2=$(git rev-parse HEAD) # Get the hash of the commit pushed by local2
 
+
     # Go back to the first local repo and make another change (file3)
     cd "$testdir/local/$TEST_SUBDIR_NAME"
     sleep 1 # Short delay before modifying
@@ -110,6 +111,7 @@ load 'bats-custom/startup-shutdown'
     local upstream_commit_hash=$(git rev-parse HEAD)
     run rm -rf local_ahead
 
+
     # 3. Go back to gitwatch repo (Local is now one commit behind remote)
     cd "$testdir/local/$TEST_SUBDIR_NAME"
     run git rev-parse origin/master
@@ -121,6 +123,7 @@ load 'bats-custom/startup-shutdown'
 
     # 4. Start gitwatch with -R and -r flag
     echo "# DEBUG: Starting gitwatch with -R on a stale repo" >&3
+
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -r origin -R "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
     GITWATCH_PID=$!
     sleep 1 # Allow watcher to initialize
@@ -269,7 +272,7 @@ load 'bats-custom/startup-shutdown'
     # 5. Assert: Log confirms no remote was selected (no error or pull/push messages)
     run cat "$output_file"
     assert_output --partial "No push remote selected."
-    assert_output --partial "Executing pull command:" "Should execute pull command"
+    refute_output --partial "Executing pull command:" "Should not execute pull command"
     refute_output --partial "Executing push command:" "Should not show a push command run"
 
     cd /tmp
@@ -320,6 +323,7 @@ load 'bats-custom/startup-shutdown'
     run cat "$output_file"
     assert_output --partial "HEAD is detached" "Should detect detached HEAD state"
     assert_output --partial "Executing push command: git push 'origin' HEAD:'master'" "Push command should use HEAD:branch format"
+
 
     # 9. Cleanup: Go back to master before teardown
     git checkout master &> /dev/null

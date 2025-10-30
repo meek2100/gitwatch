@@ -71,6 +71,7 @@ load 'bats-custom/startup-shutdown'
     assert_success
     assert_output --partial "Scripted auto-commit on change"
 
+
     cd /tmp
 }
 
@@ -88,6 +89,7 @@ load 'bats-custom/startup-shutdown'
 
     # 1. Start gitwatch with -f, logging all output
     # Note: Using WAITTIME from bats-custom/startup-shutdown.bash for the sleep duration
+
 
     "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -f "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
     GITWATCH_PID=$!
@@ -142,7 +144,8 @@ load 'bats-custom/startup-shutdown'
     local original_perms
 
     # 1. Get original permissions of the target directory
-    if [ "$RUNNER_OS" == "Linux" ]; then
+    if [ "$RUNNER_OS" == "Linux" ];
+    then
         original_perms=$(stat -c "%a" "$target_dir")
     else
         # Use stat -f "%A" for macOS/BSD permissions
@@ -155,6 +158,7 @@ load 'bats-custom/startup-shutdown'
 
     # 3. Run gitwatch on the now unwritable target directory
     run "${BATS_TEST_DIRNAME}/../gitwatch.sh" "$target_dir"
+
 
     # 4. Assert exit code 7 and the critical permission error message
     assert_failure "Gitwatch should exit with non-zero status on permission error"
@@ -225,4 +229,19 @@ load 'bats-custom/startup-shutdown'
     # 9. Cleanup: Abort the rebase so teardown can clean the repo
     git rebase --abort
     cd /tmp
+}
+
+@test "startup_shelp_flags: Help output contains all expected flags including new ones" {
+    # 1. Run gitwatch without arguments to get the help message
+    run "${BATS_TEST_DIRNAME}/../gitwatch.sh"
+    assert_failure # Should fail because no target is given (exit 0 after help is fine too)
+
+    # 2. Assert that the required flags are present
+    assert_output --partial "-s <secs>" "Missing debounce delay (-s)"
+    assert_output --partial "-t <secs>" "Missing timeout option (-t)"
+    assert_output --partial "-R" "Missing pull/rebase flag (-R)"
+    assert_output --partial "-M" "Missing skip if merging flag (-M)"
+    assert_output --partial "-f" "Missing commit on start flag (-f)"
+    assert_output --partial "-S" "Missing syslog flag (-S)"
+    assert_output --partial "-V" "Missing version flag (-V)"
 }

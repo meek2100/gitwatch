@@ -38,7 +38,8 @@ load 'bats-custom/startup-shutdown'
 
     # 1. Temporarily remove common binary directories from PATH to simulate 'timeout' missing
     # We remove coreutils locations where 'timeout' is usually found
-    export PATH="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr)?/s?bin' | tr '\n' ':')"
+    # Use a conservative filter to remove typical bin directories, but keep others like bats dependencies
+    export PATH="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr/local/)?(s)?bin' | tr '\n' ':')"
 
     # 2. Assert that 'timeout' is not found in the simulated PATH
     run command -v timeout
