@@ -79,3 +79,37 @@ load 'bats-custom/startup-shutdown'
 
     cd /tmp
 }
+
+# --- NEW TEST ---
+@test "commit_log_mode_change: -l flag logs file mode changes" {
+    cd "$testdir/local/$TEST_SUBDIR_NAME"
+
+    # 1. Create a file and commit it
+    local script_file="mode_test.sh"
+    echo "#!/bin/bash" > "$script_file"
+    git add "$script_file"
+    git commit -q -m "Add script file"
+    local initial_hash
+    initial_hash=$(git log -1 --format=%H)
+
+    # 2. Start gitwatch with -l
+    "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
+    GITWATCH_PID=$!
+    sleep 1 # Allow watcher to initialize
+
+    # 3. Change the file mode
+    chmod +x "$script_file"
+
+    # 4. Wait for the new commit to appear
+    run wait_for_git_change 20 0.5 git log -1 --format=%H
+    assert_success "Commit for mode change timed out"
+    assert_not_equal "$initial_hash" "$output" "Commit hash did not change"
+
+    # 5. Verify the commit message contains the mode change string
+    run git log -1 --pretty=%B
+    assert_success
+    assert_output --partial "$script_file:?: Mode changed to 100755" \
+        "Commit message did not contain the expected mode change string"
+
+    cd /tmp
+}

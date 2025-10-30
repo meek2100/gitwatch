@@ -524,6 +524,9 @@ if [ -n "${GLOB_EXCLUDE_PATTERN:-}" ]; then
 
   # 5. Convert glob stars `*` into the regex equivalent `.*`
   PROCESSED_GLOB_PATTERN=${PROCESSED_GLOB_PATTERN//\*/.*}
+
+  # 6. NEW: Convert glob question mark `?` into regex single-char wildcard `.`
+  PROCESSED_GLOB_PATTERN=${PROCESSED_GLOB_PATTERN//\?/.}
 fi
 # --- End Conversion ---
 
@@ -838,8 +841,16 @@ diff-lines() {
 
     # --- Match Headers and Update State ---
 
+    # NEW: Match `diff --git a/PATH b/PATH` for mode changes or renames
+    if [[ "$stripped_reply" =~ ^diff\ --git\ a/(.*)\ b/(.*) ]]; then
+      previous_path=$(_trim_spaces "$(_strip_color "${BASH_REMATCH[1]}")")
+      path=$(_trim_spaces "$(_strip_color "${BASH_REMATCH[2]}")")
+      current_file_path="$path" # Set current path immediately
+      line=""                   # Reset line number state
+      continue
+
     # Match '--- a/path' or '--- /dev/null' - Capture everything after 'a/' or '/dev/null'
-    if [[ "$stripped_reply" =~ ^---\ (a/)?(.*) ]]; then
+    elif [[ "$stripped_reply" =~ ^---\ (a/)?(.*) ]]; then
       # Capture the raw path (Group 2). Strip any potential trailing color codes.
       # FIX: Use explicit argument passing to fix SC2119/SC2120 and use pure Bash trim
       previous_path=$(_trim_spaces "$(_strip_color "${BASH_REMATCH[2]}")")
@@ -854,6 +865,7 @@ diff-lines() {
       # Capture the raw path (Group 2). Strip any potential trailing color codes.
       # FIX: Use explicit argument passing to fix SC2119/SC2120 and use pure Bash trim
       path=$(_trim_spaces "$(_strip_color "${BASH_REMATCH[2]}")")
+      current_file_path="$path" # Set current path
       # Ensure path is not /dev/null, which is technically possible but not relevant here
       if [[ "$path" == "/dev/null" ]]; then path=""; fi
       continue
@@ -863,6 +875,13 @@ diff-lines() {
       # Capture line number from BASH_REMATCH[2] (new_start group)
       line=${BASH_REMATCH[2]:-1} # Set starting line number for additions, default to 1
       continue
+
+    # NEW: Match file mode changes
+    elif [[ "$stripped_reply" =~ ^new\ mode\ ([0-9]+) ]]; then
+      echo "$current_file_path:?: Mode changed to ${BASH_REMATCH[1]}"
+      continue
+    elif [[ "$stripped_reply" =~ ^old\ mode\ ([0-9]+) ]]; then
+      continue # Ignore old mode line, wait for new mode line
     fi
 
     # --- Match Content Lines and Output ---
