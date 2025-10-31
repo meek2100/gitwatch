@@ -55,10 +55,11 @@ repos:
       - id: docker-compose-check
   #- repo: https://github.com/lovesegfault/beautysh
   - repo: https://github.com/meek2100/beautysh
-    rev: v6.4.1
+    rev: v6.4.3
     hooks:
       - id: beautysh
-        args: ["-i", "2"]
+        args: [--config, .beautyshrc]
+        # args: ["-i", "2"]
         # additional_dependencies:
         #   - setuptools
         exclude: ^tests/diff-lines.bats$
