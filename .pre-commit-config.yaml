@@ -54,7 +54,7 @@ repos:
     hooks:
       - id: docker-compose-check
   - repo: https://github.com/lovesegfault/beautysh
-    rev: v6.4.0
+    rev: v6.2.1
     hooks:
       - id: beautysh
         args: ["-i", "2"]
