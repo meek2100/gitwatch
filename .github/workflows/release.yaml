@@ -92,12 +92,6 @@ jobs:
           echo "$NOTES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Substitute Version in gitwatch.sh
-        run: |
-          VERSION_NUMBER=$(cat VERSION)
-          sed -i "s/%%GITWATCH_VERSION%%/${VERSION_NUMBER}/g" gitwatch.sh
-          echo "Substituted version ${VERSION_NUMBER} into gitwatch.sh"
-
       - name: Install Formatting Tools
         run: |
           npm install -g prettier

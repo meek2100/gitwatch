@@ -165,7 +165,48 @@ load 'bats-custom/startup-shutdown'
   cd /tmp
 }
 
-# --- NEW TEST (Gap 2) ---
+@test "commit_log_unlimited: -l 0 flag includes full long diff" {
+  local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  output_file=$(mktemp "$testdir/output.XXXXX")
+
+  # Start gitwatch directly in the background with -l 0 (unlimited)
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 0 "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
+  GITWATCH_PID=$!
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+  sleep 1
+
+  local initial_hash
+  initial_hash=$(git log -1 --format=%H)
+
+  # Generate 10 lines of content
+  local expected_total_lines=10
+  for i in $(seq 1 $expected_total_lines); do
+    echo "Line number $i for unlimited test" >> long_file_unlimited.txt
+  done
+
+  # Wait for commit
+  run wait_for_git_change 20 0.5 git log -1 --format=%H
+  assert_success "Commit timed out"
+  assert_not_equal "$initial_hash" "$output" "Commit hash did not change"
+
+  # Verify commit message: Should contain the full diff lines
+  run git log -1 --pretty=%B
+  assert_success
+
+  # 1. Assert that the summary message is NOT present
+  refute_output --partial "Too many lines changed"
+
+  # 2. Assert that the detailed diff line content IS present
+  assert_output --partial "Line number 1 for unlimited test"
+  assert_output --partial "Line number 6 for unlimited test"
+  assert_output --partial "Line number 10 for unlimited test"
+
+  cd /tmp
+}
+
 @test "commit_log_env_var_override: GW_LOG_LINE_LENGTH overrides default" {
   # 1. Set a short, custom line length
   export GW_LOG_LINE_LENGTH=10

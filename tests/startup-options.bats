@@ -353,3 +353,10 @@ load 'bats-custom/startup-shutdown'
   assert_output --partial "-S" "Missing syslog flag (-S)"
   assert_output --partial "-V" "Missing version flag (-V)"
 }
+
+@test "startup_help_h: -h flag prints help and exits with success" {
+  run "${BATS_TEST_DIRNAME}/../gitwatch.sh" -h
+  assert_success "Running gitwatch -h should exit successfully (code 0)"
+  assert_output --partial "Usage:"
+  assert_output --partial "gitwatch - watch file or directory and git commit all changes"
+}
