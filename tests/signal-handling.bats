@@ -27,7 +27,6 @@ load 'bats-custom/startup-shutdown'
   local GIT_DIR_PATH
   GIT_DIR_PATH=$(git rev-parse --absolute-git-dir)
   local LOCKFILE="$GIT_DIR_PATH/gitwatch.lock"
-  local TIMER_PID_FILE_GLOB="${TMPDIR:-/tmp}/gitwatch_timer_*.pid"
 
   # 2. Start gitwatch in the background
   # shellcheck disable=SC2154 # testdir is sourced via setup function
