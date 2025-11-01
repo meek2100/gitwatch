@@ -73,6 +73,7 @@ EXCLUDE_PATTERN="" # Raw regex from -x
 GLOB_EXCLUDE_PATTERN="" # Glob list from -X
 USE_SYSLOG=0
 USE_FLOCK=1 # Default to on, check for command availability below
+QUIET=0 # NEW: Quiet mode flag
 
 # Print a message about how to use this script
 shelp() {
@@ -80,7 +81,7 @@ shelp() {
   echo ""
   echo "Usage:"
   echo "${0##*/} [-s <secs>] [-t <secs>] [-d <fmt>] [-r <remote> [-b <branch>]]"
-  echo "          [-m <msg>] [-l|-L <lines>] [-x <regex>] [-X <glob/list>] [-M] [-S] [-v] [-f] [-V] <target>"
+  echo "          [-m <msg>] [-l|-L <lines>] [-x <regex>] [-X <glob/list>] [-M] [-S] [-v] [-q] [-f] [-V] <target>"
   echo ""
   echo "Where <target> is the file or folder which should be watched. The target needs"
   echo "to be in a Git repository, or in the case of a folder, it may also be the top"
@@ -131,6 +132,7 @@ shelp() {
   echo " -M               Prevent commits when there is an ongoing merge in the repo"
   echo " -S               Log all messages to syslog (daemon mode)."
   echo " -v               Run in verbose mode for debugging. Enables informational messages and command tracing (set -x)."
+  echo " -q               Quiet mode. Suppress all stdout and stderr output (overridden by -S)."
   echo " -V               Print version information and exit."
   echo " -x <regex>       Raw regex pattern to exclude files/directories from being monitored (backward compatible)."
   echo " -X <glob/list>   A comma-separated list of glob patterns to exclude (e.g., '*.log,tmp/'). Converted to regex and combined with -x."
@@ -154,6 +156,7 @@ shelp() {
 
 # print all arguments to stderr
 stderr() {
+  if [ "$QUIET" -eq 1 ]; then return 0; fi # NEW: Suppress output
   if [ "$USE_SYSLOG" -eq 1 ]; then
     logger -t "${0##*/}" -p daemon.error "$@" # Use script name as tag
   else
@@ -163,6 +166,7 @@ stderr() {
 
 # print all arguments to stdout if in verbose mode
 verbose_echo() {
+  if [ "$QUIET" -eq 1 ]; then return 0; fi # NEW: Suppress output
   if [ "$VERBOSE" -eq 1 ]; then
     if [ "$USE_SYSLOG" -eq 1 ]; then
       logger -t "${0##*/}" -p daemon.info "$@" # Use script name as tag
@@ -309,7 +313,7 @@ fi
 # --- End Preliminary Path ---
 
 
-while getopts b:d:h:g:L:l:m:c:C:p:r:s:t:e:x:X:MRvSfV option; do # Process command line options
+while getopts b:d:h:g:L:l:m:c:C:p:r:s:t:e:x:X:MRvSfVq option; do # Process command line options
   case "${option}" in
     b) BRANCH=${OPTARG} ;;
     d) DATE_FMT=${OPTARG} ;;
@@ -368,6 +372,7 @@ while getopts b:d:h:g:L:l:m:c:C:p:r:s:t:e:x:X:MRvSfV option; do # Process comman
     x) EXCLUDE_PATTERN=${OPTARG} ;; # Raw Regex
     X) GLOB_EXCLUDE_PATTERN=${OPTARG} ;; # Glob/List to be converted
     e) EVENTS=${OPTARG} ;;
+    q) QUIET=1 ;; # NEW: Set quiet mode
     *)
       stderr "Error: Option '${option}' does not exist."
       shelp
