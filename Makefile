@@ -6,12 +6,16 @@
 # Default target
 all: test
 
+# Determine OS-portable core count for parallel jobs
+# Default to 1 if detection fails
+NPROC ?= $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
+
 # Run the BATS test suite
 # We set BATS_LIB_PATH to include our custom helpers and the standard ones.
-# This command is based on your CI workflow.
+# This command mimics the CI workflow for fast, parallel execution.
 test:
-	@echo "Running BATS test suite..."
-	@BATS_LIB_PATH="./tests" bats tests/
+	@echo "Running BATS test suite in parallel on $(NPROC) cores..."
+	@BATS_LIB_PATH="./tests" find tests -name "*.bats" -print0 | xargs -0 -n1 -P "$(NPROC)" bats --tap
 
 # Run all pre-commit hooks against all files
 lint:
