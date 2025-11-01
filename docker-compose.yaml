@@ -68,5 +68,7 @@ services:
       COMMIT_ON_START: "false"
       # Set to "true" to enable verbose output for debugging (-v)
       VERBOSE: "false"
+      # NEW: Set to "true" to suppress all stdout/stderr output (-q)
+      QUIET: "false"
       # Set to "true" to log all messages to syslog (-S)
       USE_SYSLOG: "false"

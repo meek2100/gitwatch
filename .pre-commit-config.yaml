@@ -14,7 +14,7 @@ repos:
         name: Lint Markdown
         args:
           - --config
-          - .markdownlint.yaml
+          - .config/.markdownlint.yaml
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -41,14 +41,14 @@ repos:
     rev: v1.37.1
     hooks:
       - id: yamllint
-        args: []
+        args: ["--config-file", ".config/.yamllint.yaml"]
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:
       - id: codespell
         args:
           - "--config"
-          - ".codespellrc"
+          - ".config/.codespellrc"
   - repo: https://github.com/IamTheFij/docker-pre-commit
     rev: v3.0.1
     hooks:
@@ -57,7 +57,7 @@ repos:
     rev: v6.2.1
     hooks:
       - id: beautysh
-        args: ["-i", "2"]
+        args: ["--config", ".config/.beautyshrc"]
         additional_dependencies:
           - setuptools
         exclude: ^tests/diff-lines.bats$
@@ -72,15 +72,23 @@ repos:
     hooks:
       - id: shellcheck
         files: \.(sh|bats|bash)$
-        args: ["--rcfile", ".shellcheckrc"]
+        args: ["--rcfile", ".config/.shellcheckrc"]
   - repo: https://github.com/AleksaC/hadolint-py
     rev: v2.14.0
     hooks:
       - id: hadolint
         name: Lint Dockerfiles
-        args: [--config, .hadolint.yaml]
+        args: [--config, ".config/.hadolint.yaml"]
   - repo: https://github.com/NixOS/nixfmt
     rev: v1.1.0
     hooks:
       - id: nixfmt
         name: Format Nix files
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-powershell
+      - id: end-of-file-fixer
+        files: \.(ps1|bat)$
+      - id: trailing-whitespace
+        files: \.(ps1|bat)$

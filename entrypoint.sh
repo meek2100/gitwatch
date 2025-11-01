@@ -70,6 +70,7 @@ VERBOSE=${VERBOSE:-false}
 COMMIT_ON_START=${COMMIT_ON_START:-false}
 PASS_DIFFS=${PASS_DIFFS:-false} # New: Pass diffs to custom command (-C)
 USE_SYSLOG=${USE_SYSLOG:-false} # New: Log to Syslog (-S)
+QUIET=${QUIET:-false} # NEW: Quiet mode (-q)
 
 
 # --- Command Construction ---
@@ -129,9 +130,14 @@ if [ "${SKIP_IF_MERGING}" = "true" ]; then
   cmd+=( -M )
 fi
 
-if [ "${VERBOSE}" = "true" ]; then
+# --- NEW: Mutually exclusive logging flags ---
+if [ "${QUIET}" = "true" ]; then
+  cmd+=( -q )
+elif [ "${VERBOSE}" = "true" ]; then
+  # Only add verbose if quiet is not set
   cmd+=( -v )
 fi
+# --- End new logic ---
 
 if [ "${COMMIT_ON_START}" = "true" ]; then
   cmd+=( -f )

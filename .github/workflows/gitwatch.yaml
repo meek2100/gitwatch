@@ -115,3 +115,51 @@ jobs:
           find . -name "*.bats" -print0 | xargs -0 -n1 -P "$NPROC" bats --tap
 
           echo "Finished running tests"
+
+  windows-smoke-test:
+    name: Windows Installer Smoke Test
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+
+      - name: Substitute Version Number into gitwatch.sh
+        shell: bash
+        run: |
+          VERSION_NUMBER=$(cat VERSION)
+          sed -i "s/%%GITWATCH_VERSION%%/${VERSION_NUMBER}/g" gitwatch.sh
+          echo "Substituted version ${VERSION_NUMBER} into gitwatch.sh for testing."
+
+      - name: Run Windows Installer
+        shell: powershell
+        run: |
+          # The installer needs all 3 files in the same directory
+          # We need to copy gitwatch.sh into the examples/windows directory for the test
+          Copy-Item -Path ".\gitwatch.sh" -Destination ".\examples\windows\gitwatch.sh" -Force
+
+          # Run the installer script with Administrator privileges
+          Start-Process powershell -Verb RunAs -ArgumentList "-File .\examples\windows\install.ps1"
+
+          # Wait for the installer to finish and PATH to propagate
+          Write-Host "Waiting 30 seconds for installer and PATH to propagate..."
+          Start-Sleep -Seconds 30
+
+      - name: Verify gitwatch.bat --version
+        shell: powershell
+        run: |
+          # Reload the environment to get the new PATH
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+
+          Write-Host "Updated PATH: $env:Path"
+          Write-Host "Verifying gitwatch.bat is in PATH..."
+
+          # This command will fail if gitwatch.bat is not found in the path
+          Get-Command gitwatch.bat
+
+          Write-Host "Running gitwatch.bat --version..."
+
+          # This command will fail if the wrapper, WSL, or the script itself fails
+          gitwatch.bat --version

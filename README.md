@@ -72,6 +72,27 @@ That's really up to you, but here are some examples:
 
 `gitwatch` can be installed in various ways.
 
+### Windows 11 (via WSL Installer)
+
+`gitwatch` is fully supported on Windows 11 through the Windows Subsystem for Linux (WSL). A `.exe` installer is provided to make setup seamless.
+
+1.  **Download** the latest `gitwatch-setup.exe` from the [GitHub Releases page](https://github.com/gitwatch/gitwatch/releases/latest).
+2.  **Run** the installer. It will automatically:
+    - Request Administrator privileges.
+    - Check for and install WSL if it's not already present (this may take a few minutes).
+    - Install all required Linux dependencies (`git`, `flock`, `timeout`, `inotify-tools`) inside WSL.
+    - Install the `gitwatch.sh` script into WSL.
+    - Install a `gitwatch.bat` wrapper on your Windows system and add it to your `PATH`.
+
+After installation, you can open any Windows Command Prompt or PowerShell terminal and use `gitwatch` as if it were a native application:
+
+```
+# Example: Watch a directory in your Windows "Documents" folder
+gitwatch -r origin -b main "C:\Users\YourUser\Documents\MyNotes"
+```
+
+The wrapper automatically handles path translation, and `gitwatch` will use your existing Windows `.gitconfig` and SSH keys.
+
 ### From Source
 
 `gitwatch` can be installed from source by simply cloning the repository
@@ -220,6 +241,7 @@ The following environment variables are available for configuring the
 | `SKIP_IF_MERGING`   | `"false"`              | Set to `"true"` to prevent commits when a merge is in progress (`-M`).                                                            |
 | `COMMIT_ON_START`   | `"false"`              | Set to `"true"` to commit any pending changes on startup (`-f`).                                                                  |
 | `VERBOSE`           | `"false"`              | Set to `"true"` to enable verbose output for debugging (`-v`).                                                                    |
+| `QUIET`             | `"false"`              | Set to `"true"` to suppress all stdout/stderr output (`-q`). Overrides `VERBOSE`.                                                 |
 | `USE_SYSLOG`        | `"false"`              | Set to `"true"` to log all messages to syslog (`-S`).                                                                             |
 
 <!-- prettier-ignore-end -->
@@ -410,6 +432,7 @@ Where `<target>` is the file or folder to be watched.
 | `-f`   | _None_        | _None_                 | **Commit on Start.** Commits any pending staged changes before starting the watch loop.                                            |
 | `-S`   | _None_        | _None_                 | **Syslog.** Logs all messages to syslog (daemon mode) instead of stdout/stderr.                                                    |
 | `-v`   | _None_        | _None_                 | **Verbose.** Enables verbose logging for debugging (`set -x` if not using syslog).                                                 |
+| `-q`   | _None_        | _None_                 | **Quiet.** Suppress all stdout and stderr output (overridden by `-S`).                                                             |
 | `-V`   | _None_        | _None_                 | **Version.** Prints version information and exits.                                                                                 |
 
 ### Security Considerations
@@ -486,14 +509,23 @@ you have other calls in `rc.local` after the mentioned line, because the
 This service is designed to run in user space (`--user` flag).
 
 - If installed to a path other than `/usr/local/bin/gitwatch`, modify the
-  `ExecStart` path within `gitwatch@.service` to suit.
+  `ExecStart` path within `examples/gitwatch@.service` to suit.
 - Create the user systemd directory if it does not exist and copy the
   systemd service file:
-  `mkdir -p "$HOME/.config/systemd/user" && cp gitwatch@.service $HOME/.config/systemd/user`
+  `mkdir -p "$HOME/.config/systemd/user" && cp examples/gitwatch@.service $HOME/.config/systemd/user`
 - Start and enable the service for a given path and arguments by running
   the following command. The arguments are passed to the service after
   being escaped.
-  `systemctl --user --now enable gitwatch@$(systemd-escape -- "'-r url/to/repository' /path/to/folder").service`
+
+  ```
+  systemctl --user --now enable gitwatch@$(systemd-escape -- "'-r url/to/repository' /path/to/folder").service
+  ```
+
+  **Note on persistence:** By default, `systemd` user services are terminated when the user logs out. To ensure `gitwatch` runs even when you are not logged in, you must enable "lingering" for your user:
+
+  ```
+  loginctl enable-linger <your-username>
+  ```
 
 ## Other Articles
 

@@ -49,6 +49,7 @@ let
         commitOnStartFlag = getflag "-f" "commitOnStart" cfg;
         useSyslogFlag = getflag "-S" "useSyslog" cfg;
         verboseFlag = getflag "-v" "verbose" cfg;
+        quietFlag = getflag "-q" "quiet" cfg;
         passDiffsFlag = getflag "-C" "passDiffs" cfg;
         # Custom command args (special handling to use -c and override -m/-l if present)
         customCommandArgs =
@@ -78,7 +79,7 @@ let
             skipIfMergingFlag
             commitOnStartFlag
             useSyslogFlag
-            verboseFlag
+            (if cfg.quiet then quietFlag else verboseFlag)
             # Special handling for commit message: custom command overrides -m
             (if cfg.customCommand != null then customCommandArgs else messageArg)
             # The path must be the last argument
@@ -145,7 +146,8 @@ in
         sleepTime = 5;
         timeout = 120;
         useSyslog = true;
-        verbose = true;
+        verbose = false;
+        quiet = true;
         logDiffLines = 10;
         gitDir = "/mnt/data/.git";
         globExcludePattern = "*.log,temp/";
@@ -210,6 +212,11 @@ in
           };
           verbose = lib.mkOption {
             description = "If true, enable verbose output for debugging (-v).";
+            type = bool;
+            default = false;
+          };
+          quiet = lib.mkOption {
+            description = "If true, suppress all stdout/stderr output (-q). Overrides 'verbose'.";
             type = bool;
             default = false;
           };
