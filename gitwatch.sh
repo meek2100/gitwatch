@@ -29,7 +29,7 @@
 #       original work by Lester Buck
 #       (but heavily modified by now)
 #
-#   Requires the command 'inotifywait' (Linux) or 'fswatch' (macOS),
+#   Requires the command 'inotifywait' (Linux) or 'fswatch' (macOS/BSD),
 #   and 'git'. Checks for these and provides installation hints.
 #   'flock' is highly recommended for robustness and is checked for.
 #
@@ -142,7 +142,7 @@ shelp() {
   echo "It is therefore recommended to terminate the script before changing the repo's"
   echo "config and restarting it afterwards."
   echo ""
-  echo 'By default, gitwatch tries to use the binaries "git", "inotifywait" (or "fswatch" on macOS),'
+  echo 'By default, gitwatch tries to use the binaries "git", "inotifywait" (or "fswatch" on macOS/BSD),'
   echo "and \"flock\" (highly recommended for robust locking), expecting to find them in the PATH (it uses 'command -v' to check this"
   echo "and will abort with an error if they cannot be found). If you want to use"
   echo "binaries that are named differently and/or located outside of your PATH, you can"
@@ -396,10 +396,10 @@ fi
 # Use ${VAR:-} expansion for safety with set -u
 OS_TYPE=$(uname)
 if [ -z "${GW_INW_BIN:-}" ]; then
-  if [ "$OS_TYPE" != "Darwin" ]; then
+  if [ "$OS_TYPE" = "Linux" ]; then
     INW="inotifywait"
     if [ -z "${EVENTS:-}" ]; then EVENTS="close_write,move,move_self,delete,create,modify"; fi
-  else
+  elif [ "$OS_TYPE" = "Darwin" ] || [ "$OS_TYPE" = "FreeBSD" ] || [ "$OS_TYPE" = "OpenBSD" ]; then
     INW="fswatch"
     if [ -z "${EVENTS:-}" ]; then
       # default events specified via a mask, see
@@ -408,6 +408,10 @@ if [ -z "${GW_INW_BIN:-}" ]; then
       #                = 256 + 128+ 16 + 8 + 4 + 2
       EVENTS="414";
     fi
+  else
+    # Fallback for other systems, default to inotifywait
+    INW="inotifywait"
+    if [ -z "${EVENTS:-}" ]; then EVENTS="close_write,move,move_self,delete,create,modify"; fi
   fi
 else
   INW="$GW_INW_BIN"
@@ -420,8 +424,8 @@ for cmd in "$BASE_GIT_CMD" "$INW"; do
   is_command "$cmd" || {
     stderr "Error: Required command '$cmd' not found."
     # ... (Platform-specific hints remain the same) ...
-    if [ "$OS_TYPE" = "Darwin" ]; then
-      # macOS hints
+    if [ "$OS_TYPE" = "Darwin" ] || [ "$OS_TYPE" = "FreeBSD" ] || [ "$OS_TYPE" = "OpenBSD" ]; then
+      # macOS/BSD hints
       case "$cmd" in
         "$BASE_GIT_CMD") stderr "  Hint: Install Apple Command Line Tools ('xcode-select --install') or Homebrew ('brew install git')" ;;
         "$INW") stderr "  Hint: Install with Homebrew: 'brew install fswatch'" ;;
