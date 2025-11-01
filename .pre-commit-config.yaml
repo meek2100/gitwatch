@@ -61,12 +61,6 @@ repos:
         additional_dependencies:
           - setuptools
         exclude: ^tests/diff-lines.bats$
-  #- repo: https://github.com/meek2100/beautysh
-  #  rev: v6.4.2
-  #  hooks:
-  #    - id: beautysh
-  #      args: [--config, .beautyshrc]
-  #      exclude: ^gitwatch.sh$
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1
     hooks:
@@ -84,11 +78,3 @@ repos:
     hooks:
       - id: nixfmt
         name: Format Nix files
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
-    hooks:
-      - id: check-powershell
-      - id: end-of-file-fixer
-        files: \.(ps1|bat)$
-      - id: trailing-whitespace
-        files: \.(ps1|bat)$
