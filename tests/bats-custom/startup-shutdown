@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Source the global test config
+source "$(dirname "$BASH_SOURCE")/../test_config.sh"
+
 # Provides setup (default) and setup_with_spaces.
 
 # Common teardown function used by both setups
@@ -58,6 +61,11 @@ _common_teardown() {
 
 
 _common_setup() {
+  # If verbose logging is enabled in the config, redirect FD 3 to stdout
+  if [ "${TEST_VERBOSE:-false}" = "true" ]; then
+    exec 3>&1
+  fi
+
   local use_spaces=$1 # Argument: 1 for spaces, 0 for no spaces
 
   # Time to wait for gitwatch to respond
