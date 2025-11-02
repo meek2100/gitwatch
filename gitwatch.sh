@@ -478,7 +478,7 @@ if [ "$NO_LOCK" -eq 0 ]; then
 
     stderr "Error: Required command 'flock' not found for process locking.
 $flock_hint
-  Install 'flock' or re-run with the -n flag to disable locking and proceed."
+    Install 'flock' or re-run with the -n flag to disable locking and proceed."
     exit 2
   fi
 else
