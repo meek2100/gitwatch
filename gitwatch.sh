@@ -622,7 +622,7 @@ if ! [ -r "$TARGETDIR_ABS" ] || ! [ -w "$TARGETDIR_ABS" ] || ! [ -x "$TARGETDIR_
   fi
 
   stderr "========================================================================================="
-  stderr "⚠️  CRITICAL PERMISSION ERROR: Cannot Access Target Directory"
+  stderr "CRITICAL PERMISSION ERROR: Cannot Access Target Directory"
   stderr "========================================================================================="
   stderr "The application is running as user: $CURRENT_USER (UID $CURRENT_UID)"
   stderr "Attempted to access target directory: $TARGETDIR_ABS"
@@ -687,7 +687,7 @@ if ! [ -r "$GIT_DIR_PATH" ] || ! [ -x "$GIT_DIR_PATH" ]; then
   # ---------------------------------------------------
 
   stderr "========================================================================================="
-  stderr "⚠️  CRITICAL PERMISSION ERROR: Cannot Access Git Repository Metadata"
+  stderr "CRITICAL PERMISSION ERROR: Cannot Access Git Repository Metadata"
   stderr "========================================================================================="
   stderr "The application is running as user: $CURRENT_USER (UID $CURRENT_UID)"
   stderr "Attempted to access Git directory: $GIT_DIR_PATH"
