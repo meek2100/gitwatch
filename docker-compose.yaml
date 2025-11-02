@@ -74,3 +74,5 @@ services:
       USE_SYSLOG: "false"
       # NEW: Set to "true" to disable file locking (-n).
       DISABLE_LOCKING: "false"
+      # NEW: Overrides the default 150-character truncation for commit log lines
+      GW_LOG_LINE_LENGTH: 150

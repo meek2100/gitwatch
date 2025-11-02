@@ -249,8 +249,8 @@ The following environment variables are available for configuring the
 | `VERBOSE`            | `"false"`              | Set to `"true"` to enable verbose output for debugging (`-v`).                                                                    |
 | `QUIET`              | `"false"`              | Set to `"true"` to suppress all stdout/stderr output (`-q`). Overrides `VERBOSE`.                                                 |
 | `USE_SYSLOG`         | `"false"`              | Set to `"true"` to log all messages to syslog (`-S`).                                                                             |
-| `DISABLE_LOCKING`    | `"false"`              | **NEW.** Set to `"true"` to disable file locking (`-n`). Bypasses `flock` dependency check.                                       |
-| `GW_LOG_LINE_LENGTH` | `150`                  | **NEW.** Overrides the default 150-character truncation for lines in the `-l`/`-L` commit log.                                    |
+| `DISABLE_LOCKING`    | `"false"`              | Set to `"true"` to disable file locking (`-n`). Bypasses `flock` dependency check.                                                |
+| `GW_LOG_LINE_LENGTH` | `150`                  | Overrides the default 150-character truncation for lines in the `-l`/`-L` commit log.                                             |
 
 <!-- prettier-ignore-end -->
 

@@ -62,6 +62,8 @@ USER_EXCLUDE_PATTERN=${EXCLUDE_PATTERN:-""}
 # New: Read the raw regex pattern (for -x)
 RAW_EXCLUDE_REGEX=${RAW_EXCLUDE_REGEX:-""}
 EVENTS=${EVENTS:-""}
+# NEW: Log line length (read by gitwatch.sh from env)
+GW_LOG_LINE_LENGTH=${GW_LOG_LINE_LENGTH:-}
 
 # Boolean flags (set to "true" to enable)
 PULL_BEFORE_PUSH=${PULL_BEFORE_PUSH:-false}
@@ -163,6 +165,12 @@ echo "Starting gitwatch with the following arguments:"
 printf "%q " "/app/gitwatch.sh" "${cmd[@]}"
 echo # Add a newline for cleaner logging
 echo "-------------------------------------------------"
+
+# NEW: Export the log line length variable so gitwatch.sh can read it
+if [ -n "${GW_LOG_LINE_LENGTH}" ]; then
+  export GW_LOG_LINE_LENGTH
+  echo "Exporting GW_LOG_LINE_LENGTH=${GW_LOG_LINE_LENGTH}"
+fi
 
 # Use 'gosu' or 'exec' to run the command, replacing the entrypoint shell process.
 # This ensures that signals (like TERM) go directly to gitwatch.sh (PID 1 best practice).
