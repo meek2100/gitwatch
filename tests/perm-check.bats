@@ -21,8 +21,7 @@ load 'bats-custom/startup-shutdown'
   local original_perms
 
   # 1. Get original permissions of the .git directory
-  if [ "$RUNNER_OS" == "Linux" ];
-  then
+  if [ "$RUNNER_OS" == "Linux" ]; then
     original_perms=$(stat -c "%a" "$GIT_DIR_PATH")
   else
     original_perms=$(stat -f "%A" "$GIT_DIR_PATH")
@@ -38,7 +37,7 @@ load 'bats-custom/startup-shutdown'
   # 4. Assert exit code 7 and the critical permission error message
   assert_failure "Gitwatch should exit with non-zero status on critical permission error"
   assert_exit_code 7 "Gitwatch should exit with code 7 (Critical Permission Error)"
-  assert_output --partial "⚠️  CRITICAL PERMISSION ERROR: Cannot Access Git Repository Metadata"
+  assert_output --partial "CRITICAL PERMISSION ERROR: Cannot Access Git Repository Metadata"
   assert_output --partial "permissions on the Git repository's metadata folder"
 
   # 5. Cleanup: Restore original permissions *before* teardown runs
@@ -55,8 +54,7 @@ load 'bats-custom/startup-shutdown'
   local original_perms
 
   # 1. Get original permissions of the target directory
-  if [ "$RUNNER_OS" == "Linux" ];
-  then
+  if [ "$RUNNER_OS" == "Linux" ]; then
     original_perms=$(stat -c "%a" "$target_dir")
   else
     original_perms=$(stat -f "%A" "$target_dir")
@@ -72,7 +70,7 @@ load 'bats-custom/startup-shutdown'
   # 4. Assert exit code 7 and the critical permission error message
   assert_failure "Gitwatch should exit with non-zero status on critical permission error"
   assert_exit_code 7 "Gitwatch should exit with code 7 (Critical Permission Error)"
-  assert_output --partial "⚠️  CRITICAL PERMISSION ERROR: Cannot Access Target Directory"
+  assert_output --partial "CRITICAL PERMISSION ERROR: Cannot Access Target Directory"
   assert_output --partial "permissions on the target directory itself"
 
   # 5. Cleanup: Restore original permissions *before* teardown runs
