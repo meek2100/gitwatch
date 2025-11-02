@@ -30,8 +30,8 @@
 #       (but heavily modified by now)
 #
 #   Requires the command 'inotifywait' (Linux) or 'fswatch' (macOS/BSD),
-#   and 'git'. Checks for these and provides installation hints.
-#   'flock' is highly recommended for robustness and is checked for.
+#   'git', 'timeout', and 'flock'.
+#   Checks for these and provides installation hints.
 #
 
 # --- Production Hardening ---
@@ -72,8 +72,8 @@ EVENTS="" # User-defined events
 EXCLUDE_PATTERN="" # Raw regex from -x
 GLOB_EXCLUDE_PATTERN="" # Glob list from -X
 USE_SYSLOG=0
-USE_FLOCK=1 # Default to on, check for command availability below
 QUIET=0 # NEW: Quiet mode flag
+NO_LOCK=0 # NEW: No-lock flag
 
 # Print a message about how to use this script
 shelp() {
@@ -81,7 +81,7 @@ shelp() {
   echo ""
   echo "Usage:"
   echo "${0##*/} [-s <secs>] [-t <secs>] [-d <fmt>] [-r <remote> [-b <branch>]]"
-  echo "          [-m <msg>] [-l|-L <lines>] [-x <regex>] [-X <glob/list>] [-M] [-S] [-v] [-q] [-f] [-V] <target>"
+  echo "          [-m <msg>] [-l|-L <lines>] [-x <regex>] [-X <glob/list>] [-M] [-S] [-v] [-q] [-n] [-f] [-V] <target>"
   echo ""
   echo "Where <target> is the file or folder which should be watched. The target needs"
   echo "to be in a Git repository, or in the case of a folder, it may also be the top"
@@ -133,6 +133,7 @@ shelp() {
   echo " -S               Log all messages to syslog (daemon mode)."
   echo " -v               Run in verbose mode for debugging. Enables informational messages and command tracing (set -x)."
   echo " -q               Quiet mode. Suppress all stdout and stderr output (overridden by -S)."
+  echo " -n               Disable file locking. Bypasses the 'flock' dependency check."
   echo " -V               Print version information and exit."
   echo " -x <regex>       Raw regex pattern to exclude files/directories from being monitored (backward compatible)."
   echo " -X <glob/list>   A comma-separated list of glob patterns to exclude (e.g., '*.log,tmp/'). Converted to regex and combined with -x."
@@ -145,7 +146,7 @@ shelp() {
   echo "config and restarting it afterwards."
   echo ""
   echo 'By default, gitwatch tries to use the binaries "git", "inotifywait" (or "fswatch" on macOS/BSD),'
-  echo "and \"flock\" (highly recommended for robust locking), expecting to find them in the PATH (it uses 'command -v' to check this"
+  echo "and \"flock\" (required for robust locking), expecting to find them in the PATH (it uses 'command -v' to check this"
   echo "and will abort with an error if they cannot be found). If you want to use"
   echo "binaries that are named differently and/or located outside of your PATH, you can"
   echo "define replacements in the environment variables GW_GIT_BIN, GW_INW_BIN, and"
@@ -313,7 +314,7 @@ fi
 # --- End Preliminary Path ---
 
 
-while getopts b:d:h:g:L:l:m:c:C:p:r:s:t:e:x:X:MRvSfVq option; do # Process command line options
+while getopts b:d:h:g:L:l:m:c:C:p:r:s:t:e:x:X:MRvSfVqn option; do # Process command line options
   case "${option}" in
     b) BRANCH=${OPTARG} ;;
     d) DATE_FMT=${OPTARG} ;;
@@ -373,6 +374,7 @@ while getopts b:d:h:g:L:l:m:c:C:p:r:s:t:e:x:X:MRvSfVq option; do # Process comma
     X) GLOB_EXCLUDE_PATTERN=${OPTARG} ;; # Glob/List to be converted
     e) EVENTS=${OPTARG} ;;
     q) QUIET=1 ;; # NEW: Set quiet mode
+    n) NO_LOCK=1 ;; # NEW: Set no-lock mode
     *)
       stderr "Error: Option '${option}' does not exist."
       shelp
@@ -456,39 +458,42 @@ if [ "$USE_SYSLOG" -eq 1 ] && ! is_command "logger"; then
   stderr "Error: Required command 'logger' not found (for -S syslog option)."
   exit 2
 fi
+
+# --- Check for 'flock' dependency ---
+# Use GW_FLOCK_BIN if set, otherwise default to "flock"
+if [ -z "${GW_FLOCK_BIN:-}" ]; then FLOCK="flock"; else FLOCK="$GW_FLOCK_BIN"; fi
+
+# Only check for flock if locking is *not* disabled
+if [ "$NO_LOCK" -eq 0 ]; then
+  if ! is_command "$FLOCK"; then
+    # --- Platform-specific hint ---
+    flock_hint=""
+    if [ "$OS_TYPE" = "Darwin" ]; then
+      flock_hint="  Hint: Install with Homebrew: 'brew install flock'"
+    else
+      # Assume Linux/other Unix-like
+      flock_hint="  Hint: Install 'flock' (e.g., 'apt install util-linux' or 'dnf install util-linux')."
+    fi
+    # --- End platform-specific hint ---
+
+    stderr "Error: Required command 'flock' not found for process locking.
+$flock_hint
+  Install 'flock' or re-run with the -n flag to disable locking and proceed."
+    exit 2
+  fi
+else
+  verbose_echo "File locking explicitly disabled via -n flag."
+fi
+# --- End flock check ---
+
 # Add check for hash command needed for tmpdir fallback
-if ! is_command "sha256sum" && ! is_command "md5sum"; then
+if [ "$NO_LOCK" -eq 0 ] && ! is_command "sha256sum" && ! is_command "md5sum"; then
   # Only warn if flock *is* available, as the hash is only needed for the fallback logic
   if is_command "$FLOCK"; then
     stderr "Warning: Neither 'sha256sum' nor 'md5sum' found. Lockfile fallback to /tmp might use less unique names."
   fi
 fi
 unset cmd BASE_GIT_CMD # Clean up
-
-# --- Check for optional 'flock' dependency ---
-# Use GW_FLOCK_BIN if set, otherwise default to "flock"
-if [ -z "${GW_FLOCK_BIN:-}" ]; then FLOCK="flock"; else FLOCK="$GW_FLOCK_BIN"; fi
-
-if ! is_command "$FLOCK"; then
-  USE_FLOCK=0
-
-  # --- Platform-specific hint ---
-  flock_hint=""
-  if [ "$OS_TYPE" = "Darwin" ]; then
-    flock_hint="  Hint: Install with Homebrew: 'brew install flock'"
-  else
-    # Assume Linux/other Unix-like
-    flock_hint="  Hint: Install 'flock' (e.g., 'apt install util-linux' or 'dnf install util-linux')."
-  fi
-  # --- End platform-specific hint ---
-
-  stderr "Warning: 'flock' command not found.
-$flock_hint
-Proceeding without file locking. This may lead to commit race conditions during rapid file changes
-or allow multiple gitwatch instances to run on the same repository, potentially causing
-  errors or duplicate commits."
-fi
-# --- End flock check ---
 verbose_echo "Dependency checks complete."
 
 
@@ -711,7 +716,7 @@ LOCKFILE_BASENAME="gitwatch"
 
 # Check for write permission. If it fails, fall back to $TMPDIR
 # This handles the case where Write permission was missing on $GIT_DIR_PATH (the check above passed)
-if [ "$USE_FLOCK" -eq 1 ]; then
+if [ "$NO_LOCK" -eq 0 ]; then
   if ! touch "$LOCKFILE_DIR/gitwatch.lock.tmp" 2>/dev/null; then
     verbose_echo "Warning: Cannot write lockfile to $LOCKFILE_DIR. Falling back to temporary directory."
     # Use $TMPDIR if set, otherwise /tmp
@@ -741,7 +746,7 @@ LOCKFILE="$LOCKFILE_DIR/$LOCKFILE_BASENAME.lock"
 COMMIT_LOCKFILE="$LOCKFILE_DIR/$LOCKFILE_BASENAME.commit.lock"
 # --- End tmpdir Fallback ---
 
-if [ "$USE_FLOCK" -eq 1 ]; then
+if [ "$NO_LOCK" -eq 0 ]; then
   # Open main lockfile on FD 9. Lock is held for the script's lifetime.
   # FD 9 is chosen arbitrarily, avoid 0, 1, 2.
   exec 9>"$LOCKFILE"
@@ -1188,7 +1193,7 @@ _perform_commit() {
 
 # Wrapper for perform_commit that uses a lock to prevent concurrent runs
 perform_commit() {
-  if [ "$USE_FLOCK" -eq 0 ]; then
+  if [ "$NO_LOCK" -eq 1 ]; then
     _perform_commit # Run without lock
     local nocommit_status=$?
     if [ $nocommit_status -ne 0 ]; then
@@ -1229,14 +1234,20 @@ fi
 # --- Debounce Timer PID File ---
 # Using a file to store the PID of the *active* timer subshell
 # Use sha256sum for uniqueness if available
-if is_command "sha256sum"; then
-  TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | sha256sum | awk '{print $1}').pid"
-elif is_command "md5sum"; then
-  TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | md5sum | awk '{print $1}').pid"
+if [ "$NO_LOCK" -eq 0 ]; then
+  if is_command "sha256sum"; then
+    TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | sha256sum | awk '{print $1}').pid"
+  elif is_command "md5sum"; then
+    TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | md5sum | awk '{print $1}').pid"
+  else
+    # Fallback if no hash command found
+    TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_${GIT_DIR_PATH//\//_}.pid"
+  fi
 else
-  # Fallback if no hash command found
-  TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_${GIT_DIR_PATH//\//_}.pid"
+  # If locking is disabled, we don't need a unique PID file, but we still need one
+  TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(date +%s%N).pid"
 fi
+
 
 # Cleanup PID file on exit
 # Redefine trap to include PID file removal

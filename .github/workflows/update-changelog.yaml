@@ -7,8 +7,8 @@ on:
       - master # Only when the target branch is master
 
 permissions:
-  contents: write # Needed to commit the changelog update
-  pull-requests: read # Needed to get PR details
+  contents: write # Needed to create/push branches and create PRs
+  pull-requests: write # Needed to create a PR
 
 jobs:
   update_changelog:
@@ -16,16 +16,6 @@ jobs:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          # Check out the master branch explicitly
-          ref: master
-          token: ${{ secrets.GITHUB_TOKEN }}
-          # Fetch depth 0 to ensure we have the full history if needed,
-          # though not strictly necessary for just adding a line.
-          fetch-depth: 0
-
       - name: Get PR Details
         id: pr_details
         run: |
@@ -35,6 +25,24 @@ jobs:
           # Simple format: "- PR Title (#Number) by @Author"
           CHANGELOG_ENTRY="- ${PR_TITLE} (#${PR_NUMBER}) by @${PR_AUTHOR}"
           echo "entry=${CHANGELOG_ENTRY}" >> $GITHUB_OUTPUT
+          echo "branch_name=chore/changelog-pr-${PR_NUMBER}" >> $GITHUB_OUTPUT
+
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          # Check out the master branch explicitly
+          ref: master
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Create New Branch
+        run: |
+          git checkout -b ${{ steps.pr_details.outputs.branch_name }}
+
+      - name: Configure Git User
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
       - name: Update CHANGELOG.md
         run: |
@@ -67,8 +75,6 @@ jobs:
           # Check if awk actually inserted the line (basic check: file size difference)
           if [ "$(wc -c < "${CHANGELOG_FILE}")" -eq "$(wc -c < "${CHANGELOG_FILE}.tmp")" ]; then
              echo "Warning: awk may not have inserted the entry. Header might be missing or duplicated."
-             # Fallback: Append entry just in case awk failed silently (less ideal formatting)
-             # echo "$NEW_ENTRY" >> "${CHANGELOG_FILE}.tmp"
           fi
 
           mv "${CHANGELOG_FILE}.tmp" "${CHANGELOG_FILE}"
@@ -83,16 +89,26 @@ jobs:
           prettier --write CHANGELOG.md
           echo "Formatted CHANGELOG.md"
 
-      - name: Commit and Push Updated Changelog
+      - name: Commit and Push Updated Changelog to New Branch
         run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add CHANGELOG.md
           # Check if the changelog was actually modified
           if git diff --staged --quiet; then
             echo "No changes detected in CHANGELOG.md."
           else
             git commit -m "chore: Update CHANGELOG.md for PR #${{ github.event.pull_request.number }}"
-            # Push back to the master branch
-            git push origin master
+            # Push to the new branch
+            git push origin ${{ steps.pr_details.outputs.branch_name }}
           fi
+
+      - name: Create Pull Request
+        # Only run if the commit was actually pushed
+        if: steps.commit_files.outputs.committed == 'true'
+        uses: repo-sync/pull-request@v2
+        with:
+          source_branch: ${{ steps.pr_details.outputs.branch_name }}
+          destination_branch: "master"
+          pr_title: "chore: Update CHANGELOG.md for PR #${{ github.event.pull_request.number }}"
+          pr_body: "Automated changelog update from #${{ github.event.pull_request.number }}."
+          pr_reviewer: "${{ github.event.pull_request.user.login }}"
+          token: ${{ secrets.GITHUB_TOKEN }}
