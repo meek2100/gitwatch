@@ -36,10 +36,11 @@ load 'bats-custom/startup-shutdown'
   local startup_commit_hash=$output
   assert_not_equal "$initial_commit_hash" "$startup_commit_hash" "Commit hash should change after startup commit"
 
-  # 5. Verify the content of the commit message (should be default)
+  # 5. Verify the content of the commit message
   run git log -1 --pretty=%B
   assert_success
-  assert_output --partial "Scripted auto-commit on change"
+  # The commit message logic will use the 'file changes' summary
+  assert_output --partial "File changes detected:  M initial_file.txt"
 
   cd /tmp
 }
@@ -73,13 +74,13 @@ load 'bats-custom/startup-shutdown'
   # 5. Verify the local commit message
   run git log -1 --pretty=%B
   assert_success
-  assert_output --partial "Scripted auto-commit on change"
+  assert_output --partial "File changes detected:  M initial_file.txt"
 
   cd /tmp
 }
 
-# --- NEW TEST: -f with staged and unstaged changes ---
-@test "startup_commit_f_staged_and_unstaged: -f commits staged changes and leaves unstaged/untracked" {
+# --- CORRECTED TEST: -f with staged and unstaged changes ---
+@test "startup_commit_f_all_changes: -f flag commits staged, unstaged, and untracked files" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -115,25 +116,18 @@ load 'bats-custom/startup-shutdown'
   local startup_commit_hash=$output
   assert_not_equal "$initial_commit_hash" "$startup_commit_hash" "Commit hash should change after startup commit"
 
-  # 7. Verify only the STAGED file was committed
-  run git log -1 --pretty=%B
+  # 7. Verify all files were committed
+  run git log -1 --name-only --pretty=format:
   assert_success
   assert_output --partial "staged_file.txt"
-  refute_output --partial "initial_file.txt" # This file was only modified/unstaged
+  assert_output --partial "initial_file.txt" # This was unstaged, should be committed
+  assert_output --partial "untracked_file.txt" # This was untracked, should be committed
 
   # 8. Verify the local status after the commit:
-  # - staged_file.txt is committed (clean)
-  # - initial_file.txt has an UNSTAGED change (M)
-  # - untracked_file.txt is still UNTRACKED (?)
+  # The working directory should be CLEAN
   run git status --porcelain
   assert_success
-  assert_output --regexp "^ M initial_file\.txt" "Unstaged modification should remain unstaged (M)"
-  assert_output --partial "?? untracked_file.txt" "Untracked file should remain untracked"
-  refute_output --partial "staged_file.txt" "Staged file should be clean after commit"
-
-  # 9. Cleanup the remaining files manually for teardown
-  git reset --hard HEAD -q
-  rm -f untracked_file.txt
+  assert_output "" "Working directory should be clean after -f commit"
 
   cd /tmp
 }
@@ -248,8 +242,7 @@ load 'bats-custom/startup-shutdown'
   local original_perms
 
   # 1. Get original permissions of the target directory
-  if [ "$RUNNER_OS" == "Linux" ];
-  then
+  if [ "$RUNNER_OS" == "Linux" ]; then
     original_perms=$(stat -c "%a" "$target_dir")
   else
     # Use stat -f "%A" for macOS/BSD permissions
@@ -325,7 +318,6 @@ load 'bats-custom/startup-shutdown'
 
   # 7. Assert: Remote hash has NOT changed (Push skipped due to pull failure)
   run git rev-parse origin/master
-
   assert_success
   assert_equal "$initial_remote_hash" "$output" "Remote hash should NOT change (push should have been skipped)"
 
