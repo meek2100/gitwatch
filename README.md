@@ -9,6 +9,7 @@
 - [gitwatch](#gitwatch)
   - [What to use it for?](#what-to-use-it-for)
   - [Installation](#installation)
+    - [Windows 11 (via WSL Installer)](#windows-11-via-wsl-installer)
     - [From Source](#from-source)
     - [Releases](#releases)
       - [Update](#update)
@@ -90,7 +91,7 @@ A `.exe` installer is provided to make setup seamless.
 After installation, you can open any Windows Command Prompt or PowerShell terminal and use
 `gitwatch` as if it were a native application:
 
-```
+```shell
 # Example: Watch a directory in your Windows "Documents" folder
 gitwatch -r origin -b main "C:\Users\YourUser\Documents\MyNotes"
 ```
@@ -522,13 +523,15 @@ This service is designed to run in user space (`--user` flag).
   the following command. The arguments are passed to the service after
   being escaped.
 
-  ```
+  ```shell
   systemctl --user --now enable gitwatch@$(systemd-escape -- "'-r url/to/repository' /path/to/folder").service
   ```
 
-  **Note on persistence:** By default, `systemd` user services are terminated when the user logs out. To ensure `gitwatch` runs even when you are not logged in, you must enable "lingering" for your user:
+  **Note on persistence:** By default, `systemd` user services are
+  terminated when the user logs out. To ensure `gitwatch` runs
+  even when you are not logged in, you must enable "lingering" for your user:
 
-  ```
+  ```shell
   loginctl enable-linger <your-username>
   ```
 
