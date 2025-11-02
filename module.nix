@@ -53,6 +53,13 @@ let
         passDiffsFlag = getflag "-C" "passDiffs" cfg;
         disableLockingFlag = getflag "-n" "disableLocking" cfg; # NEW: No-lock flag
 
+        # NEW: Environment variable for log line length
+        logLineLengthEnv =
+          if cfg.logLineLength != null then
+            "GW_LOG_LINE_LENGTH=${lib.strings.escapeShellArg (toString cfg.logLineLength)}"
+          else
+            "";
+
         # Custom command args (special handling to use -c and override -m/-l if present)
         customCommandArgs =
           if cfg.customCommand != null then
@@ -123,7 +130,7 @@ let
           ++ lib.optionals pkgs.stdenv.isDarwin [ fswatch ];
         script = ''
           ${fetcher}
-          gitwatch ${allArgs}
+          ${logLineLengthEnv} gitwatch ${allArgs}
         '';
         serviceConfig.User = cfg.user;
       }
@@ -151,7 +158,8 @@ in
         useSyslog = true;
         verbose = false;
         quiet = true;
-        disableLocking = false; # NEW
+        disableLocking = false;
+        logLineLength = 100;
         logDiffLines = 10;
         gitDir = "/mnt/data/.git";
         globExcludePattern = "*.log,temp/";
@@ -283,6 +291,14 @@ in
           };
           logDiffLines = lib.mkOption {
             description = "Log actual changes up to a given number of lines, 0 for unlimited (-l).";
+            type = nullOr (oneOf [
+              str
+              int
+            ]);
+            default = null;
+          };
+          logLineLength = lib.mkOption {
+            description = "Set max line length for -l/-L commit logs (GW_LOG_LINE_LENGTH).";
             type = nullOr (oneOf [
               str
               int

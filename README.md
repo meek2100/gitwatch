@@ -227,28 +227,30 @@ Here's a breakdown of the important parts of the `docker-compose.yml` file:
 The following environment variables are available for configuring the
 `gitwatch` container:
 
-| Variable            | Default Value          | Description                                                                                                                       |
-| :------------------ | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------------- |
-| `PUID`              | `1000`                 | **Optional.** Sets the User ID (UID) for the container's non-root user to match the host user, preventing file permission issues. |
-| `PGID`              | `(blank)`              | **Optional but Recommended.** Sets the Group ID (GID) for the container's user. Run `id -g` on your host to find this value.      |
-| `GIT_WATCH_DIR`     | `/app/watched-repo`    | The directory inside the container to watch for changes. This must match the container path you set in the `volumes` section.     |
-| `GIT_REMOTE`        | `origin`               | The name of the remote repository to push to.                                                                                     |
-| `GIT_BRANCH`        | `main`                 | The branch to push to.                                                                                                            |
-| `GIT_EXTERNAL_DIR`  | `""`                   | Use with the `-g` flag (e.g., `/app/.git`) to specify an external Git directory.                                                  |
-| `PULL_BEFORE_PUSH`  | `"false"`              | Set to `"true"` to run `git pull --rebase` before every push (`-R`).                                                              |
-| `SLEEP_TIME`        | `2`                    | Time in seconds to wait after a file change before committing (`-s`).                                                             |
-| `COMMIT_MSG`        | `"Auto-commit: %d"`    | The commit message format (`-m`). Ignored if `COMMIT_CMD` is set.                                                                 |
-| `DATE_FMT`          | `"+%Y-%m-%d %H:%M:%S"` | The date format used in the commit message (`-d`).                                                                                |
-| `COMMIT_CMD`        | `""`                   | Custom shell command to generate the entire commit message (`-c`). Overrides `COMMIT_MSG`.                                        |
-| `PASS_DIFFS`        | `"false"`              | Set to `"true"` to pipe the list of changed files to `COMMIT_CMD` (`-C`).                                                         |
-| `EVENTS`            | `""`                   | Events passed to the underlying watcher tool (`-e`). Uses platform defaults if empty.                                             |
-| `EXCLUDE_PATTERN`   | `""`                   | A comma-separated list of glob patterns to exclude from monitoring (`-X`).                                                        |
-| `RAW_EXCLUDE_REGEX` | `""`                   | A raw regex pattern to exclude from monitoring (`-x`).                                                                            |
-| `SKIP_IF_MERGING`   | `"false"`              | Set to `"true"` to prevent commits when a merge is in progress (`-M`).                                                            |
-| `COMMIT_ON_START`   | `"false"`              | Set to `"true"` to commit any pending changes on startup (`-f`).                                                                  |
-| `VERBOSE`           | `"false"`              | Set to `"true"` to enable verbose output for debugging (`-v`).                                                                    |
-| `QUIET`             | `"false"`              | Set to `"true"` to suppress all stdout/stderr output (`-q`). Overrides `VERBOSE`.                                                 |
-| `USE_SYSLOG`        | `"false"`              | Set to `"true"` to log all messages to syslog (`-S`).                                                                             |
+| Variable             | Default Value          | Description                                                                                                                       |
+| :------------------- | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------------- |
+| `PUID`               | `1000`                 | **Optional.** Sets the User ID (UID) for the container's non-root user to match the host user, preventing file permission issues. |
+| `PGID`               | `(blank)`              | **Optional but Recommended.** Sets the Group ID (GID) for the container's user. Run `id -g` on your host to find this value.      |
+| `GIT_WATCH_DIR`      | `/app/watched-repo`    | The directory inside the container to watch for changes. This must match the container path you set in the `volumes` section.     |
+| `GIT_REMOTE`         | `origin`               | The name of the remote repository to push to.                                                                                     |
+| `GIT_BRANCH`         | `main`                 | The branch to push to.                                                                                                            |
+| `GIT_EXTERNAL_DIR`   | `""`                   | Use with the `-g` flag (e.g., `/app/.git`) to specify an external Git directory.                                                  |
+| `PULL_BEFORE_PUSH`   | `"false"`              | Set to `"true"` to run `git pull --rebase` before every push (`-R`).                                                              |
+| `SLEEP_TIME`         | `2`                    | Time in seconds to wait after a file change before committing (`-s`).                                                             |
+| `COMMIT_MSG`         | `"Auto-commit: %d"`    | The commit message format (`-m`). Ignored if `COMMIT_CMD` is set.                                                                 |
+| `DATE_FMT`           | `"+%Y-%m-%d %H:%M:%S"` | The date format used in the commit message (`-d`).                                                                                |
+| `COMMIT_CMD`         | `""`                   | Custom shell command to generate the entire commit message (`-c`). Overrides `COMMIT_MSG`.                                        |
+| `PASS_DIFFS`         | `"false"`              | Set to `"true"` to pipe the list of changed files to `COMMIT_CMD` (`-C`).                                                         |
+| `EVENTS`             | `""`                   | Events passed to the underlying watcher tool (`-e`). Uses platform defaults if empty.                                             |
+| `EXCLUDE_PATTERN`    | `""`                   | A comma-separated list of glob patterns to exclude from monitoring (`-X`).                                                        |
+| `RAW_EXCLUDE_REGEX`  | `""`                   | A raw regex pattern to exclude from monitoring (`-x`).                                                                            |
+| `SKIP_IF_MERGING`    | `"false"`              | Set to `"true"` to prevent commits when a merge is in progress (`-M`).                                                            |
+| `COMMIT_ON_START`    | `"false"`              | Set to `"true"` to commit any pending changes on startup (`-f`).                                                                  |
+| `VERBOSE`            | `"false"`              | Set to `"true"` to enable verbose output for debugging (`-v`).                                                                    |
+| `QUIET`              | `"false"`              | Set to `"true"` to suppress all stdout/stderr output (`-q`). Overrides `VERBOSE`.                                                 |
+| `USE_SYSLOG`         | `"false"`              | Set to `"true"` to log all messages to syslog (`-S`).                                                                             |
+| `DISABLE_LOCKING`    | `"false"`              | **NEW.** Set to `"true"` to disable file locking (`-n`). Bypasses `flock` dependency check.                                       |
+| `GW_LOG_LINE_LENGTH` | `150`                  | **NEW.** Overrides the default 150-character truncation for lines in the `-l`/`-L` commit log.                                    |
 
 <!-- prettier-ignore-end -->
 
