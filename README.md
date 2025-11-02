@@ -74,24 +74,29 @@ That's really up to you, but here are some examples:
 
 ### Windows 11 (via WSL Installer)
 
-`gitwatch` is fully supported on Windows 11 through the Windows Subsystem for Linux (WSL). A `.exe` installer is provided to make setup seamless.
+`gitwatch` is fully supported on Windows 11 through the Windows Subsystem for Linux (WSL).
+A `.exe` installer is provided to make setup seamless.
 
-1.  **Download** the latest `gitwatch-setup.exe` from the [GitHub Releases page](https://github.com/gitwatch/gitwatch/releases/latest).
-2.  **Run** the installer. It will automatically:
-    - Request Administrator privileges.
-    - Check for and install WSL if it's not already present (this may take a few minutes).
-    - Install all required Linux dependencies (`git`, `flock`, `timeout`, `inotify-tools`) inside WSL.
-    - Install the `gitwatch.sh` script into WSL.
-    - Install a `gitwatch.bat` wrapper on your Windows system and add it to your `PATH`.
+1. **Download** the latest `gitwatch-setup.exe` from the
+   [GitHub Releases page](https://github.com/gitwatch/gitwatch/releases/latest).
+2. **Run** the installer. It will automatically:
+   - Request Administrator privileges.
+   - Check for and install WSL if it's not already present (this may take a few minutes).
+   - Install all required Linux dependencies (`git`, `flock`, `timeout`, `inotify-tools`)
+     inside WSL.
+   - Install the `gitwatch.sh` script into WSL.
+   - Install a `gitwatch.bat` wrapper on your Windows system and add it to your `PATH`.
 
-After installation, you can open any Windows Command Prompt or PowerShell terminal and use `gitwatch` as if it were a native application:
+After installation, you can open any Windows Command Prompt or PowerShell terminal and use
+`gitwatch` as if it were a native application:
 
 ```
 # Example: Watch a directory in your Windows "Documents" folder
 gitwatch -r origin -b main "C:\Users\YourUser\Documents\MyNotes"
 ```
 
-The wrapper automatically handles path translation, and `gitwatch` will use your existing Windows `.gitconfig` and SSH keys.
+The wrapper automatically handles path translation, and `gitwatch` will use your existing
+Windows `.gitconfig` and SSH keys.
 
 ### From Source
 
