@@ -73,11 +73,3 @@ Thumbs.db
 # ===================================================================
 # Docker environment variables (often contain secrets)
 .env
-
-# --- Start temporary ignore for Jules setup files ---
-AGENTS.md
-pre_refactor_backup/
-tests/bats-support/
-tests/bats-assert/
-tests/bats-file/
-# --- End temporary ignore for Jules setup files ---
