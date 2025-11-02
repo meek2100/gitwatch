@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Source the global test config
-source "$(dirname "$BASH_SOURCE")/../test_config.sh"
+source "$(dirname "$BASH_SOURCE")/config.bash"
 
 # Provides setup (default) and setup_with_spaces.
 
