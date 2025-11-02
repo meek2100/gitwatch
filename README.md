@@ -310,14 +310,15 @@ path to the Git repository you want to watch.
 
 To run this script, you must have installed and globally available:
 
-- `git` ([Git](https://github.com/git/git) |
+- **Git:** ([Git](https://github.com/git/git) |
   [git-scm](http://www.git-scm.com))
 - **File Watcher:** Either `inotifywait` (part of
   **[inotify-tools](https://github.com/rvoicilas/inotify-tools)**, for
   Linux) or `fswatch` (for macOS/BSD).
-- **Locking (Highly Recommended):** `flock` (part of `util-linux` on most
-  Linux distributions) for process locking and debouncing.
-- **Timeout (Required):** `timeout` (part of `coreutils` on most
+- **Locking:** `flock` (part of `util-linux` on most
+  Linux distributions). This is required for process locking unless explicitly
+  disabled with the `-n` flag.
+- **Timeout:** `timeout` (part of `coreutils` on most
   Linux/macOS distributions) for robust Git operations.
 
 The script automatically detects the appropriate watcher tool based on your
@@ -439,6 +440,7 @@ Where `<target>` is the file or folder to be watched.
 | `-S`   | _None_        | _None_                 | **Syslog.** Logs all messages to syslog (daemon mode) instead of stdout/stderr.                                                    |
 | `-v`   | _None_        | _None_                 | **Verbose.** Enables verbose logging for debugging (`set -x` if not using syslog).                                                 |
 | `-q`   | _None_        | _None_                 | **Quiet.** Suppress all stdout and stderr output (overridden by `-S`).                                                             |
+| `-n`   | _None_        | _None_                 | **No Lock.** Disables file locking and bypasses the `flock` dependency check.                                                      |
 | `-V`   | _None_        | _None_                 | **Version.** Prints version information and exits.                                                                                 |
 
 ### Security Considerations

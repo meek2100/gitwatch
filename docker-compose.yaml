@@ -26,7 +26,7 @@ services:
       PUID: 1000
       # Set to your host user's GID (run `id -g` on your host)
       # This is critical for file permissions on mounted volumes.
-      PGID:
+      PGID: 1000 # Example GID, change this to your host's GID
 
       # --- Watched Directory ---
       # This should match the container path in the 'volumes' section above
@@ -72,3 +72,5 @@ services:
       QUIET: "false"
       # Set to "true" to log all messages to syslog (-S)
       USE_SYSLOG: "false"
+      # NEW: Set to "true" to disable file locking (-n).
+      DISABLE_LOCKING: "false"

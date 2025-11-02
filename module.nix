@@ -51,6 +51,8 @@ let
         verboseFlag = getflag "-v" "verbose" cfg;
         quietFlag = getflag "-q" "quiet" cfg;
         passDiffsFlag = getflag "-C" "passDiffs" cfg;
+        disableLockingFlag = getflag "-n" "disableLocking" cfg; # NEW: No-lock flag
+
         # Custom command args (special handling to use -c and override -m/-l if present)
         customCommandArgs =
           if cfg.customCommand != null then
@@ -80,6 +82,7 @@ let
             commitOnStartFlag
             useSyslogFlag
             (if cfg.quiet then quietFlag else verboseFlag)
+            disableLockingFlag # NEW: Added flag
             # Special handling for commit message: custom command overrides -m
             (if cfg.customCommand != null then customCommandArgs else messageArg)
             # The path must be the last argument
@@ -148,6 +151,7 @@ in
         useSyslog = true;
         verbose = false;
         quiet = true;
+        disableLocking = false; # NEW
         logDiffLines = 10;
         gitDir = "/mnt/data/.git";
         globExcludePattern = "*.log,temp/";
@@ -227,6 +231,12 @@ in
           };
           logDiffNoColor = lib.mkOption {
             description = "If true, logs diff lines without color (overrides -l to -L).";
+            type = bool;
+            default = false;
+          };
+          # NEW: No-lock option
+          disableLocking = lib.mkOption {
+            description = "If true, disable file locking and bypass flock dependency check (-n).";
             type = bool;
             default = false;
           };

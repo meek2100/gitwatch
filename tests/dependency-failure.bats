@@ -33,6 +33,7 @@ load 'bats-custom/startup-shutdown'
   assert_failure "Gitwatch should exit with non-zero status on missing dependency"
   assert_exit_code 2 "Gitwatch should exit with code 2 (Missing required command)"
   assert_output --partial "Error: Required command 'logger' not found (for -S syslog option)."
+
   # 5. Cleanup
   export PATH="$path_backup" # Restore PATH
   cd /tmp
@@ -63,12 +64,13 @@ load 'bats-custom/startup-shutdown'
   assert_failure "Gitwatch should exit with non-zero status on missing dependency"
   assert_exit_code 2 "Gitwatch should exit with code 2 (Missing required command)"
   assert_output --partial "Error: Required command 'timeout' not found."
+
   # 5. Cleanup
   export PATH="$path_backup" # Restore PATH
   cd /tmp
 }
 
-# --- NEW TESTS ---
+# --- END OLD TESTS ---
 
 @test "dependency_failure_git: Exits with code 2 if 'git' command is missing" {
   # shellcheck disable=SC2031 # PATH modification is intentional for mocking
@@ -90,6 +92,7 @@ load 'bats-custom/startup-shutdown'
   assert_failure
   assert_exit_code 2
   assert_output --partial "Error: Required command 'git' not found."
+
   # 4. Cleanup
   export PATH="$path_backup"
   cd /tmp
@@ -101,8 +104,7 @@ load 'bats-custom/startup-shutdown'
   local watcher_name=""
   local watcher_hint=""
 
-  if [ "$RUNNER_OS" == "Linux" ];
-  then
+  if [ "$RUNNER_OS" == "Linux" ]; then
     watcher_name="inotifywait"
     watcher_hint="inotify-tools"
   else
@@ -134,7 +136,7 @@ load 'bats-custom/startup-shutdown'
   cd /tmp
 }
 
-@test "dependency_warning_flock: Warns (does not exit) if 'flock' command is missing" {
+@test "dependency_failure_flock: Exits with code 2 if 'flock' command is missing (and -n is not used)" {
   # shellcheck disable=SC2031 # PATH modification is intentional for mocking
   local path_backup="$PATH"
   local output_file
@@ -150,38 +152,30 @@ load 'bats-custom/startup-shutdown'
   run command -v flock
   refute_success "Failed to simulate missing 'flock' command"
 
-  # 2. Run gitwatch *in the background*
+  # 2. Run gitwatch *without -n*
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
-  # shellcheck disable=SC2034 # used by teardown
-  GITWATCH_PID=$!
-  sleep 1 # Allow script to initialize and print warning
+  run "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME"
 
-  # 3. Assert: Check log output for the warning
-  run cat "$output_file"
-  assert_output --partial "Warning: 'flock' command not found."
-  assert_output --partial "Proceeding without file locking."
+  # 3. Assert: Script exits with failure code 2
+  assert_failure "Gitwatch should have exited with an error"
+  assert_exit_code 2 "Exit code should be 2 for missing dependency"
 
-  # 4. Assert: Process is *still running*
-  run kill -0 "$GITWATCH_PID"
-  assert_success "Gitwatch process exited when it should have continued without flock"
+  # 4. Assert: Log output shows the ERROR message
+  assert_output --partial "Error: Required command 'flock' not found"
+  assert_output --partial "Install 'flock' or re-run with the -n flag"
+  refute_output --partial "Proceeding without file locking." # This is the old warning
 
   # 5. Cleanup
   export PATH="$path_backup"
   cd /tmp
 }
 
-@test "dependency_warning_flock_race_condition: Proves missing flock causes race condition" {
+@test "dependency_failure_flock_with_n_flag: Bypasses check and runs successfully with -n" {
   # shellcheck disable=SC2031 # PATH modification is intentional for mocking
   local path_backup="$PATH"
-  local output_file_1
+  local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  output_file_1=$(mktemp "$testdir/output1.XXXXX")
-  local output_file_2
-  # shellcheck disable=SC2154 # testdir is sourced via setup function
-  output_file_2=$(mktemp "$testdir/output2.XXXXX")
-  local pid_1
-  local pid_2
+  output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Hide 'flock'
   local new_path
@@ -192,47 +186,23 @@ load 'bats-custom/startup-shutdown'
   run command -v flock
   refute_success "Failed to simulate missing 'flock' command"
 
-  # 2. Start two gitwatch processes
+  # 2. Run gitwatch *WITH -n*
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -s 1 "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file_1" 2>&1 &
-  pid_1=$!
-  # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -s 1 "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file_2" 2>&1 &
-  pid_2=$!
-  sleep 1 # Allow them to start
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -n "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
+  GITWATCH_PID=$!
+  sleep 1 # Allow script to initialize
 
-  # 3. Assert both are running
-  run kill -0 "$pid_1"
-  assert_success "Gitwatch process 1 failed to start"
-  run kill -0 "$pid_2"
-  assert_success "Gitwatch process 2 failed to start"
+  # 3. Assert: Log output shows the bypass message
+  run cat "$output_file"
+  assert_output --partial "File locking explicitly disabled via -n flag."
+  refute_output --partial "Error: Required command 'flock' not found" # Should not error out
 
-  # 4. Assert both warned about missing flock
-  run cat "$output_file_1"
-  assert_output --partial "Warning: 'flock' command not found."
-  run cat "$output_file_2"
-  assert_output --partial "Warning: 'flock' command not found."
-  # 5. Trigger a single change
-  cd "$testdir/local/$TEST_SUBDIR_NAME"
-  echo "race condition change" >> race_file.txt
+  # 4. Assert: Process is *still running*
+  run kill -0 "$GITWATCH_PID"
+  assert_success "Gitwatch process exited when it should have continued with -n"
 
-  # 6. Wait for both processes to see the change and commit
-  sleep 3 # Wait for sleep (1s) + commit time
-
-  # 7. Assert: Check commit count.
-  # Expected: 1 (setup) + 2 (race) = 3
-  run git rev-list --count HEAD
-  assert_success
-  echo "# DEBUG: Commit count found: $output" >&3
-  # Note: On some very fast systems, the race might be so fast that one 'git add'
-  # finishes before the other, and the second one finds 'nothing to commit'.
-  # But for this test, we'll assert 3 to prove the race.
-  assert_equal "$output" "3" "Expected 3 commits (1 setup + 2 race), but found $output"
-
-  # 8. Cleanup
-  kill "$pid_1" &>/dev/null || true
-  kill "$pid_2" &>/dev/null || true
-  unset GITWATCH_PID # Prevent global teardown from failing
+  # 5. Cleanup
   export PATH="$path_backup"
   cd /tmp
 }

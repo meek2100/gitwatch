@@ -71,6 +71,7 @@ COMMIT_ON_START=${COMMIT_ON_START:-false}
 PASS_DIFFS=${PASS_DIFFS:-false} # New: Pass diffs to custom command (-C)
 USE_SYSLOG=${USE_SYSLOG:-false} # New: Log to Syslog (-S)
 QUIET=${QUIET:-false} # NEW: Quiet mode (-q)
+DISABLE_LOCKING=${DISABLE_LOCKING:-false} # NEW: Disable locking (-n)
 
 
 # --- Command Construction ---
@@ -145,6 +146,11 @@ fi
 
 if [ "${USE_SYSLOG}" = "true" ]; then
   cmd+=( -S )
+fi
+
+# NEW: Add no-lock flag
+if [ "${DISABLE_LOCKING}" = "true" ]; then
+  cmd+=( -n )
 fi
 
 
