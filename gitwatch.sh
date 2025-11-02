@@ -146,11 +146,11 @@ shelp() {
   echo "config and restarting it afterwards."
   echo ""
   echo 'By default, gitwatch tries to use the binaries "git", "inotifywait" (or "fswatch" on macOS/BSD),'
-  echo "and \"flock\" (required for robust locking), expecting to find them in the PATH (it uses 'command -v' to check this"
+  echo "expecting to find them in the PATH (it uses 'command -v' to check this"
   echo "and will abort with an error if they cannot be found). If you want to use"
   echo "binaries that are named differently and/or located outside of your PATH, you can"
-  echo "define replacements in the environment variables GW_GIT_BIN, GW_INW_BIN, and"
-  echo "GW_FLOCK_BIN for git, inotifywait/fswatch, and flock, respectively."
+  echo "define replacements in the environment variables GW_GIT_BIN and GW_INW_BIN"
+  echo "for git and inotifywait/fswatch, respectively."
   echo "The read timeout for the drain loop can be set using the GW_READ_TIMEOUT environment variable."
   echo "The line length for diffs in commit logs can be set with GW_LOG_LINE_LENGTH (default 150)."
 }
@@ -206,8 +206,15 @@ _trim_spaces() {
 # clean up at end of program
 cleanup() {
   # shellcheck disable=SC2317 # Code is reachable via trap
-  verbose_echo "Cleanup function called. Exiting."
-  # The lockfile descriptors (8 and 9) will be auto-released on exit
+  verbose_echo "Cleanup function called. Removing lock directories if they exist."
+  # Remove lock directories if they exist. Use -d for directories.
+  # The LOCKFILE and COMMIT_LOCKFILE variables are global.
+  if [ -n "${LOCKFILE:-}" ]; then
+      rmdir "$LOCKFILE" 2>/dev/null || true
+  fi
+  if [ -n "${COMMIT_LOCKFILE:-}" ]; then
+      rmdir "$COMMIT_LOCKFILE" 2>/dev/null || true
+  fi
   # shellcheck disable=SC2317 # Code is reachable via trap
   exit "$1" # Pass the exit code from the caller (or 0 if unset)
 }
@@ -447,51 +454,22 @@ for cmd in "$BASE_GIT_CMD" "$INW"; do
     exit 2
   }
 done
-# 'timeout' is required for production robustness
-if ! is_command "timeout"; then
-  stderr "Error: Required command 'timeout' not found.
-  Hint: Install 'timeout' (e.g., 'apt install coreutils' or 'dnf install coreutils')."
-  exit 2
-fi
+# 'timeout' command is no longer a dependency, using a pure Bash implementation.
+verbose_echo "Using pure Bash timeout implementation. 'timeout' command is not required."
 # 'logger' is a special case, we only check if syslog is requested
 if [ "$USE_SYSLOG" -eq 1 ] && ! is_command "logger"; then
   stderr "Error: Required command 'logger' not found (for -S syslog option)."
   exit 2
 fi
 
-# --- Check for 'flock' dependency ---
-# Use GW_FLOCK_BIN if set, otherwise default to "flock"
-if [ -z "${GW_FLOCK_BIN:-}" ]; then FLOCK="flock"; else FLOCK="$GW_FLOCK_BIN"; fi
-
-# Only check for flock if locking is *not* disabled
-if [ "$NO_LOCK" -eq 0 ]; then
-  if ! is_command "$FLOCK"; then
-    # --- Platform-specific hint ---
-    flock_hint=""
-    if [ "$OS_TYPE" = "Darwin" ]; then
-      flock_hint="  Hint: Install with Homebrew: 'brew install flock'"
-    else
-      # Assume Linux/other Unix-like
-      flock_hint="  Hint: Install 'flock' (e.g., 'apt install util-linux' or 'dnf install util-linux')."
-    fi
-    # --- End platform-specific hint ---
-
-    stderr "Error: Required command 'flock' not found for process locking.
-$flock_hint
-    Install 'flock' or re-run with the -n flag to disable locking and proceed."
-    exit 2
-  fi
-else
-  verbose_echo "File locking explicitly disabled via -n flag."
-fi
-# --- End flock check ---
+# --- Flock dependency removed ---
+# The logic now uses mkdir for atomic locking, which is a POSIX standard.
+# The dependency check for 'flock' is no longer needed.
+verbose_echo "Using mkdir for atomic locking. 'flock' is not required."
 
 # Add check for hash command needed for tmpdir fallback
 if [ "$NO_LOCK" -eq 0 ] && ! is_command "sha256sum" && ! is_command "md5sum"; then
-  # Only warn if flock *is* available, as the hash is only needed for the fallback logic
-  if is_command "$FLOCK"; then
     stderr "Warning: Neither 'sha256sum' nor 'md5sum' found. Lockfile fallback to /tmp might use less unique names."
-  fi
 fi
 unset cmd BASE_GIT_CMD # Clean up
 verbose_echo "Dependency checks complete."
@@ -742,18 +720,17 @@ if [ "$NO_LOCK" -eq 0 ]; then
   fi
 fi
 
-LOCKFILE="$LOCKFILE_DIR/$LOCKFILE_BASENAME.lock"
-COMMIT_LOCKFILE="$LOCKFILE_DIR/$LOCKFILE_BASENAME.commit.lock"
+LOCKFILE="$LOCKFILE_DIR/$LOCKFILE_BASENAME.lockdir"
+COMMIT_LOCKFILE="$LOCKFILE_DIR/$LOCKFILE_BASENAME.commit.lockdir"
 # --- End tmpdir Fallback ---
 
 if [ "$NO_LOCK" -eq 0 ]; then
-  # Open main lockfile on FD 9. Lock is held for the script's lifetime.
-  # FD 9 is chosen arbitrarily, avoid 0, 1, 2.
-  exec 9>"$LOCKFILE"
-  "$FLOCK" -n 9 || {
-    stderr "Error: gitwatch is already running on this repository (lockfile: $LOCKFILE)."; exit 1;
-  }
-  verbose_echo "Acquired main instance lock (FD 9) on $LOCKFILE"
+    # Use mkdir for atomic lock acquisition.
+    if ! mkdir "$LOCKFILE" 2>/dev/null; then
+        stderr "Error: gitwatch is already running on this repository (lockdir: $LOCKFILE)."
+        exit 1
+    fi
+    verbose_echo "Acquired main instance lock directory: $LOCKFILE"
 fi
 # --- End Lockfile Setup ---
 
@@ -1026,21 +1003,29 @@ generate_commit_message() {
   if [ -n "${COMMITCMD:-}" ]; then
     local final_cmd_string=""
     if [ "$PASSDIFFS" -eq 1 ]; then
-      # Use process substitution and pipe to custom command
-      # Pipe staged files diff
-      final_cmd_string=$(printf "timeout -s 9 %s %s diff --staged --name-only | %s" "$TIMEOUT" "$GIT" "$COMMITCMD")
+      # Pipe staged files diff to the custom command
+      final_cmd_string=$(printf "%s diff --staged --name-only | %s" "$GIT" "$COMMITCMD")
     else
-      final_cmd_string=$(printf "timeout -s 9 %s %s" "$TIMEOUT" "$COMMITCMD")
+      final_cmd_string="$COMMITCMD"
     fi
 
-    # Run the custom command with timeout
-    commit_output=$(bash -c "$final_cmd_string" 2>&1)
-    commit_exit_code=$?
+    # Run the custom command with the Bash timeout wrapper
+    {
+        commit_output=$(bash -c "$final_cmd_string" 2>&1)
+        commit_exit_code=$?
+    } &
+    local cmd_pid=$!
+    (sleep "$TIMEOUT" && kill "$cmd_pid" 2>/dev/null) &
+    local killer_pid=$!
 
-    if [ "$commit_exit_code" -eq 0 ]; then
+    local wait_exit_code=0
+    wait "$cmd_pid" || wait_exit_code=$?
+    kill "$killer_pid" 2>/dev/null || true # Clean up killer subshell
+
+    if [ "$wait_exit_code" -eq 0 ]; then
       # Command succeeded
       local_commit_msg="$commit_output"
-    elif [ "$commit_exit_code" -eq 124 ]; then
+    elif [ "$wait_exit_code" -gt 128 ]; then
       stderr "ERROR: Custom commit command '$COMMITCMD' timed out after $TIMEOUT seconds."
       local_commit_msg="Custom commit command timed out" # Fallback message
     else
@@ -1123,22 +1108,26 @@ _perform_commit() {
 
   # Commit
   local commit_cmd
-  # Add timeout to commit command
-  commit_cmd=$(printf "timeout -s 9 %s %s commit %s -m %q" "$TIMEOUT" "$GIT" "$GIT_COMMIT_ARGS" "$FINAL_COMMIT_MSG")
+  # Commit with Bash timeout wrapper
+  commit_cmd=$(printf "%s commit %s -m %q" "$GIT" "$GIT_COMMIT_ARGS" "$FINAL_COMMIT_MSG")
+  verbose_echo "Running git commit command with timeout: $commit_cmd"
+  {
+      commit_output=$(bash -c "$commit_cmd" 2>&1) # Capture stdout and stderr
+      commit_exit_code=$?
+  } &
+  local commit_pid=$!
+  (sleep "$TIMEOUT" && kill "$commit_pid" 2>/dev/null) &
+  local killer_pid=$!
 
-  # Run the commit command and capture its output and exit code
-  verbose_echo "Running git commit command: $commit_cmd"
-  commit_output=$(bash -c "$commit_cmd" 2>&1) # Capture stdout and stderr
-  commit_exit_code=$? # Capture the exit code immediately
+  local wait_exit_code=0
+  wait "$commit_pid" || wait_exit_code=$?
+  kill "$killer_pid" 2>/dev/null || true
 
   # Check the captured exit code
-  if [ "$commit_exit_code" -eq 0 ]; then
+  if [ "$wait_exit_code" -eq 0 ]; then
     # Commit succeeded
-    # Optional: Log the commit output if verbose and needed for debugging
-    # verbose_echo "Commit output: $commit_output"
     : # Do nothing, success
-  elif [ "$commit_exit_code" -eq 124 ]; then
-    # Timeout exit code (124 from coreutils timeout)
+  elif [ "$wait_exit_code" -gt 128 ]; then
     stderr "ERROR: 'git commit' timed out after $TIMEOUT seconds."
     return 1
   else
@@ -1159,32 +1148,52 @@ _perform_commit() {
   # Pull (if enabled)
   if [ -n "$PULL_CMD" ]; then
     verbose_echo "Executing pull command: $PULL_CMD"
-    # Add timeout to pull command
-    local pull_cmd_with_timeout
-    pull_cmd_with_timeout=$(printf "timeout -s 9 %s %s" "$TIMEOUT" "$PULL_CMD")
-    if ! bash -c "$pull_cmd_with_timeout"; then
-      if [ $? -eq 124 ]; then
-        stderr "ERROR: 'git pull' timed out after $TIMEOUT seconds. Skipping push."
-      else
-        stderr "ERROR: 'git pull' failed. Skipping push."
-      fi
-      return 1 # Abort
+    # Pull with Bash timeout wrapper
+    verbose_echo "Executing pull command with timeout: $PULL_CMD"
+    {
+        bash -c "$PULL_CMD"
+    } &
+    local pull_pid=$!
+    (sleep "$TIMEOUT" && kill "$pull_pid" 2>/dev/null) &
+    local killer_pid=$!
+
+    local pull_exit_code=0
+    wait "$pull_pid" || pull_exit_code=$?
+    kill "$killer_pid" 2>/dev/null || true
+
+    if [ $pull_exit_code -ne 0 ]; then
+        if [ $pull_exit_code -gt 128 ]; then
+            stderr "ERROR: 'git pull' timed out after $TIMEOUT seconds. Skipping push."
+        else
+            stderr "ERROR: 'git pull' failed. Skipping push."
+        fi
+        return 1 # Abort
     fi
   fi
 
   # Push (if enabled)
   if [ -n "$PUSH_CMD" ]; then
     verbose_echo "Executing push command: $PUSH_CMD"
-    # Add timeout to push command
-    local push_cmd_with_timeout
-    push_cmd_with_timeout=$(printf "timeout -s 9 %s %s" "$TIMEOUT" "$PUSH_CMD")
-    if ! bash -c "$push_cmd_with_timeout"; then
-      if [ $? -eq 124 ]; then
-        stderr "ERROR: 'git push' timed out after $TIMEOUT seconds."
-      else
-        stderr "ERROR: 'git push' failed."
-      fi
-      return 1 # Report failure
+    # Push with Bash timeout wrapper
+    verbose_echo "Executing push command with timeout: $PUSH_CMD"
+    {
+        bash -c "$PUSH_CMD"
+    } &
+    local push_pid=$!
+    (sleep "$TIMEOUT" && kill "$push_pid" 2>/dev/null) &
+    local killer_pid=$!
+
+    local push_exit_code=0
+    wait "$push_pid" || push_exit_code=$?
+    kill "$killer_pid" 2>/dev/null || true
+
+    if [ $push_exit_code -ne 0 ]; then
+        if [ $push_exit_code -gt 128 ]; then
+            stderr "ERROR: 'git push' timed out after $TIMEOUT seconds."
+        else
+            stderr "ERROR: 'git push' failed."
+        fi
+        return 1 # Report failure
     fi
   fi
   return 0
@@ -1193,35 +1202,34 @@ _perform_commit() {
 
 # Wrapper for perform_commit that uses a lock to prevent concurrent runs
 perform_commit() {
-  if [ "$NO_LOCK" -eq 1 ]; then
-    _perform_commit # Run without lock
-    local nocommit_status=$?
-    if [ $nocommit_status -ne 0 ]; then
-      stderr "Commit logic failed with status $nocommit_status."
+    if [ "$NO_LOCK" -eq 1 ]; then
+        _perform_commit # Run without lock
+        local nocommit_status=$?
+        if [ $nocommit_status -ne 0 ]; then
+            stderr "Commit logic failed with status $nocommit_status."
+        fi
+        return $nocommit_status
     fi
-    return $nocommit_status
-  fi
 
-  # Try to acquire a non-blocking lock on file descriptor 8 using COMMIT_LOCKFILE.
-  (
-    # Open FD 8 for the subshell, associating it with the lock file
-    exec 8>"$COMMIT_LOCKFILE"
-    "$FLOCK" -n 8 || {
-      # This is a common and expected event, so it's a good verbose log
-      verbose_echo "Commit already in progress (commit lock busy), skipping this trigger."
-      exit 0 # Exit subshell gracefully
-    }
-    verbose_echo "Acquired commit lock (FD 8) on $COMMIT_LOCKFILE, running commit logic."
-    _perform_commit
-    # Lock on FD 8 is released automatically when this subshell exits
-  )
-  local commit_status=$?
-  if [ $commit_status -ne 0 ]; then
-    stderr "Commit logic failed with status $commit_status."
-    # Option: Exit the main script upon commit failure
-    # exit 1
-  fi
-  return $commit_status
+    # Try to acquire a non-blocking lock using mkdir.
+    if ! mkdir "$COMMIT_LOCKFILE" 2>/dev/null; then
+        verbose_echo "Commit already in progress (commit lockdir busy), skipping this trigger."
+        return 0 # Not an error, just skipping a concurrent run.
+    fi
+    verbose_echo "Acquired commit lock directory: $COMMIT_LOCKFILE"
+
+    # Use a subshell to ensure the lock is released even if _perform_commit fails.
+    (
+        _perform_commit
+    )
+    local commit_status=$?
+    # Always remove the commit lockdir after the attempt.
+    rmdir "$COMMIT_LOCKFILE" || stderr "Warning: Could not remove commit lock directory '$COMMIT_LOCKFILE'."
+
+    if [ $commit_status -ne 0 ]; then
+        stderr "Commit logic failed with status $commit_status."
+    fi
+    return $commit_status
 }
 
 
