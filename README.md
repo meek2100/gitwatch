@@ -441,7 +441,7 @@ Where `<target>` is the file or folder to be watched.
 | `-M`   | _None_        | _None_                 | **Skip Merging.** Prevents commits if a Git merge/rebase is currently in progress.                                                 |
 | `-f`   | _None_        | _None_                 | **Commit on Start.** Commits any pending staged changes before starting the watch loop.                                            |
 | `-S`   | _None_        | _None_                 | **Syslog.** Logs all messages to syslog (daemon mode) instead of stdout/stderr.                                                    |
-| `-v`   | _None_        | _None_                 | **Verbose.** Enables verbose logging for debugging (`set -x` if not using syslog).                                                 |
+| `-v`   | _None_        | _None_                 | **Verbose.** Enables verbose logging for debugging                                                                                 |
 | `-q`   | _None_        | _None_                 | **Quiet.** Suppress all stdout and stderr output (overridden by `-S`).                                                             |
 | `-n`   | _None_        | _None_                 | **No Lock.** Disables file locking and bypasses the `flock` dependency check.                                                      |
 | `-V`   | _None_        | _None_                 | **Version.** Prints version information and exits.                                                                                 |
