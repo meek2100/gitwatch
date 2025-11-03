@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -euxo pipefail # <- ADDED: Enable verbose tracing and immediate exit on error
 
 #
 # gitwatch - watch file or directory and git commit all changes as they happen
@@ -42,7 +41,7 @@ set -euxo pipefail # <- ADDED: Enable verbose tracing and immediate exit on erro
 # set -o pipefail: The return value of a pipeline is the status of
 #                  the last command to exit with a non-zero status,
 #                  or zero if no command exited with a non-zero status.
-# # set -euo pipefail # <- ORIGINAL BLOCK COMMENTED OUT
+set -euo pipefail
 # --------------------------
 
 # --- Version Info ---
