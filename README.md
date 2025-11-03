@@ -9,6 +9,7 @@
 - [gitwatch](#gitwatch)
   - [What to use it for?](#what-to-use-it-for)
   - [Installation](#installation)
+    - [macOS (via Homebrew)](#macos-via-homebrew)
     - [Windows 11 (via WSL Installer)](#windows-11-via-wsl-installer)
     - [From Source](#from-source)
     - [Releases](#releases)
@@ -22,7 +23,6 @@
     - [Docker Compose (Recommended)](#docker-compose-recommended)
     - [Using the Dockerfile](#using-the-dockerfile)
   - [Requirements](#requirements)
-    - [Notes for Mac](#notes-for-mac)
   - [Local Testing](#local-testing)
   - [What it does](#what-it-does)
   - [Usage](#usage)
@@ -73,6 +73,21 @@ That's really up to you, but here are some examples:
 
 `gitwatch` can be installed in various ways.
 
+### macOS (via Homebrew)
+
+While `gitwatch` is not yet in the official Homebrew repository, the
+easiest way to run it on macOS is to first install its dependencies
+using Homebrew, and then install the script.
+
+```shell
+# 1. Install required dependencies
+brew install fswatch flock coreutils
+
+# 2. Install gitwatch
+# (Use the "From Source" or "Releases" method above)
+[sudo] make install
+```
+
 ### Windows 11 (via WSL Installer)
 
 `gitwatch` is fully supported on Windows 11 through the Windows Subsystem for Linux (WSL).
@@ -101,16 +116,18 @@ Windows `.gitconfig` and SSH keys.
 
 ### From Source
 
-`gitwatch` can be installed from source by simply cloning the repository
-and putting the shell script into your `$PATH`. The commands below will do
-that for you if `/usr/local/bin` is in your `$PATH`. You may need to invoke
-`install` with `sudo`.
+`gitwatch` can be installed from source using the provided `Makefile`. This is
+the recommended method for building from source as it uses standard `install`
+commands.
 
 ```sh
 git clone https://github.com/gitwatch/gitwatch.git
 cd gitwatch
-[sudo] install -b gitwatch.sh /usr/local/bin/gitwatch
+[sudo] make install
 ```
+
+This will install `gitwatch.sh` to `/usr/local/bin/gitwatch` by default.
+You can uninstall it at any time with `[sudo] make uninstall`.
 
 ### Releases
 
@@ -325,22 +342,6 @@ To run this script, you must have installed and globally available:
 
 The script automatically detects the appropriate watcher tool based on your
 operating system.
-
-### Notes for Mac
-
-If running on macOS, you'll need to install the required runtime tools and
-the **BATS testing framework** via Homebrew:
-
-```sh
-# Runtime Dependencies
-brew install fswatch flock coreutils
-```
-
-```sh
-# Testing Dependencies (Required to run .bats files locally)
-# bats-core and its helper libraries are now explicitly required.
-brew install bats-core bats-support bats-assert bats-file
-```
 
 ## Local Testing
 

@@ -449,10 +449,18 @@ for cmd in "$BASE_GIT_CMD" "$INW"; do
     exit 2
   }
 done
-# 'timeout' is required for production robustness
+# 'timeout' (GNU version) is required for production robustness
 if ! is_command "timeout"; then
   stderr "Error: Required command 'timeout' not found.
-  Hint: Install 'timeout' (e.g., 'apt install coreutils' or 'dnf install coreutils')."
+  Hint: Install 'timeout' (e.g., 'apt install coreutils' or 'brew install coreutils')."
+  exit 2
+fi
+# Check for GNU coreutils version
+# Use a subshell and check exit status + output to be safe
+if ! (timeout --version 2>&1 | grep -q "GNU coreutils"); then
+  stderr "Error: GNU 'timeout' (from coreutils) not found.
+  gitwatch.sh requires the GNU version for consistent behavior.
+  Hint: Install 'coreutils' (e.g., 'brew install coreutils' on macOS)."
   exit 2
 fi
 # 'logger' is a special case, we only check if syslog is requested

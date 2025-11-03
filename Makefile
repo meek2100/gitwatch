@@ -1,7 +1,7 @@
 # Makefile for gitwatch development
 
 # Use .PHONY to declare targets that are not files
-.PHONY: all test lint install-hooks clean
+.PHONY: all test lint install uninstall install-hooks clean
 
 # Default target
 all: test
@@ -15,12 +15,26 @@ NPROC ?= $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
 # This command mimics the CI workflow for fast, parallel execution.
 test:
 	@echo "Running BATS test suite in parallel on $(NPROC) cores..."
-	@BATS_LIB_PATH="./tests" find tests -name "*.bats" -print0 | xargs -0 -n1 -P "$(NPROC)" bats --tap
+	@BATS_LIB_PATH="./tests" find tests -name "*.bats" -print0 | \
+	xargs -0 -n1 -P "$(NPROC)" bats --tap
 
 # Run all pre-commit hooks against all files
 lint:
 	@echo "Running linters and formatters..."
 	pre-commit run --all-files
+
+# --- Installation Targets ---
+PREFIX ?= /usr/local
+BINDIR ?= $(PREFIX)/bin
+
+install:
+	@echo "Installing gitwatch.sh to $(BINDIR)/gitwatch..."
+	@install -D -m 755 gitwatch.sh $(BINDIR)/gitwatch
+
+uninstall:
+	@echo "Removing gitwatch from $(BINDIR)/gitwatch..."
+	@rm -f $(BINDIR)/gitwatch
+# --- End Installation Targets ---
 
 # Install the pre-commit git hooks
 install-hooks:
