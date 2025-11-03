@@ -25,9 +25,46 @@ _cleanup_remotedirs() {
   fi
 }
 
+# --- NEW: DEBUG-ON-FAILURE HELPER ---
+# Dumps debug information if a test fails
+debug_on_failure() {
+  # This function is called by teardown if the test failed ($BATS_TEST_STATUS -ne 0)
+  if [ "$BATS_TEST_STATUS" -ne 0 ]; then
+    verbose_echo "--- DEBUG: Test '$BATS_TEST_NAME' FAILED! ---" >&3
+
+    # Dump the gitwatch log file (if it exists)
+    local log_file
+    # Search for a log file, which we assume is named output.* in the testdir
+    log_file=$(find "$testdir" -name "output.*" 2>/dev/null | head -n 1)
+
+    if [ -n "$log_file" ] && [ -f "$log_file" ]; then
+      verbose_echo "--- Log File Content ($log_file) ---" >&3
+      # Dump log to descriptor 3
+      cat "$log_file" >&3
+      verbose_echo "--- End Log File ---" >&3
+    else
+      verbose_echo "--- No log file found to dump. ---" >&3
+    fi
+
+    # Dump git status from the test repo
+    local repo_path="$testdir/local/$TEST_SUBDIR_NAME"
+    if [ -d "$repo_path/.git" ]; then
+      verbose_echo "--- Git Status ($repo_path) ---" >&3
+      (cd "$repo_path" && git status) >&3
+      verbose_echo "--- End Git Status ---" >&3
+    fi
+    verbose_echo "--- END DEBUG ---" >&3
+  fi
+}
+# --- END NEW ---
+
 # _common_teardown: The main teardown logic, run after each test
 _common_teardown() {
   verbose_echo "# Teardown started"
+
+  # --- FIX (Logic): Dump debug info *before* we clean up ---
+  debug_on_failure
+  # --- END FIX ---
 
   # 1. Terminate the gitwatch process if it's running
   if [ -n "$GITWATCH_PID" ] && kill -0 "$GITWATCH_PID" &>/dev/null;
@@ -100,6 +137,7 @@ _common_setup() {
   local_repo_dir="$testdir/local"
   remote_repo_dir="$testdir/remote"
   mkdir -p
+
   "$local_repo_dir"
   mkdir -p "$remote_repo_dir"
 
@@ -159,6 +197,7 @@ setup_with_spaces() {
   testdir=$(mktemp -d "$BATS_TEST_TMPDIR/temp space.XXXXX")
   TEST_SUBDIR_NAME="rem with spaces"
   _common_setup
+
   0
   verbose_echo "# Testdir with spaces: $testdir"
   verbose_echo "# Local clone dir: $testdir/local/$TEST_SUBDIR_NAME"
@@ -180,7 +219,8 @@ setup_for_remotedirs() {
   # 1. Init the "vault" repo
   git init "$git_dir_vault"
   # Configure the repo to use the "work" tree
-  git -C "$git_dir_vault" config
+  git -C "$git_dir_vault"
+  config
   core.worktree "$work_tree"
 
   # 2. Set git config in the vault
@@ -217,6 +257,7 @@ teardown()
 }
 
 teardown_for_remotedirs() {
-  verbose_echo "# Running custom cleanup for remotedirs"
+  verbose_echo "#
+  Running custom cleanup for remotedirs"
   _common_teardown
 }

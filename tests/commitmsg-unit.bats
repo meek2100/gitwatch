@@ -74,6 +74,16 @@ setup() {
     # shellcheck disable=SC2034 # Global variable, used by sourced script logic
     FORMATTED_COMMITMSG="$COMMITMSG"
   fi
+
+  # --- FIX (Logic): Prevent state pollution from other tests ---
+  # Ensure output goes to stderr for assert_stderr to capture
+  # --- FIX (Shellcheck SC2034): Add disable directive for sourced-script variables ---
+  # shellcheck disable=SC2034 # Global variable, used by sourced script logic
+  USE_SYSLOG=0
+  # shellcheck disable=SC2034 # Global variable, used by sourced script logic
+  QUIET=0
+  # --- END FIX ---
+
   # Ensure TIMEOUT has a default value if not set by script (it should be): "${TIMEOUT:=60}"
 }
 
@@ -82,6 +92,7 @@ setup() {
   # shellcheck disable=SC2030,SC2031 # Modifying global variable in subshell to be read by sourced function
   export COMMITMSG="Commit: %d"
   LISTCHANGES=-1
+
 
   COMMITCMD=""
 
@@ -109,6 +120,7 @@ setup() {
   LISTCHANGES_COLOR="--color=always"
 
   run
+
   generate_commit_message
   assert_success
   # Expects the concatenated output from the 3-line mock
@@ -127,7 +139,8 @@ file.txt:2: +added line 2
   assert_success
   # Expects the concatenated output from the 3-line mock
   assert_output --partial "file.txt:1: +added line 1 (no color)
-file.txt:2: +added line 2 (no color)
+file.txt:2: +added
+line 2 (no color)
   file.txt:3: +added line 3 (no color)"
 }
 
@@ -160,7 +173,8 @@ Summary:
 }
 
 @test "commitmsg_unit: -C flag pipes files to custom command" {
-  # shellcheck disable=SC2034 # Global variable is intentionally set
+  # shellcheck disable=SC2034
+  # Global variable is intentionally set
   COMMITCMD="wc -l" # Command that reads from stdin
   # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   PASSDIFFS=1
@@ -179,7 +193,8 @@ Summary:
   run generate_commit_message
   assert_success
   assert_output "Custom command failed"
-  # Note: stderr
+  #
+  Note: stderr
   assert_stderr --partial "ERROR: Custom commit command 'command_that_fails_zz' failed"
 }
 
@@ -195,7 +210,6 @@ Summary:
   assert_success
   assert_output "Custom command timed out"
   assert_stderr --partial "ERROR: Custom commit command 'sleep 3' timed out after 1 seconds."
-
   # Restore default
   export TIMEOUT=60
 }
