@@ -17,6 +17,8 @@
     <true/>
     <key>EnvironmentVariables</key>
     <dict>
+      <key>PATH</key>
+      <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
       <key>GW_GIT_BIN</key>
       <string>/usr/local/bin/git</string>
       <key>GW_INW_BIN</key>
