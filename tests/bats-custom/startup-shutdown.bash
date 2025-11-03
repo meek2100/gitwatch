@@ -82,7 +82,6 @@ _common_setup() {
   # 1. Use a unique, descriptive name for the test directory
   #    This makes debugging /tmp easier
   local test_name_safe
-  # --- FIX: Replaced 'name' with 'BATS_TEST_NAME' ---
   test_name_safe=$(echo "$BATS_TEST_NAME" | tr -c 'a-zA-Z0-9' '_')
   # shellcheck disable=SC2154 # BATS_TEST_TMPDIR is set by BATS
   testdir=$(mktemp -d "$BATS_TEST_TMPDIR/gitwatch-test-$test_name_safe-XXXXX")
@@ -97,12 +96,12 @@ _common_setup() {
 
   # 3. Initialize the repositories
   git init "$local_repo_dir/$TEST_SUBDIR_NAME"
-  cd "$local_repo_dir/$TEST_SUBDIR_NAME"
+  cd "$local_repo_dir/$TEST_SUBDIR_NAME" || return 1
   git config user.email "test@example.com"
   git config user.name "BATS Test"
   git config --local commit.gpgsign false # Disable signing for tests
 
-  echo "test" > file.txt
+  echo "test" > initial_file.txt
   git add .
   git commit -m "Initial commit"
   local initial_hash
@@ -123,7 +122,7 @@ _common_setup() {
   GITWATCH_TEST_ARGS=( "-v" )
 
   # 6. Set the current directory for the test
-  cd "$local_repo_dir"
+  cd "$local_repo_dir" || return 1
   verbose_echo "# Setup complete, current directory: $(pwd)"
   verbose_echo "# Testdir: $testdir"
   verbose_echo "# Local clone dir: $local_repo_dir/$TEST_SUBDIR_NAME"
@@ -177,7 +176,7 @@ setup_for_remotedirs() {
 
   # 3. Create initial commit *from the work tree*
   # We must 'cd' into the work-tree for git-dir/work-tree commands to function
-  cd "$work_tree"
+  cd "$work_tree" || return 1
   echo "test" > file.txt
   # Run git commands with explicit git-dir and work-tree
   git --git-dir="$git_dir_vault" --work-tree="$work_tree" add .

@@ -76,8 +76,11 @@ run_container() {
   local docker_args=( "$@" ) # The rest are docker args
 
   # Run the container in detached mode
+  # --- FIX: Add capabilities for user/group switching ---
   docker run -d \
     --name "$container_name" \
+    --cap-add=SETGID \
+    --cap-add=SETUID \
     -v "$TEST_REPO_HOST_DIR:/app/watched-repo" \
     "${docker_args[@]}" \
     "$DOCKER_IMAGE_NAME"

@@ -22,7 +22,7 @@ teardown() {
 
 @test "wait_for_git_change: Succeeds when output changes" {
   # Run the helper in the background
-  wait_for_git_change 5 0.1 git log -1 --format=%H "$MOCK_OUTPUT_FILE" &
+  wait_for_git_change 5 0.1 cat "$MOCK_OUTPUT_FILE" &
   local wait_pid=$!
 
   # Wait a moment and then change the file
@@ -36,14 +36,14 @@ teardown() {
 
 @test "wait_for_git_change: Fails (times out) when output does not change" {
   # Run the helper and expect it to fail (timeout)
-  run wait_for_git_change 1 0.1 git log -1 --format=%H "$MOCK_OUTPUT_FILE"
+  run wait_for_git_change 1 0.1 cat "$MOCK_OUTPUT_FILE"
   assert_failure "Helper function succeeded when it should have timed out"
 }
 
 @test "wait_for_git_change --target: Succeeds when output matches target" {
   local target_state="target_state_achieved"
   # Run the helper in the background
-  wait_for_git_change 5 0.1 --target "$target_state" git log -1 --format=%H "$MOCK_OUTPUT_FILE" &
+  wait_for_git_change 5 0.1 --target "$target_state" cat "$MOCK_OUTPUT_FILE" &
   local wait_pid=$!
 
   # Wait a moment, change to an intermediate state, then the target state
@@ -60,7 +60,7 @@ teardown() {
 @test "wait_for_git_change --target: Fails (times out) if target is never matched" {
   local target_state="target_state_never_achieved"
   # Run the helper in the background
-  wait_for_git_change 1 0.1 --target "$target_state" git log -1 --format=%H "$MOCK_OUTPUT_FILE" &
+  wait_for_git_change 1 0.1 --target "$target_state" cat "$MOCK_OUTPUT_FILE" &
   local wait_pid=$!
 
   # Change to a different state
