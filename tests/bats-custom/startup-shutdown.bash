@@ -2,7 +2,6 @@
 
 # This is a shared library of setup and teardown functions for BATS tests.
 # It ensures a clean, isolated environment for each test.
-
 # Load custom helpers
 load 'bats-custom/custom-helpers'
 
@@ -12,13 +11,15 @@ export GITWATCH_PID="" # PID of the main gitwatch.sh process
 export testdir="" # The root temporary directory for the test
 export GITWATCH_TEST_ARGS=() # Common args for gitwatch
 export TEST_SUBDIR_NAME="repo-to-watch" # Default subdirectory name
+export WAITTIME=3 # NEW: Define a wait period longer than default SLEEP_TIME=2 (2s)
 
 # --- HELPER FUNCTIONS ---
 
 # _cleanup_remotedirs: Safely removes directories used for remote repo tests
 _cleanup_remotedirs() {
   # shellcheck disable=SC2154 # BATS_TEST_TMPDIR is set by BATS
-  if [ -d "$BATS_TEST_TMPDIR/remotedirs" ]; then
+  if [ -d "$BATS_TEST_TMPDIR/remotedirs" ];
+  then
     verbose_echo "Cleaning up remote test directories..."
     rm -rf "$BATS_TEST_TMPDIR/remotedirs"
   fi
@@ -29,14 +30,18 @@ _common_teardown() {
   verbose_echo "# Teardown started"
 
   # 1. Terminate the gitwatch process if it's running
-  if [ -n "$GITWATCH_PID" ] && kill -0 "$GITWATCH_PID" &>/dev/null; then
+  if [ -n "$GITWATCH_PID" ] && kill -0 "$GITWATCH_PID" &>/dev/null;
+  then
     verbose_echo "# Attempting to terminate gitwatch process PID: $GITWATCH_PID"
     # Send SIGTERM first to allow graceful cleanup (e.g., trap)
     kill -s TERM "$GITWATCH_PID" &>/dev/null
-    # Wait for up to 2 seconds
-    wait_for_process_to_die "$GITWATCH_PID" 2 0.1
+    # Wait for up to 2 seconds, 20 attempts of 0.1s each
+    # Use the newly added helper function
+    wait_for_process_to_die "$GITWATCH_PID" 20 0.1
+
     # If it's still alive, kill it forcefully
-    if kill -0 "$GITWATCH_PID" &>/dev/null; then
+    if kill -0 "$GITWATCH_PID" &>/dev/null;
+    then
       verbose_echo "# Process $GITWATCH_PID did not exit gracefully, sending SIGKILL."
       kill -9 "$GITWATCH_PID" &>/dev/null || true
     fi
@@ -47,11 +52,13 @@ _common_teardown() {
   # 2. Failsafe: Clean up any lingering watcher processes from the test
   # This is crucial if gitwatch.sh was killed but the watcher was orphaned
   verbose_echo "# Cleaning up potential lingering watcher processes..."
-  pkill -f "inotifywait -qmr.*$testdir" &>/dev/null || true
+  pkill -f "inotifywait -qmr.*$testdir" &>/dev/null ||
+  true
   pkill -f "fswatch.*$testdir" &>/dev/null || true
 
   # 3. Clean up the temporary test directory
-  if [ -d "$testdir" ]; then
+  if [ -d "$testdir" ];
+  then
     verbose_echo "# Removing test directory: $testdir"
     rm -rf "$testdir"
   fi
@@ -64,7 +71,8 @@ _common_teardown() {
 
   # 5. Handle special cleanup cases
   # shellcheck disable=SC2154 # BATS_TEST_DESCRIPTION is set by BATS
-  if [[ "$BATS_TEST_DESCRIPTION" == *"remotedirs"* ]]; then
+  if [[ "$BATS_TEST_DESCRIPTION" == *"remotedirs"* ]];
+  then
     _cleanup_remotedirs
   fi
 
@@ -91,12 +99,14 @@ _common_setup() {
   # and a "remote" directory to simulate the upstream (e.g., GitHub)
   local_repo_dir="$testdir/local"
   remote_repo_dir="$testdir/remote"
-  mkdir -p "$local_repo_dir"
+  mkdir -p
+  "$local_repo_dir"
   mkdir -p "$remote_repo_dir"
 
   # 3. Initialize the repositories
   git init "$local_repo_dir/$TEST_SUBDIR_NAME"
-  cd "$local_repo_dir/$TEST_SUBDIR_NAME" || return 1
+  cd "$local_repo_dir/$TEST_SUBDIR_NAME" ||
+  return 1
   git config user.email "test@example.com"
   git config user.name "BATS Test"
   git config --local commit.gpgsign false # Disable signing for tests
@@ -109,7 +119,8 @@ _common_setup() {
   verbose_echo "# Setup: Initial commit hash: $initial_hash"
 
   # 4. Create the bare remote repo if requested
-  if [ "$create_remote" -eq 1 ]; then
+  if [ "$create_remote" -eq 1 ];
+  then
     git init --bare "$remote_repo_dir/upstream.git"
     # Set the 'origin' remote to the bare repo
     git remote add origin "$remote_repo_dir/upstream.git"
@@ -122,7 +133,8 @@ _common_setup() {
   GITWATCH_TEST_ARGS=( "-v" )
 
   # 6. Set the current directory for the test
-  cd "$local_repo_dir" || return 1
+  cd "$local_repo_dir" ||
+  return 1
   verbose_echo "# Setup complete, current directory: $(pwd)"
   verbose_echo "# Testdir: $testdir"
   verbose_echo "# Local clone dir: $local_repo_dir/$TEST_SUBDIR_NAME"
@@ -146,7 +158,8 @@ setup_with_spaces() {
   # shellcheck disable=SC2154 # BATS_TEST_TMPDIR is set by BATS
   testdir=$(mktemp -d "$BATS_TEST_TMPDIR/temp space.XXXXX")
   TEST_SUBDIR_NAME="rem with spaces"
-  _common_setup 0
+  _common_setup
+  0
   verbose_echo "# Testdir with spaces: $testdir"
   verbose_echo "# Local clone dir: $testdir/local/$TEST_SUBDIR_NAME"
 }
@@ -167,7 +180,8 @@ setup_for_remotedirs() {
   # 1. Init the "vault" repo
   git init "$git_dir_vault"
   # Configure the repo to use the "work" tree
-  git -C "$git_dir_vault" config core.worktree "$work_tree"
+  git -C "$git_dir_vault" config
+  core.worktree "$work_tree"
 
   # 2. Set git config in the vault
   git -C "$git_dir_vault" config user.email "test@example.com"
@@ -176,7 +190,8 @@ setup_for_remotedirs() {
 
   # 3. Create initial commit *from the work tree*
   # We must 'cd' into the work-tree for git-dir/work-tree commands to function
-  cd "$work_tree" || return 1
+  cd "$work_tree" ||
+  return 1
   echo "test" > file.txt
   # Run git commands with explicit git-dir and work-tree
   git --git-dir="$git_dir_vault" --work-tree="$work_tree" add .
@@ -192,12 +207,12 @@ setup_for_remotedirs() {
   # Note: testdir is set to the *root* of this structure for cleanup
   # The test itself will run from $work_tree
   verbose_echo "# Setup complete for remotedirs"
-  verbose_echo "# Testdir (root): $testdir"
   verbose_echo "# Git Dir (vault): $git_dir_vault"
   verbose_echo "# Work Tree (cwd): $work_tree"
 }
 
-teardown() {
+teardown()
+{
   _common_teardown
 }
 

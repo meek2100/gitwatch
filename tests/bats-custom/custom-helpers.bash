@@ -39,15 +39,18 @@ wait_for_git_change() {
   local current_output=""
 
   # Basic input validation
-  if ! [[ "$max_attempts" =~ ^[0-9]+$ ]] || ! [[ "$delay" =~ ^[0-9]+(\.[0-9]+)?$ ]];
+  if !
+  [[ "$max_attempts" =~ ^[0-9]+$ ]] || ! [[ "$delay" =~ ^[0-9]+(\.[0-9]+)?$ ]];
   then
     echo "Usage: wait_for_git_change [--target <expected>] <max_attempts> <delay_seconds> <command...>" >&3
-    echo "Error: max_attempts must be an integer and delay_seconds must be a number." >&3
+    echo "Error: max_attempts must be an integer and delay_seconds must be a number."
+    >&3
     return 1
   fi
   if [ $# -eq 0 ];
   then
-    echo "Error: No command provided to wait_for_git_change." >&3
+    echo "Error: No command provided to wait_for_git_change."
+    >&3
     return 1
   fi
 
@@ -56,7 +59,8 @@ wait_for_git_change() {
   local initial_status=$?
   if [ $initial_status -ne 0 ] && [ "$check_for_change" = true ];
   then
-    echo "Initial command failed with status $initial_status. Cannot wait for change." >&3
+    echo "Initial command failed with status $initial_status. Cannot wait for change."
+    >&3
     # If waiting for a target, failure might be the initial state, so we continue.
     if [ "$check_for_change" = true ]; then return 1; fi
   fi
@@ -76,14 +80,16 @@ wait_for_git_change() {
       # Succeed if output is different from initial AND command was successful
       if [[ "$current_output" != "$initial_output" ]] && [ $current_status -eq 0 ];
       then
-        echo "Output changed to '$current_output'. Success." >&3
+        echo "Output changed to '$current_output'. Success."
+        >&3
         return 0
       fi
     else
       # Succeed if output matches the target
       if [[ "$current_output" == "$target_output" ]] && [ $current_status -eq 0 ];
       then
-        echo "Output matches target '$target_output'. Success." >&3
+        echo "Output matches target '$target_output'. Success."
+        >&3
         return 0
       fi
     fi
@@ -92,6 +98,50 @@ wait_for_git_change() {
   done
 
   echo "Timeout reached after $max_attempts attempts. Final output: '$current_output'" >&3
+  return 1 # Timeout
+}
+
+# wait_for_process_to_die: Waits for a process to terminate.
+#
+# Usage: wait_for_process_to_die <pid> <max_attempts> <delay_seconds>
+#
+# Arguments:
+#   pid: The PID of the process to wait for.
+#   max_attempts: The maximum number of times to check.
+#   delay_seconds: The time to wait (in seconds) between checks.
+#
+# Returns:
+#   0 if the process terminated (PID is no longer found).
+#   1 if the timeout is reached and the process is still running.
+#
+# Outputs:
+#   Debug messages to BATS file descriptor 3 (>&3).
+wait_for_process_to_die() {
+  local pid=$1
+  local max_attempts=$2
+  local delay=$3
+  local attempt=1
+
+  # Basic input validation
+  if ! [[ "$max_attempts" =~ ^[0-9]+$ ]] || ! [[ "$delay" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    echo "Error: wait_for_process_to_die requires integer max_attempts and numeric delay_seconds." >&3
+    return 1
+  fi
+
+  while (( attempt <= max_attempts )); do
+    # Check if the process is still running (kill -0)
+    if kill -0 "$pid" &>/dev/null; then
+      # Still running
+      sleep "$delay"
+      (( attempt++ ))
+    else
+      # Not running (or no permission to check, which is functionally equivalent
+      # to success for teardown purposes)
+      echo "Process $pid successfully terminated." >&3
+      return 0
+    fi
+  done
+  echo "Timeout reached after $max_attempts attempts. Process $pid is still running." >&3
   return 1 # Timeout
 }
 
@@ -124,7 +174,7 @@ create_failing_watcher_bin() {
 }
 
 # NEW: create_hanging_bin: Creates a dummy script that sleeps for a very long time,
-#                         simulating a hung command (e.g., git push to a dead server).
+#                     simulating a hung command (e.g., git push to a dead server).
 #
 # Usage: create_hanging_bin <name>
 #
@@ -147,11 +197,12 @@ create_hanging_bin() {
   {
     # Print signature to indicate the hanging version was called
     echo "echo \"*** DUMMY HANG: $name called, will sleep 600s ***\" >&2"
-    # Sleep for 10 minutes (much longer than gitwatch.sh's 60s timeout)
-    echo "sleep 600"
-    # Exit cleanly if it ever wakes up, though it should be killed by 'timeout'
-    echo "exit 0"
-  } >> "$dummy_path"
-  chmod +x "$dummy_path"
-  echo "$dummy_path"
+    # Sleep for 10 minutes (much longer than gitwatch.sh's
+  60s timeout)
+  echo "sleep 600"
+  # Exit cleanly if it ever wakes up, though it should be killed by 'timeout'
+  echo "exit 0"
+} >> "$dummy_path"
+chmod +x "$dummy_path"
+echo "$dummy_path"
 }
