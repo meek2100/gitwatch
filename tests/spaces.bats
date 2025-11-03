@@ -19,7 +19,7 @@ setup() {
   # BATS_TEST_DIRNAME should handle spaces if the script itself is in such a path
   # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" $GITWATCH_TEST_ARGS -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   echo "# Testdir with spaces: $testdir" >&3

@@ -34,7 +34,7 @@ DEFAULT_TIMEOUT=60
   echo "# DEBUG: Starting gitwatch with hanging git binary and sleep=${test_sleep_time}s and -t ${DEFAULT_TIMEOUT}" >&3
 
 
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" $GITWATCH_TEST_ARGS -s "$test_sleep_time" -t "$DEFAULT_TIMEOUT" -r origin "$target_dir" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -s "$test_sleep_time" -t "$DEFAULT_TIMEOUT" -r origin "$target_dir" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$target_dir"
@@ -80,7 +80,7 @@ DEFAULT_TIMEOUT=60
 
 
   echo "# DEBUG: Starting gitwatch with hanging git binary and -R and -t ${DEFAULT_TIMEOUT}" >&3
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" $GITWATCH_TEST_ARGS -s "$test_sleep_time" -t "$DEFAULT_TIMEOUT" -r origin -R "$target_dir" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -s "$test_sleep_time" -t "$DEFAULT_TIMEOUT" -r origin -R "$target_dir" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$target_dir"
@@ -130,7 +130,7 @@ DEFAULT_TIMEOUT=60
   initial_hash=$(git log -1 --format=%H)
   echo "# DEBUG: Starting gitwatch with hanging commit binary and -t ${DEFAULT_TIMEOUT}" >&3
 
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" $GITWATCH_TEST_ARGS -s "$test_sleep_time" -t "$DEFAULT_TIMEOUT" "$target_dir" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -s "$test_sleep_time" -t "$DEFAULT_TIMEOUT" "$target_dir" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow watcher to initialize

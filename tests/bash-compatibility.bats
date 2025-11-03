@@ -22,7 +22,7 @@ load 'bats-custom/startup-shutdown'
   local expected_version="$MOCK_BASH_MAJOR_VERSION"
 
   # 2. Run gitwatch in verbose mode, which prints the calculated timeout
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" $GITWATCH_TEST_ARGS "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow gitwatch to initialize and print the output
@@ -51,7 +51,7 @@ load 'bats-custom/startup-shutdown'
   local expected_version="$MOCK_BASH_MAJOR_VERSION"
 
   # 2. Run gitwatch in verbose mode, which prints the calculated timeout
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" $GITWATCH_TEST_ARGS "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow gitwatch to initialize and print the output
@@ -81,7 +81,7 @@ load 'bats-custom/startup-shutdown'
   export MOCK_BASH_MAJOR_VERSION="4"
 
   # 2. Run gitwatch in verbose mode
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" $GITWATCH_TEST_ARGS "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow gitwatch to initialize and print the output

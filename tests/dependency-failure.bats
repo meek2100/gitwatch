@@ -154,7 +154,7 @@ load 'bats-custom/startup-shutdown'
 
   # 2. Run gitwatch *without -n*
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  run "${BATS_TEST_DIRNAME}/../gitwatch.sh" $GITWATCH_TEST_ARGS "$testdir/local/$TEST_SUBDIR_NAME"
+  run "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$testdir/local/$TEST_SUBDIR_NAME"
 
   # 3. Assert: Script exits with failure code 2
   assert_failure "Gitwatch should have exited with an error"
@@ -188,7 +188,7 @@ load 'bats-custom/startup-shutdown'
 
   # 2. Run gitwatch *WITH -n*
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" $GITWATCH_TEST_ARGS -n "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -n "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow script to initialize
