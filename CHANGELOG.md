@@ -18,8 +18,7 @@ incorporating all changes **after** commit `5cdaeb49dc`._
   - `-f`: Commit any pending changes on startup before starting the watch
     loop.
   - `-S`: Log messages to syslog instead of stderr/stdout.
-  - `-v`: Enable verbose output for debugging (also enables `set -x` if not
-    using syslog).
+  - `-v`: Enable verbose output for debugging.
   - `-V`/`--version`: Print version information (read from `VERSION` file
     or embedded placeholder) and exit.
 - **Robustness & Reliability:**
