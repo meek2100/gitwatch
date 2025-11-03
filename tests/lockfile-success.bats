@@ -21,7 +21,7 @@ load 'bats-custom/startup-shutdown'
 
   # 1. Start the first gitwatch instance in the background. This one will acquire the lock.
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file_1" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" $GITWATCH_TEST_ARGS "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file_1" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   # Store PID for teardown

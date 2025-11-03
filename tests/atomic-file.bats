@@ -26,7 +26,7 @@ load 'bats-custom/startup-shutdown'
   initial_hash=$(git log -1 --format=%H)
 
   # 2. Start gitwatch watching ONLY watched.txt
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v -l 10 "$watched_file_path" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" $GITWATCH_TEST_ARGS -l 10 "$watched_file_path" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1
