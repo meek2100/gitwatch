@@ -39,18 +39,16 @@ wait_for_git_change() {
   local current_output=""
 
   # Basic input validation
-  if !
-  [[ "$max_attempts" =~ ^[0-9]+$ ]] || ! [[ "$delay" =~ ^[0-9]+(\.[0-9]+)?$ ]];
+  # FIX: Consolidated multiline conditional check for shellcheck compliance (SC1035, SC1073)
+  if ! [[ "$max_attempts" =~ ^[0-9]+$ ]] || ! [[ "$delay" =~ ^[0-9]+(\.[0-9]+)?$ ]];
   then
     echo "Usage: wait_for_git_change [--target <expected>] <max_attempts> <delay_seconds> <command...>" >&3
-    echo "Error: max_attempts must be an integer and delay_seconds must be a number."
-    >&3
+    echo "Error: max_attempts must be an integer and delay_seconds must be a number." >&3
     return 1
   fi
   if [ $# -eq 0 ];
   then
-    echo "Error: No command provided to wait_for_git_change."
-    >&3
+    echo "Error: No command provided to wait_for_git_change." >&3
     return 1
   fi
 
@@ -59,8 +57,7 @@ wait_for_git_change() {
   local initial_status=$?
   if [ $initial_status -ne 0 ] && [ "$check_for_change" = true ];
   then
-    echo "Initial command failed with status $initial_status. Cannot wait for change."
-    >&3
+    echo "Initial command failed with status $initial_status. Cannot wait for change." >&3
     # If waiting for a target, failure might be the initial state, so we continue.
     if [ "$check_for_change" = true ]; then return 1; fi
   fi
@@ -80,16 +77,14 @@ wait_for_git_change() {
       # Succeed if output is different from initial AND command was successful
       if [[ "$current_output" != "$initial_output" ]] && [ $current_status -eq 0 ];
       then
-        echo "Output changed to '$current_output'. Success."
-        >&3
+        echo "Output changed to '$current_output'. Success." >&3
         return 0
       fi
     else
       # Succeed if output matches the target
       if [[ "$current_output" == "$target_output" ]] && [ $current_status -eq 0 ];
       then
-        echo "Output matches target '$target_output'. Success."
-        >&3
+        echo "Output matches target '$target_output'. Success." >&3
         return 0
       fi
     fi
@@ -123,14 +118,18 @@ wait_for_process_to_die() {
   local attempt=1
 
   # Basic input validation
-  if ! [[ "$max_attempts" =~ ^[0-9]+$ ]] || ! [[ "$delay" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+  # FIX: Consolidated multiline conditional check for shellcheck compliance (SC1035, SC1073)
+  if ! [[ "$max_attempts" =~ ^[0-9]+$ ]] || ! [[ "$delay" =~ ^[0-9]+(\.[0-9]+)?$ ]];
+  then
     echo "Error: wait_for_process_to_die requires integer max_attempts and numeric delay_seconds." >&3
     return 1
   fi
 
-  while (( attempt <= max_attempts )); do
+  while (( attempt <= max_attempts ));
+  do
     # Check if the process is still running (kill -0)
-    if kill -0 "$pid" &>/dev/null; then
+    if kill -0 "$pid" &>/dev/null;
+    then
       # Still running
       sleep "$delay"
       (( attempt++ ))
@@ -194,15 +193,16 @@ create_hanging_bin() {
 
   echo "#!/usr/bin/env bash" > "$dummy_path"
   # Fix SC2129: Combine redirects
+  # FIX: Ensure comment inside brace group is single-line to avoid parser confusion.
   {
     # Print signature to indicate the hanging version was called
     echo "echo \"*** DUMMY HANG: $name called, will sleep 600s ***\" >&2"
-    # Sleep for 10 minutes (much longer than gitwatch.sh's
-  60s timeout)
-  echo "sleep 600"
-  # Exit cleanly if it ever wakes up, though it should be killed by 'timeout'
-  echo "exit 0"
-} >> "$dummy_path"
-chmod +x "$dummy_path"
-echo "$dummy_path"
+    # Sleep for 10 minutes (much longer than gitwatch.sh's 60s timeout)
+    echo "sleep 600"
+    # Exit cleanly if it ever wakes up, though it should be killed by 'timeout'
+    echo "exit 0"
+  } >> "$dummy_path"
+
+  chmod +x "$dummy_path"
+  echo "$dummy_path"
 }
