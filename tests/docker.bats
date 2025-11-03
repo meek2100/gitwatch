@@ -20,7 +20,6 @@ setup_file() {
   # shellcheck disable=SC2154 # BATS_TEST_DIRNAME is set by BATS
   local repo_root="${BATS_TEST_DIRNAME}/.."
 
-  # --- FIX: Pass the repo root ('..') as the build context ---
   run docker build -t "$DOCKER_IMAGE_NAME" "$repo_root"
 
   if [ "$status" -ne 0 ]; then
@@ -49,7 +48,7 @@ setup() {
   # Initialize a git repo in the host directory
   git init "$TEST_REPO_HOST_DIR"
   (
-    cd "$TEST_REPO_HOST_DIR"
+    cd "$TEST_REPO_HOST_DIR" || return 1 # <-- SHELLCHECK FIX
     git config user.email "docker@test.com"
     git config user.name "Docker Test"
     echo "initial" > file.txt
@@ -76,7 +75,6 @@ run_container() {
   local docker_args=( "$@" ) # The rest are docker args
 
   # Run the container in detached mode
-  # --- FIX: Add capabilities for user/group switching ---
   docker run -d \
     --name "$container_name" \
     --cap-add=SETGID \
