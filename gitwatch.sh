@@ -133,7 +133,7 @@ shelp() {
   echo " -f               Commit any pending changes on startup before watching."
   echo " -M               Prevent commits when there is an ongoing merge in the repo"
   echo " -S               Log all messages to syslog (daemon mode)."
-  echo " -v               Run in verbose mode for debugging. Enables informational messages and command tracing (set -x)."
+  echo " -v               Run in verbose mode for debugging. Enables informational messages."
   echo " -q               Quiet mode. Suppress all stdout and stderr output (overridden by -S)."
   echo " -n               Disable file locking. Bypasses the 'flock' dependency check."
   echo " -V               Print version information and exit."
