@@ -13,7 +13,9 @@
 # Dependencies
 # ===================================================================
 node_modules/
-
+tests/bats-assert
+tests/bats-file
+tests/bats-support
 
 # ===================================================================
 # Build & Packaging Artifacts
