@@ -151,8 +151,8 @@ shelp() {
   echo "and \"flock\" (required for robust locking), expecting to find them in the PATH (it uses 'command -v' to check this"
   echo "and will abort with an error if they cannot be found). If you want to use"
   echo "binaries that are named differently and/or located outside of your PATH, you can"
-  echo "define replacements in the environment variables GW_GIT_BIN, GW_INW_BIN, and"
-  echo "GW_FLOCK_BIN for git, inotifywait/fswatch, and flock, respectively."
+  echo "define replacements in the environment variables GW_GIT_BIN, GW_INW_BIN, GW_FLOCK_BIN, and"
+  echo "GW_TIMEOUT_BIN for git, inotifywait/fswatch, flock, and timeout, respectively."
   echo "The read timeout for the drain loop can be set using the GW_READ_TIMEOUT environment variable."
   echo "The line length for diffs in commit logs can be set with GW_LOG_LINE_LENGTH (default 150)."
 }
@@ -426,6 +426,15 @@ else
   INW="$GW_INW_BIN"
 fi
 
+# --- Check for 'flock' dependency ---
+# Use GW_FLOCK_BIN if set, otherwise default to "flock"
+if [ -z "${GW_FLOCK_BIN:-}" ]; then FLOCK="flock"; else FLOCK="$GW_FLOCK_BIN"; fi
+
+# --- Check for 'timeout' dependency ---
+# Use GW_TIMEOUT_BIN if set, otherwise default to "timeout"
+if [ -z "${GW_TIMEOUT_BIN:-}" ]; then TIMEOUT_CMD="timeout"; else TIMEOUT_CMD="$GW_TIMEOUT_BIN"; fi
+
+
 # Check availability of selected binaries (uses final $GIT, $INW, $FLOCK values)
 # Check the base git command before potential modification by -g
 BASE_GIT_CMD=$(echo "$GIT" | awk '{print $1}')
@@ -449,29 +458,29 @@ for cmd in "$BASE_GIT_CMD" "$INW"; do
     exit 2
   }
 done
+
 # 'timeout' (GNU version) is required for production robustness
-if ! is_command "timeout"; then
-  stderr "Error: Required command 'timeout' not found.
-  Hint: Install 'timeout' (e.g., 'apt install coreutils' or 'brew install coreutils')."
+if ! is_command "$TIMEOUT_CMD"; then
+  stderr "Error: Required command '$TIMEOUT_CMD' not found.
+  Hint: Install 'timeout' (e.g., 'apt install coreutils' or 'brew install coreutils').
+  Hint: You can specify a custom path (e.g., 'gtimeout') via the GW_TIMEOUT_BIN environment variable."
   exit 2
 fi
 # Check for GNU coreutils version
 # Use a subshell and check exit status + output to be safe
-if ! (timeout --version 2>&1 | grep -q "GNU coreutils"); then
-  stderr "Error: GNU 'timeout' (from coreutils) not found.
+if ! ("$TIMEOUT_CMD" --version 2>&1 | grep -q "GNU coreutils"); then
+  stderr "Error: GNU 'timeout' (from coreutils) not found (found at '$TIMEOUT_CMD').
   gitwatch.sh requires the GNU version for consistent behavior.
-  Hint: Install 'coreutils' (e.g., 'brew install coreutils' on macOS)."
+  Hint: Install 'coreutils' (e.g., 'brew install coreutils' on macOS).
+  Hint: If your GNU timeout is named 'gtimeout', run: export GW_TIMEOUT_BIN=gtimeout"
   exit 2
 fi
+
 # 'logger' is a special case, we only check if syslog is requested
 if [ "$USE_SYSLOG" -eq 1 ] && ! is_command "logger"; then
   stderr "Error: Required command 'logger' not found (for -S syslog option)."
   exit 2
 fi
-
-# --- Check for 'flock' dependency ---
-# Use GW_FLOCK_BIN if set, otherwise default to "flock"
-if [ -z "${GW_FLOCK_BIN:-}" ]; then FLOCK="flock"; else FLOCK="$GW_FLOCK_BIN"; fi
 
 # Only check for flock if locking is *not* disabled
 if [ "$NO_LOCK" -eq 0 ]; then
@@ -1038,9 +1047,9 @@ generate_commit_message() {
     if [ "$PASSDIFFS" -eq 1 ]; then
       # Use process substitution and pipe to custom command
       # Pipe staged files diff
-      final_cmd_string=$(printf "timeout -s 9 %s %s diff --staged --name-only | %s" "$TIMEOUT" "$GIT" "$COMMITCMD")
+      final_cmd_string=$(printf "%s -s 9 %s %s diff --staged --name-only | %s" "$TIMEOUT_CMD" "$TIMEOUT" "$GIT" "$COMMITCMD")
     else
-      final_cmd_string=$(printf "timeout -s 9 %s %s" "$TIMEOUT" "$COMMITCMD")
+      final_cmd_string=$(printf "%s -s 9 %s %s" "$TIMEOUT_CMD" "$TIMEOUT" "$COMMITCMD")
     fi
 
     # Run the custom command with timeout
@@ -1134,7 +1143,7 @@ _perform_commit() {
   # Commit
   local commit_cmd
   # Add timeout to commit command
-  commit_cmd=$(printf "timeout -s 9 %s %s commit %s -m %q" "$TIMEOUT" "$GIT" "$GIT_COMMIT_ARGS" "$FINAL_COMMIT_MSG")
+  commit_cmd=$(printf "%s -s 9 %s %s commit %s -m %q" "$TIMEOUT_CMD" "$TIMEOUT" "$GIT" "$GIT_COMMIT_ARGS" "$FINAL_COMMIT_MSG")
 
   # Run the commit command and capture its output and exit code
   verbose_echo "Running git commit command: $commit_cmd"
@@ -1171,7 +1180,7 @@ _perform_commit() {
     verbose_echo "Executing pull command: $PULL_CMD"
     # Add timeout to pull command
     local pull_cmd_with_timeout
-    pull_cmd_with_timeout=$(printf "timeout -s 9 %s %s" "$TIMEOUT" "$PULL_CMD")
+    pull_cmd_with_timeout=$(printf "%s -s 9 %s %s" "$TIMEOUT_CMD" "$TIMEOUT" "$PULL_CMD")
     if ! bash -c "$pull_cmd_with_timeout"; then
       if [ $? -eq 124 ]; then
         stderr "ERROR: 'git pull' timed out after $TIMEOUT seconds. Skipping push."
@@ -1187,7 +1196,7 @@ _perform_commit() {
     verbose_echo "Executing push command: $PUSH_CMD"
     # Add timeout to push command
     local push_cmd_with_timeout
-    push_cmd_with_timeout=$(printf "timeout -s 9 %s %s" "$TIMEOUT" "$PUSH_CMD")
+    push_cmd_with_timeout=$(printf "%s -s 9 %s %s" "$TIMEOUT_CMD" "$TIMEOUT" "$PUSH_CMD")
     if ! bash -c "$push_cmd_with_timeout"; then
       if [ $? -eq 124 ]; then
         stderr "ERROR: 'git push' timed out after $TIMEOUT seconds."

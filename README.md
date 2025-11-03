@@ -481,6 +481,8 @@ override default script behavior using environment variables:
 - `GW_INW_BIN`: Specify the full path to the watcher binary (`inotifywait`
   or `fswatch`).
 - `GW_FLOCK_BIN`: Specify the full path to the `flock` binary.
+- `GW_TIMEOUT_BIN`: Specify the full path to the `timeout` binary (e.g.,
+  `gtimeout` on macOS).
 - `GW_TIMEOUT`: Overrides the default 60-second timeout for Git operations.
 - `GW_READ_TIMEOUT`: Overrides the auto-detected event drain timeout (e.g.,
   `0.1` or `1`).

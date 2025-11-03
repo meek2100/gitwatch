@@ -18,11 +18,15 @@
     <key>EnvironmentVariables</key>
     <dict>
       <key>PATH</key>
-      <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+      <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
       <key>GW_GIT_BIN</key>
-      <string>/usr/local/bin/git</string>
+      <string>/opt/homebrew/bin/git</string>
       <key>GW_INW_BIN</key>
-      <string>/usr/local/bin/fswatch</string>
+      <string>/opt/homebrew/bin/fswatch</string>
+      <key>GW_FLOCK_BIN</key>
+      <string>/opt/homebrew/bin/flock</string>
+      <key>GW_TIMEOUT_BIN</key>
+      <string>/opt/homebrew/bin/gtimeout</string>
     </dict>
  <!-- remove comment to log output from gitwatch
     <key>StandardOutPath</key>

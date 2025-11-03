@@ -29,7 +29,7 @@ create_dummy_bin() {
   echo "$dummy_path"
 }
 
-@test "custom_bins_env_vars: Uses GW_GIT_BIN, GW_INW_BIN, GW_FLOCK_BIN if set" {
+@test "custom_bins_env_vars: Uses GW_GIT_BIN, GW_INW_BIN, GW_FLOCK_BIN, GW_TIMEOUT_BIN if set" {
   # Skip if running on macOS as fswatch replacement is more complex
   if [ "$RUNNER_OS" == "macOS" ]; then
     skip "Custom bins test skipped: requires Linux environment for simple inotifywait setup."
@@ -57,10 +57,19 @@ create_dummy_bin() {
   # shellcheck disable=SC2155 # Declared on previous line
   dummy_flock=$(create_dummy_bin "flock" "$real_flock_path" "FLOCK_OK")
 
+  # --- NEW: Create dummy timeout ---
+  local real_timeout_path
+  real_timeout_path=$(command -v timeout)
+  local dummy_timeout
+  # shellcheck disable=SC2155 # Declared on previous line
+  dummy_timeout=$(create_dummy_bin "timeout" "$real_timeout_path" "TIMEOUT_OK")
+  # --- End new dummy timeout ---
+
   # 2. Set environment variables
   export GW_GIT_BIN="$dummy_git"
   export GW_INW_BIN="$dummy_inw"
   export GW_FLOCK_BIN="$dummy_flock"
+  export GW_TIMEOUT_BIN="$dummy_timeout" # --- NEW: Export dummy timeout bin ---
 
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -84,10 +93,15 @@ create_dummy_bin() {
   assert_output --partial "*** DUMMY BIN: GIT_OK ***" "Dummy Git command was not executed or its message not captured"
   assert_output --partial "*** DUMMY BIN: INW_OK ***" "Dummy Inotifywait command was not executed or its message not captured"
   assert_output --partial "*** DUMMY BIN: FLOCK_OK ***" "Dummy Flock command was not executed or its message not captured"
+  # --- NEW: Assert dummy timeout was used ---
+  # Note: The dependency check for GNU timeout will fail if the dummy bin doesn't forward --version.
+  # The create_dummy_bin helper *does* forward all args, so this test is valid.
+  assert_output --partial "*** DUMMY BIN: TIMEOUT_OK ***" "Dummy Timeout command was not executed or its message not captured"
 
   # 6. Cleanup environment variables for next test
   unset GW_GIT_BIN
   unset GW_INW_BIN
   unset GW_FLOCK_BIN
+  unset GW_TIMEOUT_BIN # --- NEW: Unset dummy timeout bin ---
   cd /tmp
 }
