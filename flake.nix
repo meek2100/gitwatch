@@ -1,5 +1,11 @@
 {
   description = "A bash script to watch a file or folder and commit changes to a git repo";
+
+  inputs = {
+    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  };
+
   outputs =
     {
       self,
