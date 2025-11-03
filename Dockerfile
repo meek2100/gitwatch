@@ -11,6 +11,8 @@ RUN apk add --no-cache \
         inotify-tools \
         openssh \
         su-exec \
+        util-linux \
+        coreutils \
     && mkdir -p /app \
     && chown appuser:appgroup /app
 
