@@ -337,7 +337,7 @@ while getopts b:d:h:g:L:l:m:c:C:p:r:s:t:e:x:X:MRvSfVqn option; do # Process comm
         # Resolve the user-provided path for GIT_DIR robustly
         RESOLVED_GIT_DIR=$(cd "$GIT_DIR" && pwd -P) || { stderr "Error resolving path for GIT_DIR '$GIT_DIR'"; exit 4; }
         # Modify the *global* GIT variable string, quoting paths
-        GIT_CMD_BASE=$(echo "$GIT" | awk '{print $1}') # Get base git command
+        read -r GIT_CMD_BASE _ <<< "$GIT" # Get base git command
         # Reconstruct the GIT command string safely using printf %q
         GIT=$(printf "%s --no-pager --work-tree %q --git-dir %q" "$GIT_CMD_BASE" "$PRELIM_TARGETDIR_ABS" "$RESOLVED_GIT_DIR")
 
@@ -396,7 +396,6 @@ verbose_echo "Verbose logging enabled."
 
 # Enable command tracing only if verbose and not using syslog (to avoid flooding syslog)
 if [ "$VERBOSE" -eq 1 ] && [ "$USE_SYSLOG" -eq 0 ]; then
-  # set -x # Removed: Too noisy, replaced with targeted verbose_echo calls
   verbose_echo "Command tracing disabled in favor of verbose_echo."
 fi
 
@@ -437,7 +436,7 @@ if [ -z "${GW_TIMEOUT_BIN:-}" ]; then TIMEOUT_CMD="timeout"; else TIMEOUT_CMD="$
 
 # Check availability of selected binaries (uses final $GIT, $INW, $FLOCK values)
 # Check the base git command before potential modification by -g
-BASE_GIT_CMD=$(echo "$GIT" | awk '{print $1}')
+read -r BASE_GIT_CMD _ <<< "$GIT" # Get base git command
 for cmd in "$BASE_GIT_CMD" "$INW"; do
   is_command "$cmd" || {
     stderr "Error: Required command '$cmd' not found."
@@ -744,11 +743,9 @@ if [ "$NO_LOCK" -eq 0 ]; then
     # Use sha256sum if available, md5sum as fallback, or just path chars as last resort
     REPO_HASH=""
     if is_command "sha256sum"; then
-      # --- NEW: Use read instead of awk ---
-      REPO_HASH=$(echo -n "$GIT_DIR_PATH" | sha256sum | read -r hash _; echo "$hash")
+      REPO_HASH=$(echo -n "$GIT_DIR_PATH" | sha256sum | (read -r hash _; echo "$hash"))
     elif is_command "md5sum"; then
-      # --- NEW: Use read instead of awk ---
-      REPO_HASH=$(echo -n "$GIT_DIR_PATH" | md5sum | read -r hash _; echo "$hash")
+      REPO_HASH=$(echo -n "$GIT_DIR_PATH" | md5sum | (read -r hash _; echo "$hash"))
     else
       # Simple "hash" for POSIX compliance, replaces / with _
       REPO_HASH="${GIT_DIR_PATH//\//_}"
@@ -1255,9 +1252,9 @@ fi
 # Use sha256sum for uniqueness if available
 if [ "$NO_LOCK" -eq 0 ]; then
   if is_command "sha256sum"; then
-    TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | sha256sum | awk '{print $1}').pid"
+    TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | sha256sum | (read -r hash _; echo "$hash")).pid"
   elif is_command "md5sum"; then
-    TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | md5sum | awk '{print $1}').pid"
+    TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | md5sum | (read -r hash _; echo "$hash")).pid"
   else
     # Fallback if no hash command found
     TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_${GIT_DIR_PATH//\//_}.pid"
