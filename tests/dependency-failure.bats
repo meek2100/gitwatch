@@ -206,3 +206,98 @@ load 'bats-custom/startup-shutdown'
   export PATH="$path_backup"
   cd /tmp
 }
+
+@test "dependency_failure_non_gnu_timeout: Exits with code 2 if 'timeout' is not GNU coreutils" {
+  # shellcheck disable=SC2031 # PATH modification is intentional for mocking
+  local path_backup="$PATH"
+  local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  output_file=$(mktemp "$testdir/output.XXXXX")
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  local DUMMY_BIN="$testdir/dummy-bin"
+  mkdir -p "$DUMMY_BIN"
+
+  # 1. Create a dummy 'timeout' script that does NOT output "GNU coreutils"
+  cat > "$DUMMY_BIN/timeout" << 'EOF'
+#!/bin/bash
+echo "This is BSD timeout"
+exit 0
+EOF
+  chmod +x "$DUMMY_BIN/timeout"
+
+  # 2. Prepend the dummy bin to the PATH
+  # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
+  export PATH="$DUMMY_BIN:$PATH"
+  run command -v timeout
+  assert_output --partial "$DUMMY_BIN/timeout" "Failed to override timeout command"
+
+  # 3. Run gitwatch, which should fail the GNU version check
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  run "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$testdir/local/$TEST_SUBDIR_NAME"
+
+  # 4. Assert exit code 2 and the correct error
+  assert_failure
+  assert_exit_code 2
+  assert_output --partial "Error: GNU 'timeout' (from coreutils) not found"
+  assert_output --partial "Hint: If your GNU timeout is named 'gtimeout', run: export GW_TIMEOUT_BIN=gtimeout"
+
+  # 5. Cleanup
+  export PATH="$path_backup"
+  cd /tmp
+}
+
+@test "dependency_failure_non_gnu_timeout_with_override: Succeeds with GW_TIMEOUT_BIN" {
+  # shellcheck disable=SC2031 # PATH modification is intentional for mocking
+  local path_backup="$PATH"
+  local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  output_file=$(mktemp "$testdir/output.XXXXX")
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  local DUMMY_BIN="$testdir/dummy-bin"
+  mkdir -p "$DUMMY_BIN"
+
+  # 1. Create a dummy 'timeout' (BSD version)
+  cat > "$DUMMY_BIN/timeout" << 'EOF'
+#!/bin/bash
+echo "This is BSD timeout"
+exit 0
+EOF
+  chmod +x "$DUMMY_BIN/timeout"
+
+  # 2. Create a dummy 'gtimeout' (GNU version)
+  local real_timeout_path
+  real_timeout_path=$(command -v timeout) # Find the *real* GNU timeout on the runner
+  cat > "$DUMMY_BIN/gtimeout" << EOF
+#!/bin/bash
+# Pass all args to the real GNU timeout
+exec $real_timeout_path "\$@"
+EOF
+  chmod +x "$DUMMY_BIN/gtimeout"
+
+  # 3. Prepend the dummy bin to the PATH
+  # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
+  export PATH="$DUMMY_BIN:$PATH"
+  # Set the override variable
+  # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
+  export GW_TIMEOUT_BIN="$DUMMY_BIN/gtimeout"
+
+  # 4. Run gitwatch. It should find 'timeout', see it's non-GNU,
+  # but then use GW_TIMEOUT_BIN, check 'gtimeout', see it's GNU, and run.
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
+  GITWATCH_PID=$!
+  sleep 1 # Allow script to initialize
+
+  # 5. Assert: Process is *still running*
+  run kill -0 "$GITWATCH_PID"
+  assert_success "Gitwatch process exited when it should have continued"
+
+  # 6. Assert: Log shows it found the GNU version at the override path
+  run cat "$output_file"
+  refute_output --partial "Error: GNU 'timeout' (from coreutils) not found"
+
+  # 7. Cleanup
+  export PATH="$path_backup"
+  unset GW_TIMEOUT_BIN
+  cd /tmp
+}

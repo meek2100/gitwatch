@@ -75,6 +75,14 @@ USE_SYSLOG=${USE_SYSLOG:-false} # New: Log to Syslog (-S)
 QUIET=${QUIET:-false} # NEW: Quiet mode (-q)
 DISABLE_LOCKING=${DISABLE_LOCKING:-false} # NEW: Disable locking (-n)
 
+# --- NEW: Pass-through for binary overrides ---
+# These are exported so gitwatch.sh can find them
+export GW_GIT_BIN=${GW_GIT_BIN:-}
+export GW_INW_BIN=${GW_INW_BIN:-}
+export GW_FLOCK_BIN=${GW_FLOCK_BIN:-}
+export GW_TIMEOUT_BIN=${GW_TIMEOUT_BIN:-}
+# --- End new pass-through ---
+
 
 # --- Command Construction ---
 
