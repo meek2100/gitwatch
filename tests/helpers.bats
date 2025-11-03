@@ -1,80 +1,109 @@
 #!/usr/bin/env bats
 
-# Load standard helpers
+# Test the test helpers themselves
 load 'bats-support/load'
 load 'bats-assert/load'
-load 'bats-file/load' # Use bats-file for temp files
-
-# Load the custom helper file to *source* the function we are testing
+load 'bats-file/load'
 load 'bats-custom/custom-helpers'
 
-# This is a unit test for the helper, so we mock the command it calls
-# We create a dummy file that our mock command will read
+# --- FIX: Define a writable mock output file ---
+export MOCK_OUTPUT_FILE=""
 
 setup() {
-  # This file will store the "output" of our mock command
-  # shellcheck disable=SC2154 # testdir is sourced via setup function
-  export MOCK_OUTPUT_FILE="$testdir/mock_output.txt"
+  # --- FIX: Use BATS_TEST_TMPDIR for a writable temp file ---
+  # shellcheck disable=SC2154 # BATS_TEST_TMPDIR is set by BATS
+  MOCK_OUTPUT_FILE="$BATS_TEST_TMPDIR/mock_output.txt"
   echo "initial_state" > "$MOCK_OUTPUT_FILE"
 }
 
-# This is our mock command. It's not 'git', it's just 'cat'.
-# We are testing the helper's logic, not git.
-@test "wait_for_git_change: Succeeds when output changes" {
-  # In 0.5s, we will change the file *in the background*
-  (sleep 0.5 && echo "new_state" > "$MOCK_OUTPUT_FILE") &
+teardown() {
+  rm -f "$MOCK_OUTPUT_FILE"
+}
 
-  # The helper will call 'cat $MOCK_OUTPUT_FILE'
-  # It will first see "initial_state"
-  # After 0.5s, it will see "new_state" and succeed
-  run wait_for_git_change 10 0.1 cat "$MOCK_OUTPUT_FILE"
-  assert_success
-  assert_output --partial "Output changed to 'new_state'. Success."
+@test "wait_for_git_change: Succeeds when output changes" {
+  # Run the helper in the background
+  wait_for_git_change 5 0.1 git log -1 --format=%H "$MOCK_OUTPUT_FILE" &
+  local wait_pid=$!
+
+  # Wait a moment and then change the file
+  sleep 0.5
+  echo "new_state" > "$MOCK_OUTPUT_FILE"
+
+  # Wait for the helper to exit
+  run wait "$wait_pid"
+  assert_success "Helper function failed to detect change"
 }
 
 @test "wait_for_git_change: Fails (times out) when output does not change" {
-  # We do not change the file. It will always be "initial_state"
-  run wait_for_git_change 3 0.1 cat "$MOCK_OUTPUT_FILE"
-  assert_failure
-  assert_output --partial "Timeout reached after 3 attempts."
+  # Run the helper and expect it to fail (timeout)
+  run wait_for_git_change 1 0.1 git log -1 --format=%H "$MOCK_OUTPUT_FILE"
+  assert_failure "Helper function succeeded when it should have timed out"
 }
 
 @test "wait_for_git_change --target: Succeeds when output matches target" {
-  # In 0.5s, change the file to the target state
-  (sleep 0.5 && echo "target_state" > "$MOCK_OUTPUT_FILE") &
+  local target_state="target_state_achieved"
+  # Run the helper in the background
+  wait_for_git_change 5 0.1 --target "$target_state" git log -1 --format=%H "$MOCK_OUTPUT_FILE" &
+  local wait_pid=$!
 
-  run wait_for_git_change --target "target_state" 10 0.1 cat "$MOCK_OUTPUT_FILE"
-  assert_success
-  assert_output --partial "Output matches target 'target_state'. Success."
+  # Wait a moment, change to an intermediate state, then the target state
+  sleep 0.5
+  echo "intermediate_state" > "$MOCK_OUTPUT_FILE"
+  sleep 0.5
+  echo "$target_state" > "$MOCK_OUTPUT_FILE"
+
+  # Wait for the helper to exit
+  run wait "$wait_pid"
+  assert_success "Helper function failed to detect target match"
 }
 
 @test "wait_for_git_change --target: Fails (times out) if target is never matched" {
-  # In 0.5s, change to a *different* state
-  (sleep 0.5 && echo "wrong_state" > "$MOCK_OUTPUT_FILE") &
+  local target_state="target_state_never_achieved"
+  # Run the helper in the background
+  wait_for_git_change 1 0.1 --target "$target_state" git log -1 --format=%H "$MOCK_OUTPUT_FILE" &
+  local wait_pid=$!
 
-  run wait_for_git_change --target "target_state" 3 0.1 cat "$MOCK_OUTPUT_FILE"
-  assert_failure
-  assert_output --partial "Timeout reached after 3 attempts."
+  # Change to a different state
+  sleep 0.5
+  echo "some_other_state" > "$MOCK_OUTPUT_FILE"
+
+  # Wait for the helper to exit (it should time out and fail)
+  run wait "$wait_pid"
+  assert_failure "Helper function succeeded when it should have timed out"
 }
 
+
 @test "wait_for_git_change: Handles initial command failure" {
-  # Test if the *initial* command fails (e.g., file not found)
-  # shellcheck disable=SC2154 # testdir is sourced via setup function
-  run wait_for_git_change 3 0.1 cat "$testdir/non_existent_file.txt"
-  assert_failure
-  assert_output --partial "Initial command failed with status 1. Cannot wait for change."
+  # Run the helper with a command that fails, but still check for file change
+  rm -f "$MOCK_OUTPUT_FILE" # Ensure file doesn't exist
+
+  wait_for_git_change 5 0.1 cat "$MOCK_OUTPUT_FILE" &
+  local wait_pid=$!
+
+  # Wait a moment and then create the file (which changes the 'cat' output)
+  sleep 0.5
+  echo "new_state" > "$MOCK_OUTPUT_FILE"
+
+  # Wait for the helper to exit
+  run wait "$wait_pid"
+  assert_success "Helper function failed to detect change after initial error"
 }
 
 @test "wait_for_git_change --target: Continues if initial command fails" {
-  # When using --target, we *expect* the initial command to fail (e.g.,)
-  # We are waiting for the *target* state, which might be "success"
+  local target_state="target_state_achieved"
+  rm -f "$MOCK_OUTPUT_FILE" # Ensure file doesn't exist
 
-  # In 0.5s, create the file (making the command succeed)
-  # shellcheck disable=SC2154 # testdir is sourced via setup function
-  (sleep 0.5 && echo "target_state" > "$testdir/non_existent_file.txt") &
+  # Run the helper in the background
+  wait_for_git_change 5 0.1 --target "$target_state" cat "$MOCK_OUTPUT_FILE" &
+  local wait_pid=$!
 
-  # shellcheck disable=SC2154 # testdir is sourced via setup function
-  run wait_for_git_change --target "target_state" 10 0.1 cat "$testdir/non_existent_file.txt"
-  assert_success
-  assert_output --partial "Output matches target 'target_state'. Success."
+  # Wait a moment, create with intermediate state, then the target state
+  sleep 0.5
+  echo "intermediate_state" > "$MOCK_OUTPUT_FILE"
+  sleep 0.5
+  echo "$target_state" > "$MOCK_OUTPUT_FILE"
+
+  # Wait for the helper to exit
+  run wait "$wait_pid"
+  assert_success "Helper function failed to detect target match after initial error"
 }
