@@ -15,7 +15,7 @@ jobs:
   #-------------------------------------------------------------------------
   bats:
     name: BATS Tests
-    if: "! contains(github.event.head_commit.message, '#noaction')"
+    if: "!contains(github.event.head_commit.message, '#noaction')"
     permissions:
       contents: read
     strategy:
@@ -218,9 +218,11 @@ jobs:
           } else {
             Write-Host "New commit detected. Test passed!"
           }
-        finally:
-          # 7. Cleanup Files
-          Write-Host "Cleaning up test directory..."
-          Remove-Item $testDir -Recurse -Force -ErrorAction SilentlyContinue
-          Remove-Item $logFile -ErrorAction SilentlyContinue
-          Remove-Item $errFile -ErrorAction SilentlyContinue
+
+      - name: Cleanup Test Files
+        if: always()
+        shell: powershell
+        run: |
+          Remove-Item "C:\gitwatch-test-dir" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item "C:\gitwatch.log" -ErrorAction SilentlyContinue
+          Remove-Item "C:\gitwatch.err" -ErrorAction SilentlyContinue
