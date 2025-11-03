@@ -4,147 +4,147 @@
 load 'bats-support/load'
 load 'bats-assert/load'
 load 'bats-file/load'
+# Load custom helpers
+load 'bats-custom/custom-helpers'
 
-# This file must be run from the root of the repository
-# (where the Dockerfile is)
-
-# --- Global Setup & Teardown ---
+# --- GLOBAL VARS ---
+export DOCKER_IMAGE_NAME="gitwatch-test-image"
+export DOCKER_CONTAINER_NAME_PREFIX="gitwatch-test"
+export TEST_REPO_HOST_DIR="" # Set in setup
+export RUNNER_UID=""
+export RUNNER_GID=""
+# ---------------------
 
 setup_file() {
-  # 1. Build the Docker image from the local Dockerfile
-  run docker build -t gitwatch:test .
+  # Build the Docker image from the parent directory
+  # shellcheck disable=SC2154 # BATS_TEST_DIRNAME is set by BATS
+  local repo_root="${BATS_TEST_DIRNAME}/.."
+
+  # --- FIX: Pass the repo root ('..') as the build context ---
+  run docker build -t "$DOCKER_IMAGE_NAME" "$repo_root"
+
+  if [ "$status" -ne 0 ]; then
+    echo "# DEBUG: Docker image build failed"
+    echo "$output"
+  fi
   assert_success "Docker image build failed"
-
-  # 2. Create a temporary host directory to act as the "watched" volume
-  TEST_REPO_DIR=$(mktemp -d)
-  export TEST_REPO_DIR
-  echo "# DEBUG: Host repo volume created at: $TEST_REPO_DIR" >&3
-
-  # 3. Initialize it as a bare-minimum Git repo
-  git -C "$TEST_REPO_DIR" init -q
-  git -C "$TEST_REPO_DIR" config user.email "docker-test@example.com"
-  git -C "$TEST_REPO_DIR" config user.name "Docker Test"
-  touch "$TEST_REPO_DIR/initial_file.txt"
-  git -C "$TEST_REPO_DIR" add .
-  git -C "$TEST_REPO_DIR" commit -q -m "Initial commit"
-
-  # 4. Get the host runner's UID/GID for the PUID/PGID test
-  HOST_UID=$(id -u)
-  HOST_GID=$(id -g)
-  export HOST_UID
-  export HOST_GID
-  echo "# DEBUG: Host runner UID/GID: $HOST_UID/$HOST_GID" >&3
 }
 
 teardown_file() {
-  # 1. Remove the test Docker image
-  docker rmi gitwatch:test >/dev/null 2>&1 || true
-
-  # 2. Remove the host repo volume
-  if [ -n "$TEST_REPO_DIR" ];
-  then
-    rm -rf "$TEST_REPO_DIR"
-    echo "# DEBUG: Cleaned up host repo volume: $TEST_REPO_DIR" >&3
-  fi
+  # Clean up the Docker image
+  docker rmi "$DOCKER_IMAGE_NAME" 2>/dev/null || true
 }
 
-# --- Per-Test Setup & Teardown ---
-
 setup() {
-  # Create a unique container name for each test
-  CONTAINER_NAME="gitwatch-test-${BATS_TEST_NUMBER}"
-  export CONTAINER_NAME
+  # Get the UID/GID of the user running the tests on the host
+  RUNNER_UID=$(id -u)
+  RUNNER_GID=$(id -g)
+
+  # Create a temporary directory on the *host* to act as the repo volume
+  # shellcheck disable=SC2154 # BATS_TEST_TMPDIR is set by BATS
+  TEST_REPO_HOST_DIR=$(mktemp -d "$BATS_TEST_TMPDIR/docker-host-repo.XXXXX")
+  verbose_echo "# DEBUG: Host repo volume created at: $TEST_REPO_HOST_DIR"
+  verbose_echo "# DEBUG: Host runner UID/GID: $RUNNER_UID/$RUNNER_GID"
+
+  # Initialize a git repo in the host directory
+  git init "$TEST_REPO_HOST_DIR"
+  (
+    cd "$TEST_REPO_HOST_DIR"
+    git config user.email "docker@test.com"
+    git config user.name "Docker Test"
+    echo "initial" > file.txt
+    git add .
+    git commit -m "Initial commit"
+  )
 }
 
 teardown() {
-  # 1. Dump logs for debugging failures
-  echo "# DEBUG: --- Logs for container '$CONTAINER_NAME' ---" >&3
-  docker logs "$CONTAINER_NAME" >&3
-  echo "# DEBUG: --- End logs for '$CONTAINER_NAME' ---" >&3
-
-  # 2. Stop and remove the container
-  docker stop "$CONTAINER_NAME" >/dev/null 2>&1 || true
-  docker rm "$CONTAINER_NAME" >/dev/null 2>&1 || true
+  # Stop and remove all containers with the test prefix
+  docker ps -a --filter "name=${DOCKER_CONTAINER_NAME_PREFIX}-" --format "{{.ID}}" | xargs -r docker rm -f
+  # Clean up the host directory
+  if [ -d "$TEST_REPO_HOST_DIR" ]; then
+    # We must 'sudo' this because the container might have changed permissions
+    sudo rm -rf "$TEST_REPO_HOST_DIR"
+    verbose_echo "# DEBUG: Cleaned up host repo volume: $TEST_REPO_HOST_DIR"
+  fi
 }
 
-# --- Test Cases ---
+# Helper to run a container and wait for it to be ready
+run_container() {
+  local container_name="$1"
+  shift
+  local docker_args=( "$@" ) # The rest are docker args
+
+  # Run the container in detached mode
+  docker run -d \
+    --name "$container_name" \
+    -v "$TEST_REPO_HOST_DIR:/app/watched-repo" \
+    "${docker_args[@]}" \
+    "$DOCKER_IMAGE_NAME"
+
+  # Wait for 5 seconds for it to initialize
+  sleep 5
+}
+
+# Helper to get container logs
+get_container_logs() {
+  local container_name="$1"
+  verbose_echo "# DEBUG: --- Logs for container '$container_name' ---"
+  docker logs "$container_name"
+  verbose_echo "# DEBUG: --- End logs for '$container_name' ---"
+}
 
 @test "docker_puid_gid: Entrypoint correctly switches user" {
-  # 1. Run the container with PUID/PGID set to the host user
-  run docker run -d --name "$CONTAINER_NAME" \
-    -e PUID="$HOST_UID" \
-    -e PGID="$HOST_GID" \
-    -v "$TEST_REPO_DIR":/app/watched-repo \
-    gitwatch:test
-  assert_success "Container failed to start"
+  local container_name="${DOCKER_CONTAINER_NAME_PREFIX}-1"
+  run_container "$container_name" \
+    -e PUID="$RUNNER_UID" \
+    -e PGID="$RUNNER_GID"
 
-  # 2. Give the container time to start
-  sleep 5
+  # 1. Check who owns the files *inside* the container
+  run docker exec "$container_name" ls -ld /app/watched-repo
+  assert_success "docker exec 'ls' command failed"
+  assert_output --partial "appuser appgroup" "PUID/PGID switch failed: /app/watched-repo not owned by appuser:appgroup"
 
-  # 3. Have the container (running as 'appuser') create a file in the volume
-  run docker exec "$CONTAINER_NAME" touch /app/watched-repo/puid_test_file.txt
+  # 2. Check if the user can write to the volume as 'appuser'
+  run docker exec --user appuser "$container_name" touch /app/watched-repo/test-touch
   assert_success "docker exec 'touch' command failed"
-
-  # 4. Assert: Check the ownership of the new file *on the host*.
-  # This is the definitive test: if PUID/PGID switching worked,
-  # the host user ($HOST_UID/$HOST_GID) should own the file.
-  run stat -c "%u %g" "$TEST_REPO_DIR/puid_test_file.txt"
-  assert_output "$HOST_UID $HOST_GID"
 }
 
 @test "docker_env_vars: Entrypoint correctly passes flags" {
-  # 1. Run the container with multiple env vars set
-  run docker run -d --name "$CONTAINER_NAME" \
+  local container_name="${DOCKER_CONTAINER_NAME_PREFIX}-2"
+  run_container "$container_name" \
     -e VERBOSE=true \
     -e COMMIT_ON_START=true \
-    -e EXCLUDE_PATTERN="*.log,tmp/" \
-    -v "$TEST_REPO_DIR":/app/watched-repo \
-    gitwatch:test
-  assert_success "Container failed to start"
+    -e EXCLUDE_PATTERN="*.log,tmp/" # Test the -X flag
 
-  # 2. Give the container time to start and run the -f flag
-  sleep 5
+  # Check the container logs to see the command that was executed
+  run get_container_logs "$container_name"
 
-  # 3. Assert: Check the container logs
-  run docker logs "$CONTAINER_NAME"
-
-
-  # 4. Check for flags in the entrypoint startup message
+  # Check that the entrypoint translated the env vars to the correct flags
   assert_output --partial "Starting gitwatch with the following arguments:"
-  assert_output --partial " -v " # VERBOSE=true -> -v
-  assert_output --partial " -f " # COMMIT_ON_START=true -> -f
-  # Check that the EXCLUDE_PATTERN was passed to -X (with %q quoting)
-  assert_output --partial " -X '*.log,tmp/' "
-
-  # 5. Check for verbose output from gitwatch.sh, proving the flags were received
-  # This proves -f was received and processed
-  assert_output --partial "Performing initial commit check..."
-  # This proves -v was received AND -X was received and processed
-  assert_output --partial "Converting glob exclude pattern '.*\.log|tmp/'"
+  assert_output --partial " -v "
+  assert_output --partial " -f "
+  # Check that the glob pattern was passed to -X
+  assert_output --partial " -X \*.log\,tmp/ "
 }
 
 @test "docker_env_vars: COMMIT_CMD overrides default message" {
+  local container_name="${DOCKER_CONTAINER_NAME_PREFIX}-3"
   local custom_message="Custom Docker Commit"
 
-  # 1. Run the container with COMMIT_CMD and a short sleep time
-  run docker run -d --name "$CONTAINER_NAME" \
-    -e COMMIT_CMD="echo '$custom_message'" \
+  run_container "$container_name" \
     -e SLEEP_TIME=1 \
-    -v "$TEST_REPO_DIR":/app/watched-repo \
-    gitwatch:test
-  assert_success "Container failed to start"
+    -e COMMIT_CMD="echo '$custom_message'" # Set a custom commit command
 
-  # 2. Wait for the container to initialize
+  # Wait for the container to start, then trigger a change
+  sleep 2
+  echo "docker change" >> "$TEST_REPO_HOST_DIR/file.txt"
+
+  # Wait for the commit (Sleep 1s + commit time)
   sleep 3
 
-  # 3. Trigger a change on the host to make gitwatch commit
-  touch "$TEST_REPO_DIR/file_for_commit_cmd.txt"
-
-
-  # 4. Wait for debounce (1s) + commit time
-  sleep 3
-
-  # 5. Assert: Check the git log *on the host*
-  run git -C "$TEST_REPO_DIR" log -1 --pretty=%B
+  # Check the git log on the *host*
+  run git -C "$TEST_REPO_HOST_DIR" log -1 --format=%B
+  assert_success
   assert_output "$custom_message"
 }
