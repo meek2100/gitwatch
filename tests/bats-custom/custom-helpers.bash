@@ -206,3 +206,7 @@ create_hanging_bin() {
   chmod +x "$dummy_path"
   echo "$dummy_path"
 }
+
+verbose_echo() {
+  echo "$@" >&3
+}
