@@ -10,10 +10,10 @@ load 'bats-custom/custom-helpers'
 # Define the custom cleanup logic specific to this file
 # Use standard echo to output debug info to avoid relying on bats-support inside teardown
 _remotedirs_cleanup() {
-  echo "# Running custom cleanup for remotedirs" >&3
+  verbose_echo "# Running custom cleanup for remotedirs"
   if [ -n "${dotgittestdir:-}" ] && [ -d "$dotgittestdir" ];
   then
-    echo "# Removing external git dir: $dotgittestdir" >&3
+    verbose_echo "# Removing external git dir: $dotgittestdir"
     rm -rf "$dotgittestdir"
   fi
 }

@@ -165,7 +165,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
   # 4. Wait for the internal timeout (10s) plus a buffer.
   # We just need to wait long enough for the fallback commit to be created.
   local total_wait_time=15
-  echo "# DEBUG: Waiting ${total_wait_time}s for hanging command to be terminated and fallback commit to occur." >&3
+  verbose_echo "# DEBUG: Waiting ${total_wait_time}s for hanging command to be terminated and fallback commit to occur."
   sleep "$total_wait_time"
 
   # 5. Assert: We wait for the actual commit to finish with the fallback message

@@ -28,10 +28,10 @@ load 'bats-custom/startup-shutdown'
   # 2. Create a file that the gitwatch user cannot read
   echo "This content cannot be added" > "$unreadable_file"
   chmod 000 "$unreadable_file"
-  echo "# DEBUG: Created unreadable file $unreadable_file" >&3
+  verbose_echo "# DEBUG: Created unreadable file $unreadable_file"
 
   # 3. Wait for the watcher to see the 'create' event and attempt the commit
-  echo "# DEBUG: Waiting $WAITTIME seconds for 'git add' to fail..." >&3
+  verbose_echo "# DEBUG: Waiting $WAITTIME seconds for 'git add' to fail..."
   sleep "$WAITTIME"
 
   # 4. Assert: Log output should show the 'git add' error

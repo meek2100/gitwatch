@@ -75,7 +75,7 @@ load 'bats-custom/startup-shutdown'
 
   # Debug: Check git status right before hash comparison
   run git status -s
-  echo "# Git status after removal wait: $output" >&3
+  verbose_echo "# Git status after removal wait: $output"
 
   # Verify push happened reflecting the removal
   run git rev-parse master

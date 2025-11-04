@@ -56,7 +56,7 @@ load 'bats-custom/startup-shutdown'
     run chmod "$ORIGINAL_PERMS" "$GIT_DIR_PATH"
     fail "Test setup failed: Cannot reliably hide 'sha256sum'/'md5sum' to test fallback logic."
   fi
-  echo "# DEBUG: Successfully hid hash commands via PATH manipulation." >&3
+  verbose_echo "# DEBUG: Successfully hid hash commands via PATH manipulation."
 
   # 4. Start gitwatch, which should fall back because of unwritable .git AND missing hash tools
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$target_path" > "$output_file" 2>&1 &

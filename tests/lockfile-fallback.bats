@@ -49,7 +49,7 @@ load 'bats-custom/startup-shutdown'
     ORIGINAL_PERMS=$(stat -f "%A" "$GIT_DIR_PATH")
   fi
 
-  echo "# DEBUG: Removing write permission from $GIT_DIR_PATH (Original: $ORIGINAL_PERMS)" >&3
+  verbose_echo "# DEBUG: Removing write permission from $GIT_DIR_PATH (Original: $ORIGINAL_PERMS)"
   # Remove write permission for the owner
   run chmod u-w "$GIT_DIR_PATH"
   assert_success "Failed to change permissions on .git directory"
@@ -92,7 +92,7 @@ load 'bats-custom/startup-shutdown'
 
   # 7. Cleanup: Restore original permissions before _common_teardown runs
   cd /tmp
-  echo "# DEBUG: Restoring original permissions: $ORIGINAL_PERMS on $GIT_DIR_PATH" >&3
+  verbose_echo "# DEBUG: Restoring original permissions: $ORIGINAL_PERMS on $GIT_DIR_PATH"
   # Use the number to restore permissions robustly
   run chmod "$ORIGINAL_PERMS" "$GIT_DIR_PATH"
   assert_success "Failed to restore original permissions"

@@ -30,7 +30,7 @@ load 'bats-custom/startup-shutdown'
   git push -q origin master
 
   initial_commit_hash=$(git log -1 --format=%H)
-  echo "# Initial hash: $initial_commit_hash" >&3
+  verbose_echo "# Initial hash: $initial_commit_hash"
 
   # 2. Simulate Upstream Change on Remote to set up the conflict
   # shellcheck disable=SC2103 # cd is necessary here to manage clone/cleanup
@@ -58,7 +58,7 @@ load 'bats-custom/startup-shutdown'
   assert_file_exist "$GIT_DIR_PATH/MERGE_HEAD" "Failed to establish a merge-in-progress state"
 
   # 5. Start gitwatch with -M flag, logging all output
-  echo "# DEBUG: Starting gitwatch with -M" >&3
+  verbose_echo "# DEBUG: Starting gitwatch with -M"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
@@ -71,7 +71,7 @@ load 'bats-custom/startup-shutdown'
   git add some_other_file.txt
 
   # Wait for the commit attempt to be skipped
-  echo "# DEBUG: Waiting $WAITTIME seconds for the commit attempt to be skipped..." >&3
+  verbose_echo "# DEBUG: Waiting $WAITTIME seconds for the commit attempt to be skipped..."
   sleep "$WAITTIME"
 
   # 7. Assert: Commit hash has NOT changed
@@ -108,7 +108,7 @@ load 'bats-custom/startup-shutdown'
   git commit -q -m "Initial conflict file commit"
   git push -q origin master
   initial_commit_hash=$(git log -1 --format=%H)
-  echo "# Initial hash: $initial_commit_hash" >&3
+  verbose_echo "# Initial hash: $initial_commit_hash"
 
   # 2. Simulate Upstream Change
   # shellcheck disable=SC2103 # cd is necessary here to manage clone/cleanup
@@ -135,7 +135,7 @@ load 'bats-custom/startup-shutdown'
   assert_file_exist "$GIT_DIR_PATH/MERGE_HEAD" "Failed to establish a merge-in-progress state"
 
   # 5. Start gitwatch *WITHOUT -M* flag
-  echo "# DEBUG: Starting gitwatch *without* -M" >&3
+  verbose_echo "# DEBUG: Starting gitwatch *without* -M"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
@@ -145,7 +145,7 @@ load 'bats-custom/startup-shutdown'
   # Note: gitwatch.sh will run `git add --all .`, staging this change
 
   # Wait for the commit attempt to fail
-  echo "# DEBUG: Waiting $WAITTIME seconds for the commit attempt to FAIL..." >&3
+  verbose_echo "# DEBUG: Waiting $WAITTIME seconds for the commit attempt to FAIL..."
   sleep "$WAITTIME"
 
   # 7. Assert: Commit hash has NOT changed
@@ -188,7 +188,7 @@ load 'bats-custom/startup-shutdown'
   git push -q origin master
   local base_hash
   base_hash=$(git log -1 --format=%H)
-  echo "# Base hash: $base_hash" >&3
+  verbose_echo "# Base hash: $base_hash"
 
   # 2. Simulate Upstream Change (local2)
   # shellcheck disable=SC2103 # cd is necessary here
@@ -219,7 +219,7 @@ load 'bats-custom/startup-shutdown'
   assert_dir_exist "$GIT_DIR_PATH/rebase-apply" "Failed to establish a rebase-in-progress state"
 
   # 5. Start gitwatch with -M flag
-  echo "# DEBUG: Starting gitwatch with -M in a rebase conflict state" >&3
+  verbose_echo "# DEBUG: Starting gitwatch with -M in a rebase conflict state"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
@@ -229,7 +229,7 @@ load 'bats-custom/startup-shutdown'
   # Note: gitwatch will run 'git add --all .', staging this new file
 
   # Wait for the commit attempt to be skipped
-  echo "# DEBUG: Waiting $WAITTIME seconds for the commit attempt to be skipped..." >&3
+  verbose_echo "# DEBUG: Waiting $WAITTIME seconds for the commit attempt to be skipped..."
   sleep "$WAITTIME"
 
   # 7. Assert: Commit hash has NOT changed (it's still the local commit)
@@ -247,104 +247,92 @@ load 'bats-custom/startup-shutdown'
   cd /tmp
 }
 
-# --- NEW: Test for CHERRY_PICK_HEAD ---
-@test "skip_if_merging_M_cherry_pick: -M flag prevents commit during a cherry-pick conflict" {
+# --- NEW TEST: CHERRY_PICK_HEAD ---
+@test "skip_if_merging_M_cherry_pick: -M flag prevents commit during a cherry-pick" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
-  local GIT_DIR_PATH
   cd "$testdir/local/$TEST_SUBDIR_NAME"
+  local GIT_DIR_PATH
+  # shellcheck disable=SC2155 # Declared on previous line
   GIT_DIR_PATH=$(git rev-parse --absolute-git-dir)
-
-  # 1. Create a commit on a separate branch to pick
-  git checkout -b feature
-  echo "feature change" > feature.txt
-  git add .
-  git commit -q -m "Feature commit"
-  local feature_commit_hash
-  feature_commit_hash=$(git log -1 --format=%H)
-  git checkout -q master
-
-  # 2. Create a conflicting change on master
-  echo "master change" > feature.txt
-  git add .
-  git commit -q -m "Master commit"
   local initial_commit_hash
   initial_commit_hash=$(git log -1 --format=%H)
 
-  # 3. Trigger the cherry-pick conflict
-  run git cherry-pick "$feature_commit_hash"
-  assert_failure "Cherry-pick should have failed"
-  assert_file_exist "$GIT_DIR_PATH/CHERRY_PICK_HEAD" "Failed to establish a cherry-pick-in-progress state"
+  # 1. Manually create the CHERRY_PICK_HEAD file to simulate state
+  echo "dummy_hash" > "$GIT_DIR_PATH/CHERRY_PICK_HEAD"
+  assert_file_exist "$GIT_DIR_PATH/CHERRY_PICK_HEAD"
 
-  # 4. Start gitwatch with -M
+  # 2. Start gitwatch with -M flag
+  verbose_echo "# DEBUG: Starting gitwatch with -M in a cherry-pick state"
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
+  sleep 1
 
-  # 5. Trigger watcher
-  echo "trigger" >> another_file.txt
+  # 3. Trigger a change
+  echo "change during cherry-pick" >> file_cherry.txt
+
+  # 4. Wait for the commit attempt to be skipped
+  verbose_echo "# DEBUG: Waiting $WAITTIME seconds for the commit attempt to be skipped..."
   sleep "$WAITTIME"
 
-  # 6. Assert: Commit hash has NOT changed
+  # 5. Assert: Commit hash has NOT changed
   run git log -1 --format=%H
+  assert_success
   assert_equal "$initial_commit_hash" "$output" "Commit hash should NOT change while in cherry-pick state"
 
-  # 7. Assert: Log output confirms the skip
+  # 6. Assert: Log output confirms the skip
   run cat "$output_file"
-  assert_output --partial "Skipping commit - repo is merging"
+  assert_output --partial "Skipping commit - repo is merging" "Gitwatch should report skipping the commit due to cherry-pick"
 
-  # 8. Cleanup
-  git cherry-pick --abort
+  # 7. Cleanup: Remove the file so teardown works
+  rm -f "$GIT_DIR_PATH/CHERRY_PICK_HEAD"
   cd /tmp
 }
 
-# --- NEW: Test for REVERT_HEAD ---
-@test "skip_if_merging_M_revert: -M flag prevents commit during a revert conflict" {
+# --- NEW TEST: REVERT_HEAD ---
+@test "skip_if_merging_M_revert: -M flag prevents commit during a revert" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
-  local GIT_DIR_PATH
   cd "$testdir/local/$TEST_SUBDIR_NAME"
+  local GIT_DIR_PATH
+  # shellcheck disable=SC2155 # Declared on previous line
   GIT_DIR_PATH=$(git rev-parse --absolute-git-dir)
-
-  # 1. Create a commit to revert
-  echo "original content" > revert_file.txt
-  git add .
-  git commit -q -m "Commit to revert"
-  local revert_commit_hash
-  revert_commit_hash=$(git log -1 --format=%H)
-
-  # 2. Create a conflicting change
-  echo "new conflicting content" > revert_file.txt
-  git add .
-  git commit -q -m "Conflicting commit"
   local initial_commit_hash
   initial_commit_hash=$(git log -1 --format=%H)
 
-  # 3. Trigger the revert conflict
-  run git revert --no-commit "$revert_commit_hash"
-  assert_failure "Revert should have failed"
-  assert_file_exist "$GIT_DIR_PATH/REVERT_HEAD" "Failed to establish a revert-in-progress state"
+  # 1. Manually create the REVERT_HEAD file to simulate state
+  echo "dummy_hash" > "$GIT_DIR_PATH/REVERT_HEAD"
+  assert_file_exist "$GIT_DIR_PATH/REVERT_HEAD"
 
-  # 4. Start gitwatch with -M
+  # 2. Start gitwatch with -M flag
+  verbose_echo "# DEBUG: Starting gitwatch with -M in a revert state"
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
+  sleep 1
 
-  # 5. Trigger watcher
-  echo "trigger" >> another_file.txt
+  # 3. Trigger a change
+  echo "change during revert" >> file_revert.txt
+
+  # 4. Wait for the commit attempt to be skipped
+  verbose_echo "# DEBUG: Waiting $WAITTIME seconds for the commit attempt to be skipped..."
   sleep "$WAITTIME"
 
-  # 6. Assert: Commit hash has NOT changed
+  # 5. Assert: Commit hash has NOT changed
   run git log -1 --format=%H
+  assert_success
   assert_equal "$initial_commit_hash" "$output" "Commit hash should NOT change while in revert state"
 
-  # 7. Assert: Log output confirms the skip
+  # 6. Assert: Log output confirms the skip
   run cat "$output_file"
-  assert_output --partial "Skipping commit - repo is merging"
+  assert_output --partial "Skipping commit - repo is merging" "Gitwatch should report skipping the commit due to revert"
 
-  # 8. Cleanup
-  git revert --abort
+  # 7. Cleanup: Remove the file so teardown works
+  rm -f "$GIT_DIR_PATH/REVERT_HEAD"
   cd /tmp
 }

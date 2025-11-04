@@ -21,7 +21,7 @@ load 'bats-custom/startup-shutdown'
   # Get the initial commit hash from the setup
   local initial_commit_hash
   initial_commit_hash=$(git log -1 --format=%H)
-  echo "# Initial hash: $initial_commit_hash" >&3
+  verbose_echo "# Initial hash: $initial_commit_hash"
 
   # 2. Start gitwatch with -f
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -56,7 +56,7 @@ load 'bats-custom/startup-shutdown'
   # Get the initial remote hash
   local initial_remote_hash
   initial_remote_hash=$(git rev-parse origin/master)
-  echo "# Initial remote hash: $initial_remote_hash" >&3
+  verbose_echo "# Initial remote hash: $initial_remote_hash"
 
   # 2. Start gitwatch with -f and -r origin
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -101,7 +101,7 @@ load 'bats-custom/startup-shutdown'
   # Get the initial commit hash
   local initial_commit_hash
   initial_commit_hash=$(git log -1 --format=%H)
-  echo "# Initial hash: $initial_commit_hash" >&3
+  verbose_echo "# Initial hash: $initial_commit_hash"
 
   # 4. Run gitwatch with -f, logging all output
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -144,7 +144,7 @@ load 'bats-custom/startup-shutdown'
   # Get the initial commit hash from the setup
   local initial_commit_hash
   initial_commit_hash=$(git log -1 --format=%H)
-  echo "# Initial hash: $initial_commit_hash" >&3
+  verbose_echo "# Initial hash: $initial_commit_hash"
 
   # 1. Start gitwatch with -f, logging all output
   # Note: Using WAITTIME from bats-custom/startup-shutdown.bash for the sleep duration

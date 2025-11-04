@@ -36,7 +36,7 @@ load 'bats-custom/startup-shutdown'
   sleep 1 # Allow watcher to initialize
 
   # 3. Delete the watched file
-  echo "# DEBUG: Deleting the watched file: $watched_file_path" >&3
+  verbose_echo "# DEBUG: Deleting the watched file: $watched_file_path"
   run rm "$watch_file"
   assert_success "Failed to delete watched file"
 
@@ -55,7 +55,7 @@ load 'bats-custom/startup-shutdown'
   # Use 'kill -0' to check if PID is alive
   while kill -0 "$watch_pid" 2>/dev/null && [ "$wait_count" -lt "$max_wait" ];
   do
-    echo "# DEBUG: Waiting for gitwatch PID $watch_pid to exit..." >&3
+    verbose_echo "# DEBUG: Waiting for gitwatch PID $watch_pid to exit..."
     sleep 1
     wait_count=$((wait_count + 1))
   done
@@ -97,7 +97,7 @@ load 'bats-custom/startup-shutdown'
   sleep 1 # Allow watcher to initialize
 
   # 3. Delete the watched directory
-  echo "# DEBUG: Deleting the watched directory: $sub_dir_path" >&3
+  verbose_echo "# DEBUG: Deleting the watched directory: $sub_dir_path"
   cd /tmp # Move out of the directory before deletion
   run rm -rf "$sub_dir_path"
   assert_success "Failed to delete watched directory"
@@ -107,7 +107,7 @@ load 'bats-custom/startup-shutdown'
   local wait_count=0
   while kill -0 "$watch_pid" 2>/dev/null && [ "$wait_count" -lt "$max_wait" ];
   do
-    echo "# DEBUG: Waiting for gitwatch PID $watch_pid to exit..." >&3
+    verbose_echo "# DEBUG: Waiting for gitwatch PID $watch_pid to exit..."
     sleep 1
     wait_count=$((wait_count + 1))
   done
@@ -163,7 +163,7 @@ load 'bats-custom/startup-shutdown'
   local wait_count=0
   while kill -0 "$watch_pid" 2>/dev/null && [ "$wait_count" -lt "$max_wait" ];
   do
-    echo "# DEBUG: Waiting for gitwatch PID $watch_pid to exit..." >&3
+    verbose_echo "# DEBUG: Waiting for gitwatch PID $watch_pid to exit..."
     sleep 1
     wait_count=$((wait_count + 1))
   done

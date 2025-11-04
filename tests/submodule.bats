@@ -22,13 +22,13 @@ setup() {
   local remote_path="$testdir/remote/upstream.git"
 
   # 1. Add the submodule and commit it *before* starting gitwatch
-  echo "# DEBUG: Adding submodule from $remote_path" >&3
+  verbose_echo "# DEBUG: Adding submodule from $remote_path"
   git submodule add "$remote_path" sub
   git commit -q -m "Add submodule"
   git push -q origin master
   local initial_hash
   initial_hash=$(git log -1 --format=%H)
-  echo "# DEBUG: Initial parent commit hash: $initial_hash" >&3
+  verbose_echo "# DEBUG: Initial parent commit hash: $initial_hash"
 
   # 2. Start gitwatch
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -38,7 +38,7 @@ setup() {
   sleep 1
 
   # 3. Make a change *inside* the submodule
-  echo "# DEBUG: Making change inside submodule 'sub'" >&3
+  verbose_echo "# DEBUG: Making change inside submodule 'sub'"
   # Use a subshell to avoid 'cd ..' (SC2103)
   (
     cd sub

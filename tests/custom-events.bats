@@ -149,7 +149,7 @@ create_watcher_wrapper() {
   fi
 
   # 3. Start gitwatch watching ONLY for 'create' events
-  echo "# DEBUG: Starting gitwatch with -e $create_event" >&3
+  verbose_echo "# DEBUG: Starting gitwatch with -e $create_event"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -e "$create_event" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
@@ -160,7 +160,7 @@ create_watcher_wrapper() {
   echo "modification" >> "$existing_file"
 
   # 5. Wait to ensure no commit happens
-  echo "# DEBUG: Waiting ${WAITTIME}s to ensure NO commit happens on 'modify'..." >&3
+  verbose_echo "# DEBUG: Waiting ${WAITTIME}s to ensure NO commit happens on 'modify'..."
   sleep "$WAITTIME"
 
   # 6. Assert commit hash has NOT changed

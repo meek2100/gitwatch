@@ -29,7 +29,7 @@ load 'bats-custom/startup-shutdown'
   initial_commit_hash=$(git log -1 --format=%H)
   initial_remote_hash=$(git rev-parse origin/master)
   assert_equal "$initial_commit_hash" "$initial_remote_hash" "Initial push failed"
-  echo "# Initial local hash: $initial_commit_hash" >&3
+  verbose_echo "# Initial local hash: $initial_commit_hash"
 
   # Start gitwatch in the background with verbose logging and remote push
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -48,11 +48,11 @@ load 'bats-custom/startup-shutdown'
   echo "exit 1" >> "$hook_file"
 
   chmod +x "$hook_file"
-  echo "# DEBUG: Installed failing hook at $hook_file" >&3
+  verbose_echo "# DEBUG: Installed failing hook at $hook_file"
 
   # --- FIRST CHANGE (Failure Expected) ---
   echo "line1" >> file1.txt
-  echo "# DEBUG: Waiting $WAITTIME seconds for hook failure attempt..." >&3
+  verbose_echo "# DEBUG: Waiting $WAITTIME seconds for hook failure attempt..."
 
   # Wait for the commit attempt to finish
   sleep "$WAITTIME"
@@ -77,7 +77,7 @@ load 'bats-custom/startup-shutdown'
   # 3. Clean up the hook to allow the next commit (Recovery Preparation)
   run rm -f "$hook_file"
   assert_success "Failed to remove the hook file"
-  echo "# DEBUG: Hook removed. Ready for success test." >&3
+  verbose_echo "# DEBUG: Hook removed. Ready for success test."
 
   # --- SECOND CHANGE (Success Expected - Proves Recovery) ---
   echo "line2" >> file2.txt
@@ -108,7 +108,7 @@ load 'bats-custom/startup-shutdown'
 
   # 1. Get initial remote hash
   initial_remote_hash=$(git rev-parse origin/master)
-  echo "# Initial remote hash: $initial_remote_hash" >&3
+  verbose_echo "# Initial remote hash: $initial_remote_hash"
 
   # 2. Start gitwatch
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -123,7 +123,7 @@ load 'bats-custom/startup-shutdown'
   echo "echo '*** ERROR: Push blocked by pre-push hook for testing. ***' >&2" >> "$hook_file"
   echo "exit 1" >> "$hook_file"
   chmod +x "$hook_file"
-  echo "# DEBUG: Installed failing pre-push hook at $hook_file" >&3
+  verbose_echo "# DEBUG: Installed failing pre-push hook at $hook_file"
 
   # 4. Trigger a change
   echo "A change to test pre-push failure" >> push_hook_test.txt
@@ -135,7 +135,7 @@ load 'bats-custom/startup-shutdown'
   assert_not_equal "$initial_remote_hash" "$local_commit_hash" "Local commit did not happen"
 
   # 6. Wait for the *push attempt* to fail
-  echo "# DEBUG: Waiting $WAITTIME seconds for push to fail..." >&3
+  verbose_echo "# DEBUG: Waiting $WAITTIME seconds for push to fail..."
   sleep "$WAITTIME"
 
   # 7. Assert: Remote hash has NOT changed

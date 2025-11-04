@@ -60,7 +60,7 @@ load 'bats-custom/startup-shutdown'
   assert_not_equal "$first_remote_hash" "$final_local_hash" "Local commit did not happen"
 
   # 6. Wait for the *push attempt* to fail
-  echo "# DEBUG: Waiting $WAITTIME seconds for push to fail..." >&3
+  verbose_echo "# DEBUG: Waiting $WAITTIME seconds for push to fail..."
   sleep "$WAITTIME"
 
   # 7. Assert: Remote hash has NOT changed (it's still the upstream hash)

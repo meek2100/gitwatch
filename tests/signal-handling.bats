@@ -55,7 +55,7 @@ load 'bats-custom/startup-shutdown'
   assert_file_exist "$TIMER_PID_FILE" "Timer PID file was not created at $TIMER_PID_FILE"
 
   # 5. Send SIGTERM (graceful shutdown) to the main gitwatch process
-  echo "# DEBUG: Sending SIGTERM to PID $test_pid" >&3
+  verbose_echo "# DEBUG: Sending SIGTERM to PID $test_pid"
   run kill -TERM "$test_pid"
   assert_success "kill -TERM command failed"
 
@@ -63,7 +63,7 @@ load 'bats-custom/startup-shutdown'
   local max_wait=5
   local wait_count=0
   while kill -0 "$test_pid" 2>/dev/null && [ "$wait_count" -lt "$max_wait" ]; do
-    echo "# DEBUG: Waiting for gitwatch PID $test_pid to exit..." >&3
+    verbose_echo "# DEBUG: Waiting for gitwatch PID $test_pid to exit..."
     sleep 0.5
     wait_count=$((wait_count + 1))
   done

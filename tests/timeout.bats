@@ -32,7 +32,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
 
-  echo "# DEBUG: Starting gitwatch with hanging git binary and sleep=${test_sleep_time}s and -t ${TEST_TIMEOUT}" >&3
+  verbose_echo "# DEBUG: Starting gitwatch with hanging git binary and sleep=${test_sleep_time}s and -t ${TEST_TIMEOUT}"
 
   # Note: GITWATCH_TEST_ARGS already contains the -t flag
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -s "$test_sleep_time" -r origin "$target_dir" > "$output_file" 2>&1 &
@@ -47,7 +47,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
   # 5. Wait for the debounce period (1s) plus a small buffer, then wait for the
   # expected timeout period (10s) to be triggered by the script itself.
   local total_wait_time=5
-  echo "# DEBUG: Waiting ${total_wait_time}s for commit attempt and expected timeout failure..." >&3
+  verbose_echo "# DEBUG: Waiting ${total_wait_time}s for commit attempt and expected timeout failure..."
   # Wait for a fraction of the timeout period, just enough to see the failure log
   sleep "$total_wait_time"
 
@@ -80,7 +80,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
 
-  echo "# DEBUG: Starting gitwatch with hanging git binary and -R and -t ${TEST_TIMEOUT}" >&3
+  verbose_echo "# DEBUG: Starting gitwatch with hanging git binary and -R and -t ${TEST_TIMEOUT}"
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -s "$test_sleep_time" -r origin -R "$target_dir" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
@@ -92,7 +92,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
 
   # 5. Wait for the script's internal timeout (10s) to be triggered.
   local total_wait_time=5
-  echo "# DEBUG: Waiting ${total_wait_time}s for commit/pull attempt and expected timeout failure..." >&3
+  verbose_echo "# DEBUG: Waiting ${total_wait_time}s for commit/pull attempt and expected timeout failure..."
   sleep "$total_wait_time"
 
   # 6. Assert: The commit succeeded, but the subsequent pull failed due to timeout
@@ -130,7 +130,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
 
   cd "$target_dir"
   initial_hash=$(git log -1 --format=%H)
-  echo "# DEBUG: Starting gitwatch with hanging commit binary and -t ${TEST_TIMEOUT}" >&3
+  verbose_echo "# DEBUG: Starting gitwatch with hanging commit binary and -t ${TEST_TIMEOUT}"
 
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -s "$test_sleep_time" "$target_dir" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
@@ -142,7 +142,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
 
   # 5. Wait for the script's internal timeout (10s) to be triggered.
   local total_wait_time=5
-  echo "# DEBUG: Waiting ${total_wait_time}s for commit attempt and expected timeout failure..." >&3
+  verbose_echo "# DEBUG: Waiting ${total_wait_time}s for commit attempt and expected timeout failure..."
   sleep "$total_wait_time"
 
   # 6. Assert: Commit did NOT happen, and timeout error was logged

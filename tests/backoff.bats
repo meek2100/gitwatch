@@ -77,7 +77,7 @@ EOF
   sleep 1 # Allow watcher to initialize
 
   # 3. Trigger 3 failures (GW_MAX_FAIL_COUNT)
-  echo "# DEBUG: Triggering 3 failures..." >&3
+  verbose_echo "# DEBUG: Triggering 3 failures..."
   echo "change 1" >> file.txt; sleep 2 # Wait for commit/push to fail
   echo "change 2" >> file.txt; sleep 2 # Wait for commit/push to fail
   echo "change 3" >> file.txt; sleep 2 # Wait for commit/push to fail
@@ -90,7 +90,7 @@ EOF
   assert_output --partial "Max failures reached. Entering cool-down period for 4 seconds."
 
   # 5. Trigger a 4th change *during* the cool-down
-  echo "# DEBUG: Triggering change during cool-down..." >&3
+  verbose_echo "# DEBUG: Triggering change during cool-down..."
   echo "change 4 (SKIPPED)" >> file.txt
   sleep 1 # Give time for the trigger to be logged
 
@@ -99,11 +99,11 @@ EOF
   assert_output --partial "In cool-down mode. Skipping trigger."
 
   # 7. Wait for cool-down to end (4s) + buffer (2s)
-  echo "# DEBUG: Waiting for cool-down to expire..." >&3
+  verbose_echo "# DEBUG: Waiting for cool-down to expire..."
   sleep 5
 
   # 8. Trigger a 5th change (should reset and fail again)
-  echo "# DEBUG: Triggering change after cool-down..." >&3
+  verbose_echo "# DEBUG: Triggering change after cool-down..."
   echo "change 5 (RETRY)" >> file.txt
   sleep 2 # Wait for commit/push to fail
 
@@ -113,7 +113,7 @@ EOF
   assert_output --partial "Incrementing failure count to 1/3" # Fails again, counter restarts
 
   # 10. Trigger a 6th change (to test success recovery)
-  echo "# DEBUG: Triggering success..." >&3
+  verbose_echo "# DEBUG: Triggering success..."
   touch "$state_file" # Create the state file to make 'git push' succeed
   echo "change 6 (SUCCESS)" >> file.txt
   sleep 2 # Wait for commit/push to succeed

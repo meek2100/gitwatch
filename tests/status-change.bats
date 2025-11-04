@@ -15,7 +15,7 @@ load 'bats-custom/startup-shutdown'
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   ## NEW ##
-  echo "# DEBUG: Starting gitwatch, log at $output_file" >&3
+  verbose_echo "# DEBUG: Starting gitwatch, log at $output_file"
 
   # Start gitwatch directly in the background, redirecting output
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -26,7 +26,7 @@ load 'bats-custom/startup-shutdown'
   sleep 1
 
   ## NEW ##
-  echo "# DEBUG: Creating first change (echo 'line1')" >&3
+  verbose_echo "# DEBUG: Creating first change (echo 'line1')"
   echo "line1" >> file1.txt
 
   # Use 'run' explicitly before wait_for_git_change
@@ -38,19 +38,19 @@ load 'bats-custom/startup-shutdown'
   first_commit_hash=$(git log -1 --format=%H)
 
   ## NEW ##
-  echo "# DEBUG: First commit hash is $first_commit_hash" >&3
-  echo "# DEBUG: --- Log content AFTER first commit ---" >&3
+  verbose_echo "# DEBUG: First commit hash is $first_commit_hash"
+  verbose_echo "# DEBUG: --- Log content AFTER first commit ---"
   cat "$output_file" >&3
-  echo "# DEBUG: --- End log content ---" >&3
+  verbose_echo "# DEBUG: --- End log content ---"
 
   # Touch the file (changes timestamp but not content recognized by git status)
   ## NEW ##
-  echo "# DEBUG: Touching file (touch file1.txt)" >&3
+  verbose_echo "# DEBUG: Touching file (touch file1.txt)"
   touch file1.txt
 
   # This is a negative test: wait to ensure a commit *does not* happen
   ## NEW ##
-  echo "# DEBUG: Sleeping for $WAITTIME seconds to wait for *no* commit..." >&3
+  verbose_echo "# DEBUG: Sleeping for $WAITTIME seconds to wait for *no* commit..."
   sleep "$WAITTIME" # Use WAITTIME from setup
 
 
@@ -61,13 +61,13 @@ load 'bats-custom/startup-shutdown'
 
   ## NEW ##
 
-  echo "# DEBUG: Second commit hash is $second_commit_hash" >&3
+  verbose_echo "# DEBUG: Second commit hash is $second_commit_hash"
   assert_equal "$first_commit_hash" "$second_commit_hash" "Commit occurred after touch, but shouldn't have"
 
   ## NEW ##
-  echo "# DEBUG: --- Log content AFTER touch + sleep ---" >&3
+  verbose_echo "# DEBUG: --- Log content AFTER touch + sleep ---"
   cat "$output_file" >&3
-  echo "# DEBUG: --- End log content ---" >&3
+  verbose_echo "# DEBUG: --- End log content ---"
 
   # Verify verbose output indicates no changes were detected by the final diff check
   run cat "$output_file"
@@ -76,20 +76,20 @@ load 'bats-custom/startup-shutdown'
   #local commit_count
 
   # --- OLD: Verify via log count (Flaky) ---
-  # echo "# DEBUG: Grepping log file for 'Running git commit command:'" >&3
+  # verbose_echo "# DEBUG: Grepping log file for 'Running git commit command:'"
   # Count lines containing "Running git commit command:" in the log
   # commit_count=$(grep -c "Running git commit command:" "$output_file")
-  # echo "# DEBUG: Commit count found: $commit_count" >&3
+  # verbose_echo "# DEBUG: Commit count found: $commit_count"
   # assert_equal "$commit_count" "1" # Only the initial commit should have run
 
   # --- NEW: Verify commit history directly (Robust) ---
   # --- Verify commit history directly ---
-  echo "# DEBUG: Verifying total commit count using git rev-list" >&3
+  verbose_echo "# DEBUG: Verifying total commit count using git rev-list"
   # Count total commits: Initial commit (1) + commit from 'echo line1' (1) = 2
   run git rev-list --count HEAD
   assert_success "Failed to count commits"
   local expected_commit_count=2
-  echo "# DEBUG: Expected commit count: $expected_commit_count, Actual found: $output" >&3
+  verbose_echo "# DEBUG: Expected commit count: $expected_commit_count, Actual found: $output"
   assert_equal "$output" "$expected_commit_count" "Expected $expected_commit_count commits in history (setup + echo), but found $output. Commit happened after touch."
   # --- End NEW ---
 

@@ -22,8 +22,8 @@ setup() {
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
-  echo "# Testdir with spaces: $testdir" >&3
-  echo "# Local clone dir: $testdir/local/$TEST_SUBDIR_NAME" >&3
+  verbose_echo "# Testdir with spaces: $testdir"
+  verbose_echo "# Local clone dir: $testdir/local/$TEST_SUBDIR_NAME"
 
   cd "$testdir/local/$TEST_SUBDIR_NAME" # cd into the directory with spaces
   sleep 1

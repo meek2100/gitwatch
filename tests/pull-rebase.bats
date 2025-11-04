@@ -137,7 +137,7 @@ load 'bats-custom/startup-shutdown'
   assert_equal "$initial_commit_hash" "$output" "Local hash should be the initial commit"
 
   # 4. Start gitwatch with -R and -r flag
-  echo "# DEBUG: Starting gitwatch with -R on a stale repo" >&3
+  verbose_echo "# DEBUG: Starting gitwatch with -R on a stale repo"
 
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -r origin -R "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
@@ -345,7 +345,7 @@ load 'bats-custom/startup-shutdown'
 
   # 4. Start gitwatch in detached HEAD state, targeting the master branch
   local target_branch="master" # The branch we want to push *to*
-  echo "# DEBUG: Starting gitwatch in detached HEAD state, pushing to $target_branch" >&3
+  verbose_echo "# DEBUG: Starting gitwatch in detached HEAD state, pushing to $target_branch"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -r origin -b "$target_branch" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
@@ -417,7 +417,7 @@ load 'bats-custom/startup-shutdown'
 
   # 3. Start gitwatch with -R, -r, -b
   local target_branch="master"
-  echo "# DEBUG: Starting gitwatch in detached HEAD, with -R, pushing to $target_branch" >&3
+  verbose_echo "# DEBUG: Starting gitwatch in detached HEAD, with -R, pushing to $target_branch"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -r origin -b "$target_branch" -R "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown

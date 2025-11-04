@@ -72,7 +72,7 @@ teardown() {
   # 6. Wait for both commits to finish
   # Total wait = ~1s (sleep) + ~1s (sleep) + buffer
   local total_wait=5
-  echo "# DEBUG: Waiting ${total_wait}s for both commits to finish..." >&3
+  verbose_echo "# DEBUG: Waiting ${total_wait}s for both commits to finish..."
   sleep "$total_wait"
 
   # 7. Assert: Both processes should still be running
