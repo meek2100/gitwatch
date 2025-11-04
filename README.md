@@ -217,27 +217,41 @@ isolating dependencies and ensuring a consistent environment.
 
 ### Docker Compose (Recommended)
 
-The easiest way to run `gitwatch` with Docker is by using the provided [`docker-compose.yaml`](./docker-compose.yaml) file. This file is configured using environment variables.
+The easiest way to run `gitwatch` with Docker is by using the provided
+[`docker-compose.yaml`](./docker-compose.yaml) file. This file is
+configured using environment variables.
 
 **1. Prerequisites:**
 
 - **Docker and Docker Compose**: Make sure you have both installed.
-- **A Git Repository**: You need a local directory that is a Git repository you want to watch.
-- **SSH Key**: For pushing to a remote repository, the container needs access to an SSH key that is authorized with your Git provider.
+- **A Git Repository**: You need a local directory that is a Git repository
+  you want to watch.
+- **SSH Key**: For pushing to a remote repository, the container needs
+  access to an SSH key that is authorized with your Git provider.
 
 **2. Configuration:**
 
-You must configure the `docker-compose.yaml` file before running it, primarily the `volumes` and `environment` sections.
+You must configure the `docker-compose.yaml` file before running it,
+primarily the `volumes` and `environment` sections.
 
-**Warning:** To avoid file permission errors when mounting a local directory (volume), you **must** set the `PUID` and `PGID` environment variables in the `docker-compose.yaml` file to match your host user's ID. You can find these on your host machine by running `id -u` (for PUID) and `id -g` (for PGID).
+**Warning:** To avoid file permission errors when mounting a local
+directory (volume), you **must** set the `PUID` and `PGID` environment
+variables in the `docker-compose.yaml` file to match your host user's ID.
+You can find these on your host machine by running `id -u` (for PUID) and
+`id -g` (for PGID). Please review the comments within the
+[`docker-compose.yaml`](./docker-compose.yaml) file for detailed
+instructions on setting volumes and environment variables.
 
-Please review the comments within the [`docker-compose.yaml`](./docker-compose.yaml) file for detailed instructions on setting volumes and environment variables.
+<!-- prettier-ignore-start -->
 
-  <!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
 
 **3. Environment Variables**
 
-The following environment variables are available for configuring the `gitwatch` container:
+<!-- markdownlint-restore -->
+
+The following environment variables are available for configuring the
+`gitwatch` container:
 
 | Variable               | Default Value          | Description                                                                                                                             |
 | :--------------------- | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------------------- |
@@ -547,27 +561,42 @@ This service is designed to run in user space (`--user` flag).
 
 ### Troubleshooting / FAQ
 
-**Q: My logs show "ERROR: 'git push' failed." and mention "non-fast-forward". What do I do?**
+**Q: My logs show "ERROR: 'git push' failed." and mention
+"non-fast-forward". What do I do?**
 
-**A:** This means the remote repository (e.g., `origin`) has changes that your local repository does not have. `gitwatch` will not overwrite these changes. To fix this:
+**A:** This means the remote repository (e.g., `origin`) has changes that
+your local repository does not have. `gitwatch` will not overwrite these
+changes. To fix this:
 
-1.  Stop `gitwatch`.
-2.  In your watched repository, run `git pull --rebase` to fetch and apply the remote changes.
-3.  Resolve any merge conflicts that may occur.
-4.  Restart `gitwatch`.
+1. Stop `gitwatch`.
+2. In your watched repository, run `git pull --rebase` to fetch and apply
+   the remote changes.
+3. Resolve any merge conflicts that may occur.
+4. Restart `gitwatch`.
 
-To have `gitwatch` attempt this for you automatically, run it with the **`-R`** flag.
+To have `gitwatch` attempt this for you automatically, run it with the
+**`-R`** flag.
 
-**Q: My logs show "CRITICAL PERMISSION ERROR: Cannot Access Target Directory".**
+**Q: My logs show "CRITICAL PERMISSION ERROR: Cannot Access Target
+Directory".**
 
-**A:** This means the user running `gitwatch` does not have Read, Write, and Execute permissions on the directory it's trying to watch.
+**A:** This means the user running `gitwatch` does not have Read, Write,
+and Execute permissions on the directory it's trying to watch.
 
-- **On Linux/macOS:** Ensure you own the directory. Run `sudo chown -R $USER:$USER /path/to/your/repo`.
-- **In Docker:** This is a common problem. You **must** set the `PUID` and `PGID` environment variables in your `docker-compose.yaml` to match your host user's ID. You can find these by running `id -u` and `id -g` on your host machine.
+- **On Linux/macOS:** Ensure you own the directory. Run
+  `sudo chown -R $USER:$USER /path/to/your/repo`.
+- **In Docker:** This is a common problem. You **must** set the `PUID` and
+  `PGID` environment variables in your `docker-compose.yaml` to match your
+  host user's ID. You can find these by running `id -u` and `id -g` on your
+  host machine.
 
 **Q: Can I run multiple `gitwatch` scripts on the same repository?**
 
-**A:** Yes. As of version 0.6+, `gitwatch` creates a unique lockfile based on a hash of the _target path_ you are watching. This allows you to run multiple instances on the same repository, as long as they are watching different files or sub-directories (e.g., one for `/repo/docs` and one for `/repo/src`).
+**A:** Yes. As of version 0.6+, `gitwatch` creates a unique lockfile based
+on a hash of the _target path_ you are watching. This allows you to run
+multiple instances on the same repository, as long as they are watching
+different files or sub-directories (e.g., one for `/repo/docs` and one for
+`/repo/src`).
 
 ## Other Articles
 

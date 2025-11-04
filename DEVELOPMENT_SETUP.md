@@ -30,6 +30,7 @@ client and a formatter plugin is the recommended path for seamless
 integration.
 
 1. **Linter (`shellcheck`):**
+
    - Install a Language Server client (e.g., `coc.nvim`, `vim-lsp`, native
      LSP) configured to use a tool that calls `shellcheck` (such as
      `bash-language-server`).
@@ -37,6 +38,7 @@ integration.
      file.
 
 2. **Formatter (`beautysh`):**
+
    - Install a formatter plugin (e.g., `Neoformat`, `ALE`,
      `vim-autoformat`).
    - Configure the plugin to use the command **`beautysh`** as the external
@@ -63,10 +65,14 @@ For other editors (Sublime Text, Atom, JetBrains IDEs):
 
 ## 3. Build Dependencies
 
-If you plan to build the Windows installer using the Makefile (`make build-windows-installer`), you will need the following tools installed on your development machine (Linux or macOS):
+If you plan to build the Windows installer using the Makefile
+(`make build-windows-installer`), you will need the following tools
+installed on your development machine (Linux or macOS):
 
-- **PowerShell (`pwsh`):** This is required to run the `PS2EXE` build script.
+- **PowerShell (`pwsh`):** This is required to run the `PS2EXE` build
+  script.
   - _macOS:_ `brew install powershell`
   - _Linux:_ Follow official Microsoft install guides.
 - **PS2EXE Module:** This PowerShell module bundles the installer.
-  - _Install via pwsh:_ `pwsh -Command "Install-Module -Name PS2EXE -Scope CurrentUser"`
+  - _Install via pwsh:_
+    `pwsh -Command "Install-Module -Name PS2EXE -Scope CurrentUser"`
