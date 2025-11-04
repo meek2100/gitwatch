@@ -35,14 +35,49 @@ try {
     }
 }
 
-# --- 3. Install Dependencies Inside WSL ---
-Write-Host "Installing dependencies inside WSL (git, coreutils, util-linux, inotify-tools)..."
+# --- 3. Detect Distro and Install Dependencies Inside WSL ---
+Write-Host "Detecting WSL distribution and installing dependencies..."
 try {
-    wsl.exe -e sudo apt-get update
-    wsl.exe -e sudo apt-get install -y git coreutils util-linux inotify-tools
+    # Check /etc/os-release to find the package manager
+    $osRelease = wsl.exe -e cat /etc/os-release
+    $pkgManager = ""
+
+    if ($osRelease -like "*ID=ubuntu*" -or $osRelease -like "*ID=debian*") {
+        $pkgManager = "apt-get"
+    } elseif ($osRelease -like "*ID=fedora*" -or $osRelease -like "*ID=rhel*" -or $osRelease -like "*ID=centos*") {
+        $pkgManager = "dnf" # or yum
+    } elseif ($osRelease -like "*ID=alpine*") {
+        $pkgManager = "apk"
+    } elseif ($osRelease -like "*ID=sles*" -or $osRelease -like "*ID=opensuse*") {
+        $pkgManager = "zypper"
+    }
+
+    $dependencies = "git coreutils util-linux inotify-tools"
+
+    if ($pkgManager -eq "apt-get") {
+        Write-Host "Debian-based distro detected. Installing dependencies ($dependencies) using apt-get..."
+        wsl.exe -e sudo apt-get update
+        wsl.exe -e sudo apt-get install -y $dependencies
+    } elseif ($pkgManager -eq "dnf") {
+        Write-Host "Fedora-based distro detected. Installing dependencies ($dependencies) using dnf..."
+        wsl.exe -e sudo dnf install -y $dependencies
+    } elseif ($pkgManager -eq "apk") {
+        Write-Host "Alpine distro detected. Installing dependencies ($dependencies) using apk..."
+        wsl.exe -e sudo apk add $dependencies
+    } elseif ($pkgManager -eq "zypper") {
+        Write-Host "SUSE-based distro detected. Installing dependencies ($dependencies) using zypper..."
+        wsl.exe -e sudo zypper install -y $dependencies
+    } else {
+        Write-Warning "Could not automatically detect a supported package manager (apt-get, dnf, apk, zypper)."
+        Write-Warning "Attempting to use 'apt-get'..."
+        wsl.exe -e sudo apt-get update
+        wsl.exe -e sudo apt-get install -y $dependencies
+        Write-Warning "If the above command failed, please install the following dependencies in your WSL distro manually: $dependencies"
+    }
+
     Write-Host "WSL dependencies installed successfully." -ForegroundColor Green
 } catch {
-    Write-Error "Failed to install dependencies in WSL. Please check your internet connection."
+    Write-Error "Failed to install dependencies in WSL. Please check your internet connection and install them manually: $dependencies"
     Read-Host "Press Enter to exit..."
     exit 1
 }

@@ -42,6 +42,47 @@
 #                  the last command to exit with a non-zero status,
 #                  or zero if no command exited with a non-zero status.
 set -euo pipefail
+
+
+# --- Platform & Distro Detection ---
+SUDO_CMD="sudo "
+if [ "$(id -u)" -eq 0 ]; then SUDO_CMD=""; fi # Don't use sudo if already root
+
+INSTALL_CMD=""
+PKG_MANAGER=""
+OS_TYPE=$(uname)
+
+if [ "$OS_TYPE" = "Linux" ] && [ -f /etc/os-release ]; then
+  # Source the os-release file to get $ID
+  . /etc/os-release
+  PKG_MANAGER="$ID"
+  case "$ID" in
+    ubuntu|debian|mint)
+      INSTALL_CMD="${SUDO_CMD}apt install"
+      ;;
+    fedora|rhel|centos)
+      INSTALL_CMD="${SUDO_CMD}dnf install"
+      ;;
+    alpine)
+      INSTALL_CMD="${SUDO_CMD}apk add"
+      ;;
+    sles|opensuse-leap|opensuse-tumbleweed)
+      INSTALL_CMD="${SUDO_CMD}zypper install"
+      ;;
+    arch)
+      INSTALL_CMD="${SUDO_CMD}pacman -S"
+      ;;
+    *)
+      # Fallback for unknown Linux distros
+      PKG_MANAGER="unknown-linux"
+      INSTALL_CMD="<your-package-manager> install"
+      ;;
+  esac
+elif [ "$OS_TYPE" = "Darwin" ]; then
+  PKG_MANAGER="brew"
+  INSTALL_CMD="brew install"
+fi
+# --- End Platform & Distro Detection ---
 # --------------------------
 
 # --- Version Info ---
@@ -443,14 +484,46 @@ for cmd in "$BASE_GIT_CMD" "$INW"; do
     if [ "$OS_TYPE" = "Darwin" ] || [ "$OS_TYPE" = "FreeBSD" ] || [ "$OS_TYPE" = "OpenBSD" ]; then
       # macOS/BSD hints
       case "$cmd" in
-        "$BASE_GIT_CMD") stderr "  Hint: Install Apple Command Line Tools ('xcode-select --install') or Homebrew ('brew install git')" ;;
-        "$INW") stderr "  Hint: Install with Homebrew: 'brew install fswatch'" ;;
+        "$BASE_GIT_CMD")
+          local hint="  Hint: Install 'git'."
+          if [ -n "$INSTALL_CMD" ]; then
+            if [ "$PKG_MANAGER" = "brew" ]; then
+              hint="  Hint: Run \`$INSTALL_CMD git\` or \`xcode-select --install\`"
+            else
+              hint="  Hint: Run \`$INSTALL_CMD git\`"
+            fi
+          fi
+          stderr "$hint"
+          ;;
+        "$INW")
+          local hint="  Hint: '$INW' is part of the 'fswatch' package."
+          if [ "$PKG_MANAGER" = "brew" ]; then
+            hint="  Hint: Run \`$INSTALL_CMD fswatch\`"
+          fi
+          stderr "$hint"
+          ;;
       esac
     else
       # Linux hints
       case "$cmd" in
-        "$BASE_GIT_CMD") stderr "  Hint: Install 'git' (e.g., 'apt install git')." ;;
-        "$INW") stderr "  Hint: '$INW' is part of 'inotify-tools' (e.g., 'apt install inotify-tools')." ;;
+        "$BASE_GIT_CMD")
+          local hint="  Hint: Install 'git'."
+          if [ -n "$INSTALL_CMD" ]; then
+            if [ "$PKG_MANAGER" = "brew" ]; then
+              hint="  Hint: Run \`$INSTALL_CMD git\` or \`xcode-select --install\`"
+            else
+              hint="  Hint: Run \`$INSTALL_CMD git\`"
+            fi
+          fi
+          stderr "$hint"
+          ;;
+        "$INW")
+          local hint="  Hint: '$INW' is part of the 'inotify-tools' package."
+          if [ -n "$INSTALL_CMD" ]; then
+            hint="  Hint: Run \`$INSTALL_CMD inotify-tools\`"
+          fi
+          stderr "$hint"
+          ;;
       esac
     fi
     exit 2
@@ -459,43 +532,59 @@ done
 
 # 'timeout' (GNU version) is required for production robustness
 if ! is_command "$TIMEOUT_CMD"; then
-  stderr "Error: Required command '$TIMEOUT_CMD' not found.
-  Hint: Install 'timeout' (e.g., 'apt install coreutils' or 'brew install coreutils').
-  Hint: You can specify a custom path (e.g., 'gtimeout') via the GW_TIMEOUT_BIN environment variable."
+  local hint="  Hint: Install 'timeout' (part of 'coreutils')."
+  if [ -n "$INSTALL_CMD" ]; then
+    hint="  Hint: Run \`$INSTALL_CMD coreutils\`"
+  fi
+  stderr "Error: Required command '$TIMEOUT_CMD' not found."
+  stderr "$hint"
+  stderr "  Hint: You can specify a custom path (e.g., 'gtimeout') via the GW_TIMEOUT_BIN environment variable."
   exit 2
 fi
 # Check for GNU coreutils version
 # Use a subshell and check exit status + output to be safe
 if ! ("$TIMEOUT_CMD" --version 2>&1 | grep -q "GNU coreutils"); then
-  stderr "Error: GNU 'timeout' (from coreutils) not found (found at '$TIMEOUT_CMD').
-  gitwatch.sh requires the GNU version for consistent behavior.
-  Hint: Install 'coreutils' (e.g., 'brew install coreutils' on macOS).
-  Hint: If your GNU timeout is named 'gtimeout', run: export GW_TIMEOUT_BIN=gtimeout"
+  local hint="  Hint: Install 'coreutils' (e.g., 'brew install coreutils' on macOS)."
+  if [ -n "$INSTALL_CMD" ] && [ "$PKG_MANAGER" != "brew" ]; then
+    hint="  Hint: Run \`$INSTALL_CMD coreutils\`"
+  fi
+  stderr "Error: GNU 'timeout' (from coreutils) not found (found at '$TIMEOUT_CMD')."
+  stderr "  gitwatch.sh requires the GNU version for consistent behavior."
+  stderr "$hint"
+  stderr "  Hint: If your GNU timeout is named 'gtimeout', run: export GW_TIMEOUT_BIN=gtimeout"
   exit 2
 fi
 
 # 'logger' is a special case, we only check if syslog is requested
 if [ "$USE_SYSLOG" -eq 1 ] && ! is_command "logger"; then
   stderr "Error: Required command 'logger' not found (for -S syslog option)."
+  local hint="  Hint: 'logger' is usually part of 'util-linux' or 'bsd-utils'."
+  if [ -n "$INSTALL_CMD" ]; then
+    if [ "$PKG_MANAGER" = "apt" ]; then
+      hint="  Hint: Run \`$INSTALL_CMD bsd-utils\`"
+    else
+      # Most others (Fedora, Alpine, Arch) package it with 'util-linux'
+      hint="  Hint: Run \`$INSTALL_CMD util-linux\`"
+    fi
+  fi
+  stderr "$hint"
   exit 2
 fi
 
 # Only check for flock if locking is *not* disabled
 if [ "$NO_LOCK" -eq 0 ]; then
   if ! is_command "$FLOCK"; then
-    # --- Platform-specific hint ---
-    flock_hint=""
-    if [ "$OS_TYPE" = "Darwin" ]; then
-      flock_hint="  Hint: Install with Homebrew: 'brew install flock'"
-    else
-      # Assume Linux/other Unix-like
-      flock_hint="  Hint: Install 'flock' (e.g., 'apt install util-linux' or 'dnf install util-linux')."
+    local flock_hint="  Hint: Install 'flock' (usually part of 'util-linux')."
+    if [ -n "$INSTALL_CMD" ]; then
+      if [ "$PKG_MANAGER" = "brew" ]; then
+        flock_hint="  Hint: Run \`$INSTALL_CMD flock\`"
+      else
+        flock_hint="  Hint: Run \`$INSTALL_CMD util-linux\`"
+      fi
     fi
-    # --- End platform-specific hint ---
-
-    stderr "Error: Required command 'flock' not found for process locking.
-$flock_hint
-    Install 'flock' or re-run with the -n flag to disable locking and proceed."
+    stderr "Error: Required command 'flock' not found for process locking."
+    stderr "$flock_hint"
+    stderr "    Install 'flock' or re-run with the -n flag to disable locking and proceed."
     exit 2
   fi
 else

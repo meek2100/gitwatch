@@ -1,0 +1,39 @@
+---
+name: Nix Flake Build Test
+
+on:
+  push:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  nix-build:
+    name: Test Nix Flake Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v13
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Nix Flake Check
+        run: |
+          echo "Running 'nix flake check' to verify derivations..."
+          nix flake check
+
+      - name: Run Nix Build
+        run: |
+          echo "Running 'nix build' to build the default package..."
+          nix build .#gitwatch
+
+          echo "Build successful. Checking result..."
+          test -f ./result/bin/gitwatch
+          ./result/bin/gitwatch -V

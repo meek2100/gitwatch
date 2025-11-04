@@ -93,15 +93,16 @@ brew install fswatch flock coreutils
 `gitwatch` is fully supported on Windows 11 through the Windows Subsystem for Linux (WSL).
 A `.exe` installer is provided to make setup seamless.
 
-1. **Download** the latest `gitwatch-setup.exe` from the
-   [GitHub Releases page](https://github.com/gitwatch/gitwatch/releases/latest).
-2. **Run** the installer. It will automatically:
-   - Request Administrator privileges.
-   - Check for and install WSL if it's not already present (this may take a few minutes).
-   - Install all required Linux dependencies (`git`, `flock`, `timeout`, `inotify-tools`)
-     inside WSL.
-   - Install the `gitwatch.sh` script into WSL.
-   - Install a `gitwatch.bat` wrapper on your Windows system and add it to your `PATH`.
+1.  **Download** the latest `gitwatch-setup.exe` from the
+    [GitHub Releases page](https://github.com/gitwatch/gitwatch/releases/latest).
+2.  **Run** the installer. It will automatically:
+    - Request Administrator privileges.
+    - Check for and install WSL if it's not already present (this may take a few minutes).
+    - **Attempt to auto-detect your WSL distribution** (e.g., Ubuntu, Fedora, Alpine) and install required Linux dependencies (`git`, `flock`, `timeout`, `inotify-tools`) using the correct package manager.
+    - Install the `gitwatch.sh` script into WSL.
+    - Install a `gitwatch.bat` wrapper on your Windows system and add it to your `PATH`.
+
+**Note:** The installer works best with major distributions. If you use a custom or unrecognized WSL distribution, you may be prompted to install the dependencies manually.
 
 After installation, you can open any Windows Command Prompt or PowerShell terminal and use
 `gitwatch` as if it were a native application:
