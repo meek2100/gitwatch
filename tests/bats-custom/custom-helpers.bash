@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Load global configuration (variables, debug flags) FIRST
+load 'bats-custom/bats-config'
+
 # BATS Custom Helper Functions
 
 # verbose_echo: Prints a message to BATS file descriptor 3 (>&3).
@@ -47,7 +50,6 @@ wait_for_git_change() {
   local current_output=""
 
   # Basic input validation
-  # --- FIX (Shellcheck SC1035): Removed invalid newline after 'if !' ---
   if ! [[ "$max_attempts" =~ ^[0-9]+$ ]] || ! [[ "$delay" =~ ^[0-9]+(\.[0-9]+)?$ ]];
   then
     verbose_echo "Usage: wait_for_git_change [--target <expected>] <max_attempts> <delay_seconds> <command...>"
@@ -60,11 +62,9 @@ wait_for_git_change() {
     return 1
   fi
 
-  # --- FIX (Logic): Do not fail on initial command error ---
   # Get initial output, but don't fail if the command does (e.g., file not found).
   # We can wait for a change from a "failed" state to a "success" state.
   initial_output=$( "$@" 2>/dev/null ) || true
-  # --- END FIX ---
 
   verbose_echo "Initial output: '$initial_output'"
   if [ "$check_for_change" = false ];
@@ -103,11 +103,11 @@ wait_for_git_change() {
 
 # wait_for_process_to_die: Waits for a process to terminate.
 #
-# Usage: wait_for_process_to_die <pid> <timeout> <interval>
+# Usage: wait_for_process_to_die <pid> <max_attempts> <interval>
 #
 # Arguments:
 #   pid: The PID of the process to wait for.
-#   timeout: The total time (in seconds) to wait for the process to die.
+#   max_attempts:  The maximum number of times to check the command.
 #   interval: The time (in seconds) to wait between checks.
 #
 # Returns:
@@ -118,23 +118,15 @@ wait_for_git_change() {
 #   Debug messages to BATS file descriptor 3 (>&3).
 wait_for_process_to_die() {
   local pid=$1
-  local timeout=$2
+  local max_attempts=$2
   local interval=$3
+  local attempt=0
 
-  # Check for non-numeric/zero interval to prevent division by zero
-  # --- FIX (Shellcheck SC1035): Removed invalid newline after 'if !' ---
-  if ! [[ "$interval" =~ ^[0-9]*(\.[0-9]+)?$ ]] || [[ $(echo "$interval > 0" | bc -l) -eq 0 ]];
-  then
-    return 1 # Invalid interval
+  if ! [[ "$max_attempts" =~ ^[0-9]+$ ]] || ! [[ "$interval" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    verbose_echo "Error: wait_for_process_to_die requires numeric arguments."
+    return 1
   fi
 
-  # Calculate max_attempts using bc.
-  Use -l for floating point math.
-  local max_attempts
-  max_attempts=$(echo "$timeout / $interval" | bc -l)
-  max_attempts=${max_attempts%.*} # Integer truncation of decimal part (e.g., 20.9 -> 20)
-
-  local attempt=0
   while kill -0 "$pid" &>/dev/null && [ "$attempt" -lt "$max_attempts" ];
   do
     sleep "$interval"
@@ -178,10 +170,8 @@ create_failing_watcher_bin() {
   echo "$dummy_path"
 }
 
-# NEW: create_hanging_bin: Creates a dummy script that sleeps for a very long time,
-#
-# --- FIX (Shellcheck SC1036): Added missing '#' to this comment line ---
-#                 simulating a hung command (e.g., git push to a dead server).
+# create_hanging_bin: Creates a dummy script that sleeps for a very long time,
+#                     simulating a hung command (e.g., git push to a dead server).
 #
 # Usage: create_hanging_bin <name>
 #
@@ -201,7 +191,6 @@ create_hanging_bin() {
 
   echo "#!/usr/bin/env bash" > "$dummy_path"
   # Fix SC2129: Combine redirects
-  # FIX: Ensured comment is kept simple and inside the logic to avoid brace parsing errors.
   {
     # Print signature to indicate the hanging version was called
     echo "echo \"*** DUMMY HANG: $name called, will sleep 600s ***\" >&2"

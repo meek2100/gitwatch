@@ -1,17 +1,11 @@
 #!/usr/bin/env bash
 
-# This is a shared library of setup and teardown functions for BATS tests.
-# It ensures a clean, isolated environment for each test.
-# Load custom helpers
+# Load global configuration (variables, debug flags) FIRST
+load 'bats-custom/bats-config'
+# Load custom helpers (like verbose_echo, wait_for_process_to_die) SECOND
 load 'bats-custom/custom-helpers'
 
-# --- GLOBAL TEST STATE ---
-# These variables are set by setup() and used by teardown()
-export GITWATCH_PID="" # PID of the main gitwatch.sh process
-export testdir="" # The root temporary directory for the test
-export GITWATCH_TEST_ARGS=() # Common args for gitwatch
-export TEST_SUBDIR_NAME="repo-to-watch" # Default subdirectory name
-export WAITTIME=3 # NEW: Define a wait period longer than default SLEEP_TIME=2 (2s)
+# Provides setup (default) and setup_with_spaces.
 
 # --- HELPER FUNCTIONS ---
 
@@ -25,11 +19,11 @@ _cleanup_remotedirs() {
   fi
 }
 
-# --- NEW: DEBUG-ON-FAILURE HELPER ---
 # Dumps debug information if a test fails
 debug_on_failure() {
   # This function is called by teardown if the test failed ($BATS_TEST_STATUS -ne 0)
-  if [ "$BATS_TEST_STATUS" -ne 0 ]; then
+  if [ "$BATS_TEST_STATUS" -ne 0 ];
+  then
     verbose_echo "--- DEBUG: Test '$BATS_TEST_NAME' FAILED! ---" >&3
 
     # Dump the gitwatch log file (if it exists)
@@ -37,7 +31,8 @@ debug_on_failure() {
     # Search for a log file, which we assume is named output.* in the testdir
     log_file=$(find "$testdir" -name "output.*" 2>/dev/null | head -n 1)
 
-    if [ -n "$log_file" ] && [ -f "$log_file" ]; then
+    if [ -n "$log_file" ] && [ -f "$log_file" ];
+    then
       verbose_echo "--- Log File Content ($log_file) ---" >&3
       # Dump log to descriptor 3
       cat "$log_file" >&3
@@ -48,7 +43,8 @@ debug_on_failure() {
 
     # Dump git status from the test repo
     local repo_path="$testdir/local/$TEST_SUBDIR_NAME"
-    if [ -d "$repo_path/.git" ]; then
+    if [ -d "$repo_path/.git" ];
+    then
       verbose_echo "--- Git Status ($repo_path) ---" >&3
       (cd "$repo_path" && git status) >&3
       verbose_echo "--- End Git Status ---" >&3
@@ -56,24 +52,21 @@ debug_on_failure() {
     verbose_echo "--- END DEBUG ---" >&3
   fi
 }
-# --- END NEW ---
 
-# _common_teardown: The main teardown logic, run after each test
+# Common teardown function used by both setups
 _common_teardown() {
   verbose_echo "# Teardown started"
 
-  # --- FIX (Logic): Dump debug info *before* we clean up ---
+  # Dump debug info *before* we clean up
   debug_on_failure
-  # --- END FIX ---
 
   # 1. Terminate the gitwatch process if it's running
-  if [ -n "$GITWATCH_PID" ] && kill -0 "$GITWATCH_PID" &>/dev/null;
+  if [ -n "${GITWATCH_PID:-}" ] && kill -0 "$GITWATCH_PID" &>/dev/null;
   then
     verbose_echo "# Attempting to terminate gitwatch process PID: $GITWATCH_PID"
     # Send SIGTERM first to allow graceful cleanup (e.g., trap)
     kill -s TERM "$GITWATCH_PID" &>/dev/null
-    # Wait for up to 2 seconds, 20 attempts of 0.1s each
-    # Use the newly added helper function
+    # Wait for up to 2 seconds (20 attempts of 0.1s each)
     wait_for_process_to_die "$GITWATCH_PID" 20 0.1
 
     # If it's still alive, kill it forcefully
@@ -83,28 +76,28 @@ _common_teardown() {
       kill -9 "$GITWATCH_PID" &>/dev/null || true
     fi
   else
-    verbose_echo "# GITWATCH_PID variable not set, skipping process termination."
+    verbose_echo "# GITWATCH_PID variable not set or process already gone."
   fi
+  unset GITWATCH_PID # Clear the PID
 
   # 2. Failsafe: Clean up any lingering watcher processes from the test
-  # This is crucial if gitwatch.sh was killed but the watcher was orphaned
   verbose_echo "# Cleaning up potential lingering watcher processes..."
-  pkill -f "inotifywait -qmr.*$testdir" &>/dev/null ||
+  pkill -f "inotifywait.*$testdir" &>/dev/null ||
   true
   pkill -f "fswatch.*$testdir" &>/dev/null || true
 
-  # 3. Clean up the temporary test directory
-  if [ -d "$testdir" ];
+  # 3. Cleanup for Dependency Mocks
+  if [ -n "${BATS_DUMMY_BIN_DIR:-}" ]; then
+    verbose_echo "# Removing dummy bin directory: $BATS_DUMMY_BIN_DIR"
+    rm -rf "$BATS_DUMMY_BIN_DIR"
+  fi
+
+  # 4. Remove test directory (ensure quoting handles spaces)
+  if [ -n "$testdir" ] && [ -d "$testdir" ];
   then
     verbose_echo "# Removing test directory: $testdir"
     rm -rf "$testdir"
   fi
-
-  # 4. Reset global variables
-  GITWATCH_PID=""
-  testdir=""
-  GITWATCH_TEST_ARGS=()
-  TEST_SUBDIR_NAME="repo-to-watch"
 
   # 5. Handle special cleanup cases
   # shellcheck disable=SC2154 # BATS_TEST_DESCRIPTION is set by BATS
@@ -116,32 +109,29 @@ _common_teardown() {
   verbose_echo "# Teardown complete"
 }
 
+
 # _common_setup: The main setup logic, run before each test
 # Arguments:
 #   $1 - create_remote (0 or 1): If 1, creates a bare upstream repo.
 _common_setup() {
   local create_remote="$1" # 0 or 1
-  local local_repo_dir
-  local remote_repo_dir
 
   # 1. Use a unique, descriptive name for the test directory
-  #    This makes debugging /tmp easier
   local test_name_safe
   test_name_safe=$(echo "$BATS_TEST_NAME" | tr -c 'a-zA-Z0-9' '_')
   # shellcheck disable=SC2154 # BATS_TEST_TMPDIR is set by BATS
   testdir=$(mktemp -d "$BATS_TEST_TMPDIR/gitwatch-test-$test_name_safe-XXXXX")
 
-  # 2. Define standard directory structures
-  # We use a "local" directory to simulate the user's clone
-  # and a "remote" directory to simulate the upstream (e.g., GitHub)
-  local_repo_dir="$testdir/local"
-  remote_repo_dir="$testdir/remote"
-  mkdir -p
+  # Set default repo subdir name
+  TEST_SUBDIR_NAME="repo-to-watch"
 
-  "$local_repo_dir"
+  # 2. Define standard directory structures
+  local local_repo_dir="$testdir/local"
+  local remote_repo_dir="$testdir/remote"
+  mkdir -p "$local_repo_dir"
   mkdir -p "$remote_repo_dir"
 
-  # 3. Initialize the repositories
+  # 3. Initialize the local repositories
   git init "$local_repo_dir/$TEST_SUBDIR_NAME"
   cd "$local_repo_dir/$TEST_SUBDIR_NAME" ||
   return 1
@@ -166,11 +156,7 @@ _common_setup() {
     git push --set-upstream origin master
   fi
 
-  # 5. Set default arguments for running gitwatch.sh
-  #    We add -v (verbose) so we can capture logs for debugging
-  GITWATCH_TEST_ARGS=( "-v" )
-
-  # 6. Set the current directory for the test
+  # 5. Set the current directory for the test
   cd "$local_repo_dir" ||
   return 1
   verbose_echo "# Setup complete, current directory: $(pwd)"
@@ -196,9 +182,7 @@ setup_with_spaces() {
   # shellcheck disable=SC2154 # BATS_TEST_TMPDIR is set by BATS
   testdir=$(mktemp -d "$BATS_TEST_TMPDIR/temp space.XXXXX")
   TEST_SUBDIR_NAME="rem with spaces"
-  _common_setup
-
-  0
+  _common_setup 0
   verbose_echo "# Testdir with spaces: $testdir"
   verbose_echo "# Local clone dir: $testdir/local/$TEST_SUBDIR_NAME"
 }
@@ -219,9 +203,7 @@ setup_for_remotedirs() {
   # 1. Init the "vault" repo
   git init "$git_dir_vault"
   # Configure the repo to use the "work" tree
-  git -C "$git_dir_vault"
-  config
-  core.worktree "$work_tree"
+  git -C "$git_dir_vault" config core.worktree "$work_tree"
 
   # 2. Set git config in the vault
   git -C "$git_dir_vault" config user.email "test@example.com"
@@ -242,8 +224,7 @@ setup_for_remotedirs() {
   git --git-dir="$git_dir_vault" --work-tree="$work_tree" remote add origin "$remote_repo_dir/upstream.git"
   git --git-dir="$git_dir_vault" --work-tree="$work_tree" push --set-upstream origin master
 
-  # 5. Set args and paths for the test
-  GITWATCH_TEST_ARGS=( "-v" "-g" "$git_dir_vault" )
+  # 5. Set args and paths for the test (Global GITWATCH_TEST_ARGS is already set)
   # Note: testdir is set to the *root* of this structure for cleanup
   # The test itself will run from $work_tree
   verbose_echo "# Setup complete for remotedirs"
@@ -257,7 +238,6 @@ teardown()
 }
 
 teardown_for_remotedirs() {
-  verbose_echo "#
-  Running custom cleanup for remotedirs"
+  verbose_echo "# Running custom cleanup for remotedirs"
   _common_teardown
 }
