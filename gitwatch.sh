@@ -96,6 +96,14 @@ TIMEOUT=${GW_TIMEOUT:-60} # Timeout for critical Git operations (commit, pull, p
 LOG_LINE_LENGTH=${GW_LOG_LINE_LENGTH:-150}
 # --------------------------------------
 
+# --- Exponential Backoff Configuration ---
+GIT_FAIL_COUNT=0                                  # Current number of consecutive Git failures
+# MODIFIED: Allow override for testing
+MAX_FAIL_COUNT=${GW_MAX_FAIL_COUNT:-5}            # Number of failures before triggering cool-down
+COOL_DOWN_SECONDS=${GW_COOL_DOWN_SECONDS:-600}    # 10 minutes (60 * 10)
+LAST_FAIL_TIME=0                                  # Timestamp (in seconds) of the last failure
+# --- End Backoff Configuration ---
+
 REMOTE=""
 PULL_BEFORE_PUSH=0
 BRANCH=""
@@ -269,6 +277,23 @@ is_command() {
   # Use command -v for better POSIX compliance and alias handling than hash
   command -v "$1" &> /dev/null
 }
+
+# --- NEW: Helper to generate a unique hash for a path ---
+# Used for lockfiles and PID files to ensure uniqueness
+_get_path_hash() {
+  local path_to_hash="$1"
+  local path_hash=""
+  if is_command "sha256sum"; then
+    path_hash=$(echo -n "$path_to_hash" | sha256sum | (read -r hash _; echo "$hash"))
+  elif is_command "md5sum"; then
+    path_hash=$(echo -n "$path_to_hash" | md5sum | (read -r hash _; echo "$hash"))
+  else
+    # Simple "hash" for POSIX compliance, replaces / with _
+    path_hash="${path_to_hash//\//_}"
+  fi
+  echo "$path_hash"
+}
+# --- End new helper ---
 
 # Test whether or not current git directory has ongoing merge
 # Uses the globally defined $GIT command string which might include --git-dir/--work-tree
@@ -847,7 +872,13 @@ fi
 
 # --- Lockfile Setup ---
 LOCKFILE_DIR="$GIT_DIR_PATH"
-LOCKFILE_BASENAME="gitwatch"
+# --- NEW: Create a unique basename based on a hash of the target path ---
+# This allows multiple gitwatch instances on the same repo, watching different targets
+# Use TARGETFILE_ABS if it's set (watching a file), otherwise use TARGETDIR_ABS
+WATCH_PATH_TO_HASH="${TARGETFILE_ABS:-$TARGETDIR_ABS}"
+TARGET_HASH=$(_get_path_hash "$WATCH_PATH_TO_HASH")
+LOCKFILE_BASENAME="gitwatch-target_${TARGET_HASH}"
+# --- End new basename ---
 
 # Check for write permission. If it fails, fall back to $TMPDIR
 # This handles the case where Write permission was missing on $GIT_DIR_PATH (the check above passed)
@@ -856,18 +887,13 @@ if [ "$NO_LOCK" -eq 0 ]; then
     verbose_echo "Warning: Cannot write lockfile to $LOCKFILE_DIR. Falling back to temporary directory."
     # Use $TMPDIR if set, otherwise /tmp
     LOCKFILE_DIR="${TMPDIR:-/tmp}"
-    # Create a unique, predictable lockfile name based on the repo path
-    # Use sha256sum if available, md5sum as fallback, or just path chars as last resort
-    REPO_HASH=""
-    if is_command "sha256sum"; then
-      REPO_HASH=$(echo -n "$GIT_DIR_PATH" | sha256sum | (read -r hash _; echo "$hash"))
-    elif is_command "md5sum"; then
-      REPO_HASH=$(echo -n "$GIT_DIR_PATH" | md5sum | (read -r hash _; echo "$hash"))
-    else
-      # Simple "hash" for POSIX compliance, replaces / with _
-      REPO_HASH="${GIT_DIR_PATH//\//_}"
-    fi
-    LOCKFILE_BASENAME="gitwatch-$REPO_HASH"
+
+    # --- MODIFIED: Use both repo and target hash for unique /tmp name ---
+    REPO_HASH=$(_get_path_hash "$GIT_DIR_PATH")
+    # TARGET_HASH is already defined above
+    LOCKFILE_BASENAME="gitwatch-repo_${REPO_HASH}-target_${TARGET_HASH}"
+    # --- End modification ---
+
     verbose_echo "Using temporary lockfile base: $LOCKFILE_DIR/$LOCKFILE_BASENAME"
   else
     # We have write permission, clean up our test file
@@ -885,7 +911,7 @@ if [ "$NO_LOCK" -eq 0 ]; then
   exec 9>"$LOCKFILE"
   "$FLOCK" -n 9 || {
     # Exit with 69 (EX_UNAVAILABLE) to indicate the resource (lock) was busy
-    stderr "Error: gitwatch is already running on this repository (lockfile: $LOCKFILE)."; exit 69;
+    stderr "Error: gitwatch is already running on this repository/target (lockfile: $LOCKFILE)."; exit 69;
   }
   verbose_echo "Acquired main instance lock (FD 9) on $LOCKFILE"
 fi
@@ -1127,7 +1153,7 @@ generate_commit_message() {
     # --- MODIFICATION: Add timeout and check PIPESTATUS ---
     local diff_cmd
     # --- FIX for SC2183: Removed extra %s ---
-    diff_cmd=$(printf "%s -s 9 %s %s diff --staged -U0 %q" "$TIMEOUT_CMD" "$TIMEOUT" "$GIT" "$LISTCHANGES_COLOR")
+    diff_cmd=$(printf "%s -s 9 %s %s %s diff --staged -U0 %q" "$TIMEOUT_CMD" "$TIMEOUT" "$GIT" "$LISTCHANGES_COLOR")
     DIFF_COMMITMSG=$(bash -c "$diff_cmd" | diff-lines)
     local timeout_status=${PIPESTATUS[0]}
     local diff_lines_status=${PIPESTATUS[1]}
@@ -1198,7 +1224,7 @@ generate_commit_message() {
       local_commit_msg="$commit_output"
     elif [ "$commit_exit_code" -eq 124 ]; then
       stderr "ERROR: Custom commit command '$COMMITCMD' timed out after $TIMEOUT seconds."
-      local_commit_msg="Custom commit command timed out" # Fallback message
+      local_commit_msg="Custom command timed out" # Fallback message
     else
       # Command failed
       stderr "ERROR: Custom commit command '$COMMITCMD' failed with exit code $commit_exit_code."
@@ -1349,34 +1375,51 @@ _perform_commit() {
 
 # Wrapper for perform_commit that uses a lock to prevent concurrent runs
 perform_commit() {
+  # --- NEW: Backoff logic integration ---
+  # This logic is now handled in the main loop *before* perform_commit is called
+  # --- End new logic ---
+
+  local commit_status=0
   if [ "$NO_LOCK" -eq 1 ]; then
     _perform_commit # Run without lock
-    local nocommit_status=$?
-    if [ $nocommit_status -ne 0 ]; then
-      stderr "Commit logic failed with status $nocommit_status."
-    fi
-    return $nocommit_status
+    commit_status=$?
+  else
+    # Try to acquire a non-blocking lock on file descriptor 8 using COMMIT_LOCKFILE.
+    (
+      # Open FD 8 for the subshell, associating it with the lock file
+      exec 8>"$COMMIT_LOCKFILE"
+      "$FLOCK" -n 8 || {
+        # This is a common and expected event, so it's a good verbose log
+        verbose_echo "Commit already in progress (commit lock busy), skipping this trigger."
+        exit 0 # Exit subshell gracefully
+      }
+      verbose_echo "Acquired commit lock (FD 8) on $COMMIT_LOCKFILE, running commit logic."
+      _perform_commit
+      # Lock on FD 8 is released automatically when this subshell exits
+    )
+    commit_status=$?
   fi
 
-  # Try to acquire a non-blocking lock on file descriptor 8 using COMMIT_LOCKFILE.
-  (
-    # Open FD 8 for the subshell, associating it with the lock file
-    exec 8>"$COMMIT_LOCKFILE"
-    "$FLOCK" -n 8 || {
-      # This is a common and expected event, so it's a good verbose log
-      verbose_echo "Commit already in progress (commit lock busy), skipping this trigger."
-      exit 0 # Exit subshell gracefully
-    }
-    verbose_echo "Acquired commit lock (FD 8) on $COMMIT_LOCKFILE, running commit logic."
-    _perform_commit
-    # Lock on FD 8 is released automatically when this subshell exits
-  )
-  local commit_status=$?
+  # --- NEW: Backoff counter logic ---
   if [ $commit_status -ne 0 ]; then
     stderr "Commit logic failed with status $commit_status."
-    # Option: Exit the main script upon commit failure
-    # exit 1
+    # Use 'date' which is POSIX compliant
+    LAST_FAIL_TIME=$(date +%s)
+    GIT_FAIL_COUNT=$((GIT_FAIL_COUNT + 1))
+    verbose_echo "Git operation failed. Incrementing failure count to $GIT_FAIL_COUNT/$MAX_FAIL_COUNT."
+    if [ "$GIT_FAIL_COUNT" -ge "$MAX_FAIL_COUNT" ]; then
+      verbose_echo "Max failures reached. Entering cool-down period for $COOL_DOWN_SECONDS seconds."
+    fi
+  else
+    # On success, reset the counter
+    if [ "$GIT_FAIL_COUNT" -gt 0 ]; then
+      verbose_echo "Git operation succeeded. Resetting failure count."
+      GIT_FAIL_COUNT=0
+      LAST_FAIL_TIME=0
+    fi
   fi
+  # --- End backoff logic ---
+
   return $commit_status
 }
 
@@ -1389,20 +1432,10 @@ fi
 
 # --- Debounce Timer PID File ---
 # Using a file to store the PID of the *active* timer subshell
-# Use sha256sum for uniqueness if available
-if [ "$NO_LOCK" -eq 0 ]; then
-  if is_command "sha256sum"; then
-    TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | sha256sum | (read -r hash _; echo "$hash")).pid"
-  elif is_command "md5sum"; then
-    TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(echo -n "$GIT_DIR_PATH" | md5sum | (read -r hash _; echo "$hash")).pid"
-  else
-    # Fallback if no hash command found
-    TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_${GIT_DIR_PATH//\//_}.pid"
-  fi
-else
-  # If locking is disabled, we don't need a unique PID file, but we still need one
-  TIMER_PID_FILE="${TMPDIR:-/tmp}/gitwatch_timer_$(date +%s%N).pid"
-fi
+# --- MODIFIED: Use the unique lockfile basename for the PID file too ---
+# This ensures timer PIDs are also unique per target
+TIMER_PID_FILE="${TMPDIR:-/tmp}/${LOCKFILE_BASENAME}.timer.pid"
+# --- End modification ---
 
 
 # Cleanup PID file on exit
@@ -1414,6 +1447,24 @@ trap 'rm -f "$TIMER_PID_FILE"; cleanup "$?"' EXIT INT TERM
 verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
 # Execute the watcher and pipe its output to the read loop
 "${INW}" "${INW_ARGS[@]}" | while IFS= read -r line; do # Use IFS= to preserve leading spaces
+
+  # --- NEW: Exponential Backoff Check ---
+  if [ "$GIT_FAIL_COUNT" -ge "$MAX_FAIL_COUNT" ]; then
+    current_time=$(date +%s)
+    time_since_fail=$((current_time - LAST_FAIL_TIME))
+
+    if [ "$time_since_fail" -lt "$COOL_DOWN_SECONDS" ]; then
+      local remaining_wait=$((COOL_DOWN_SECONDS - time_since_fail))
+      verbose_echo "In cool-down mode. Skipping trigger. ($remaining_wait seconds remaining)"
+      continue # Skip this file change event
+    else
+      verbose_echo "Cool-down period finished. Resetting failure count and retrying."
+      GIT_FAIL_COUNT=0
+      LAST_FAIL_TIME=0
+    fi
+  fi
+  # --- End Backoff Check ---
+
   if [ -z "$line" ]; then
     verbose_echo "Received empty line from watcher, possibly pipe closed?"
     continue

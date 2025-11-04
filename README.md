@@ -32,6 +32,7 @@
     - [Starting on Boot](#starting-on-boot)
       - [SysVInit](#sysvinit)
       - [systemd](#systemd)
+    - [Troubleshooting / FAQ](#troubleshooting--faq)
   - [Other Articles](#other-articles)
     - [On the Gitwatch Wiki](#on-the-gitwatch-wiki)
     - [Community Articles](#community-articles)
@@ -216,76 +217,55 @@ isolating dependencies and ensuring a consistent environment.
 
 ### Docker Compose (Recommended)
 
-The easiest way to run `gitwatch` with Docker is by using the provided
-`docker-compose.yml` file.
+The easiest way to run `gitwatch` with Docker is by using the provided [`docker-compose.yaml`](./docker-compose.yaml) file. This file is configured using environment variables.
 
 **1. Prerequisites:**
 
 - **Docker and Docker Compose**: Make sure you have both installed.
-  - [Install Docker](https://docs.docker.com/get-docker/)
-  - [Install Docker Compose](https://docs.docker.com/compose/install/)
-- **A Git Repository**: You need a local directory that is a Git repository
-  you want to watch.
-- **SSH Key**: For pushing to a remote repository, the container needs
-  access to an SSH key that is authorized with your Git provider.
+- **A Git Repository**: You need a local directory that is a Git repository you want to watch.
+- **SSH Key**: For pushing to a remote repository, the container needs access to an SSH key that is authorized with your Git provider.
 
 **2. Configuration:**
 
-The `docker-compose.yml` file is configured using environment variables.
-You can either edit the `environment` section directly in the file or
-create a `.env` file in the same directory to set the values.
+You must configure the `docker-compose.yaml` file before running it, primarily the `volumes` and `environment` sections.
 
-**Warning:** To avoid file permission errors when mounting a local directory (volume),
-you **must** set the `PUID` and `PGID` environment variables to match your host
-user's ID. You can find these on your host machine by running `id -u` (for PUID)
-and `id -g` (for PGID).
+**Warning:** To avoid file permission errors when mounting a local directory (volume), you **must** set the `PUID` and `PGID` environment variables in the `docker-compose.yaml` file to match your host user's ID. You can find these on your host machine by running `id -u` (for PUID) and `id -g` (for PGID).
 
-Here's a breakdown of the important parts of the `docker-compose.yml` file:
+Please review the comments within the [`docker-compose.yaml`](./docker-compose.yaml) file for detailed instructions on setting volumes and environment variables.
 
-- **`volumes`**: This is the most critical section to configure.
-  - `./watched-repo:/app/watched-repo`: This maps a directory from your
-    computer (the "host") into the container.
-    - You **must** change `./watched-repo` to the path of the local Git
-      repository you want `gitwatch` to monitor.
-  - `~/.ssh/id_ed25519:/root/.ssh/id_ed25519:ro`: This securely mounts your
-    SSH private key (e.g., `id_ed25519` or `id_rsa`) into the container in
-    read-only mode (`ro`). This is necessary for `gitwatch` to push changes
-    to your remote repository.
-  - `~/.gitconfig:/root/.gitconfig:ro`: This mounts your Git configuration
-    into the container. This ensures that the commits made by `gitwatch`
-    are attributed to you with the correct name and email.
-- **`environment`**: This section controls how `gitwatch` behaves.
   <!-- prettier-ignore-start -->
-  **3. Environment Variables**
 
-The following environment variables are available for configuring the
-`gitwatch` container:
+**3. Environment Variables**
 
-| Variable             | Default Value          | Description                                                                                                                             |
-| :------------------- | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------------------- |
-| `PUID`               | `1000`                 | **Required.** Sets the User ID (UID) for the container's non-root user to match the host user, preventing file permission issues.       |
-| `PGID`               | `1000`                 | **Required.** Sets the Group ID (GID) for the container's user. Run `id -g` on your host to find this value.                            |
-| `GIT_WATCH_DIR`      | `/app/watched-repo`    | The directory inside the container to watch for changes. This must match the container path you set in the `volumes` section.           |
-| `GIT_REMOTE`         | `origin`               | The name of the remote repository to push to.                                                                                           |
-| `GIT_BRANCH`         | `main`                 | The branch to push to.                                                                                                                  |
-| `GIT_EXTERNAL_DIR`   | `""`                   | Use with the `-g` flag (e.g., `/app/.git`) to specify an external Git directory.                                                        |
-| `GIT_TIMEOUT`        | `60`                   | Timeout in seconds for critical Git operations (commit, pull, push) (`-t`).                                                             |
-| `PULL_BEFORE_PUSH`   | `"false"`              | Set to `"true"` to run `git pull --rebase` before every push (`-R`).                                                                    |
-| `SLEEP_TIME`         | `2`                    | Time in seconds to wait after a file change before committing (`-s`).                                                                   |
-| `COMMIT_MSG`         | `"Auto-commit: %d"`    | The commit message format (`-m`). Ignored if `COMMIT_CMD` is set.                                                                       |
-| `DATE_FMT`           | `"+%Y-%m-%d %H:%M:%S"` | The date format used in the commit message (`-d`).                                                                                      |
-| `COMMIT_CMD`         | `""`                   | Custom shell command to generate the entire commit message (`-c`). Overrides `COMMIT_MSG`.                                              |
-| `PASS_DIFFS`         | `"false"`              | Set to `"true"` to pipe the list of changed files to `COMMIT_CMD` (`-C`).                                                               |
-| `EVENTS`             | `""`                   | Events passed to the underlying watcher tool (`-e`). Uses platform defaults if empty.                                                   |
-| `EXCLUDE_PATTERN`    | `""`                   | A comma-separated list of glob patterns to exclude from monitoring (`-X`).                                                              |
-| `RAW_EXCLUDE_REGEX`  | `""`                   | A raw regex pattern to exclude from monitoring (`-x`).                                                                                  |
-| `SKIP_IF_MERGING`    | `"false"`              | Set to `"true"` to prevent commits when a merge is in progress (`-M`).                                                                  |
-| `COMMIT_ON_START`    | `"false"`              | Set to `"true"` to commit any pending changes on startup (`-f`).                                                                        |
-| `VERBOSE`            | `"false"`              | Set to `"true"` to enable verbose output for debugging (`-v`).                                                                          |
-| `QUIET`              | `"false"`              | Set to `"true"` to suppress all stdout/stderr output (`-q`). Overrides `VERBOSE`.                                                       |
-| `USE_SYSLOG`         | `"false"`              | Set to `"true"` to log all messages to syslog (`-S`).                                                                                   |
-| `DISABLE_LOCKING`    | `"false"`              | Set to `"true"` to disable file locking (`-n`). Bypasses `flock` dependency check.                                                      |
-| `GW_LOG_LINE_LENGTH` | `150`                  | Overrides the default 150-character truncation for _individual lines_ in the `-l`/`-L` commit log. Does not affect the number of lines. |
+The following environment variables are available for configuring the `gitwatch` container:
+
+| Variable               | Default Value          | Description                                                                                                                             |
+| :--------------------- | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------------------- |
+| `PUID`                 | `1000`                 | **Required.** Sets the User ID (UID) for the container's non-root user to match the host user, preventing file permission issues.       |
+| `PGID`                 | `1000`                 | **Required.** Sets the Group ID (GID) for the container's user. Run `id -g` on your host to find this value.                            |
+| `GIT_WATCH_DIR`        | `/app/watched-repo`    | The directory inside the container to watch for changes. This must match the container path you set in the `volumes` section.           |
+| `GIT_REMOTE`           | `origin`               | The name of the remote repository to push to.                                                                                           |
+| `GIT_BRANCH`           | `main`                 | The branch to push to.                                                                                                                  |
+| `GIT_EXTERNAL_DIR`     | `""`                   | Use with the `-g` flag (e.g., `/app/.git`) to specify an external Git directory.                                                        |
+| `GIT_TIMEOUT`          | `60`                   | Timeout in seconds for critical Git operations (commit, pull, push) (`-t`).                                                             |
+| `PULL_BEFORE_PUSH`     | `"false"`              | Set to `"true"` to run `git pull --rebase` before every push (`-R`).                                                                    |
+| `SLEEP_TIME`           | `2`                    | Time in seconds to wait after a file change before committing (`-s`).                                                                   |
+| `COMMIT_MSG`           | `"Auto-commit: %d"`    | The commit message format (`-m`). Ignored if `COMMIT_CMD` is set.                                                                       |
+| `DATE_FMT`             | `"+%Y-%m-%d %H:%M:%S"` | The date format used in the commit message (`-d`).                                                                                      |
+| `COMMIT_CMD`           | `""`                   | Custom shell command to generate the entire commit message (`-c`). Overrides `COMMIT_MSG`.                                              |
+| `PASS_DIFFS`           | `"false"`              | Set to `"true"` to pipe the list of changed files to `COMMIT_CMD` (`-C`).                                                               |
+| `EVENTS`               | `""`                   | Events passed to the underlying watcher tool (`-e`). Uses platform defaults if empty.                                                   |
+| `EXCLUDE_PATTERN`      | `""`                   | A comma-separated list of glob patterns to exclude from monitoring (`-X`).                                                              |
+| `RAW_EXCLUDE_REGEX`    | `""`                   | A raw regex pattern to exclude from monitoring (`-x`).                                                                                  |
+| `SKIP_IF_MERGING`      | `"false"`              | Set to `"true"` to prevent commits when a merge is in progress (`-M`).                                                                  |
+| `COMMIT_ON_START`      | `"false"`              | Set to `"true"` to commit any pending changes on startup (`-f`).                                                                        |
+| `VERBOSE`              | `"false"`              | Set to `"true"` to enable verbose output for debugging (`-v`).                                                                          |
+| `QUIET`                | `"false"`              | Set to `"true"` to suppress all stdout/stderr output (`-q`). Overrides `VERBOSE`.                                                       |
+| `USE_SYSLOG`           | `"false"`              | Set to `"true"` to log all messages to syslog (`-S`).                                                                                   |
+| `DISABLE_LOCKING`      | `"false"`              | Set to `"true"` to disable file locking (`-n`). Bypasses `flock` dependency check.                                                      |
+| `GW_LOG_LINE_LENGTH`   | `150`                  | Overrides the default 150-character truncation for _individual lines_ in the `-l`/`-L` commit log. Does not affect the number of lines. |
+| `GW_MAX_FAIL_COUNT`    | `5`                    | (Optional) Number of consecutive git failures before entering cool-down.                                                                |
+| `GW_COOL_DOWN_SECONDS` | `600`                  | (Optional) Cool-down time in seconds after hitting max failures.                                                                        |
 
 <!-- prettier-ignore-end -->
 
@@ -564,6 +544,30 @@ This service is designed to run in user space (`--user` flag).
   ```shell
   loginctl enable-linger <your-username>
   ```
+
+### Troubleshooting / FAQ
+
+**Q: My logs show "ERROR: 'git push' failed." and mention "non-fast-forward". What do I do?**
+
+**A:** This means the remote repository (e.g., `origin`) has changes that your local repository does not have. `gitwatch` will not overwrite these changes. To fix this:
+
+1.  Stop `gitwatch`.
+2.  In your watched repository, run `git pull --rebase` to fetch and apply the remote changes.
+3.  Resolve any merge conflicts that may occur.
+4.  Restart `gitwatch`.
+
+To have `gitwatch` attempt this for you automatically, run it with the **`-R`** flag.
+
+**Q: My logs show "CRITICAL PERMISSION ERROR: Cannot Access Target Directory".**
+
+**A:** This means the user running `gitwatch` does not have Read, Write, and Execute permissions on the directory it's trying to watch.
+
+- **On Linux/macOS:** Ensure you own the directory. Run `sudo chown -R $USER:$USER /path/to/your/repo`.
+- **In Docker:** This is a common problem. You **must** set the `PUID` and `PGID` environment variables in your `docker-compose.yaml` to match your host user's ID. You can find these by running `id -u` and `id -g` on your host machine.
+
+**Q: Can I run multiple `gitwatch` scripts on the same repository?**
+
+**A:** Yes. As of version 0.6+, `gitwatch` creates a unique lockfile based on a hash of the _target path_ you are watching. This allows you to run multiple instances on the same repository, as long as they are watching different files or sub-directories (e.g., one for `/repo/docs` and one for `/repo/src`).
 
 ## Other Articles
 

@@ -11,7 +11,6 @@ load 'bats-custom/startup-shutdown'
 
 # This test verifies that the 'trap' logic for INT/TERM signals
 # correctly cleans up the main lockfile and the timer PID file.
-
 @test "signal_handling: SIGTERM cleans up lockfile and timer PID file" {
   # Skip if 'flock' is not available, as this test relies on flock-based locking.
   if ! command -v flock &>/dev/null; then
@@ -21,32 +20,39 @@ load 'bats-custom/startup-shutdown'
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  local target_path="$testdir/local/$TEST_SUBDIR_NAME"
 
   # 1. Determine the expected lockfile and timer PID file paths
-  cd "$testdir/local/$TEST_SUBDIR_NAME"
+  cd "$target_path"
   local GIT_DIR_PATH
   GIT_DIR_PATH=$(git rev-parse --absolute-git-dir)
-  local LOCKFILE="$GIT_DIR_PATH/gitwatch.lock"
+  local target_abs_path
+  target_abs_path=$(pwd -P)
+
+  local target_hash
+  target_hash=$(_get_path_hash "$target_abs_path")
+  local lock_basename="gitwatch-target_${target_hash}"
+
+  local LOCKFILE="$GIT_DIR_PATH/${lock_basename}.lock"
+  local TIMER_PID_FILE="${TMPDIR:-/tmp}/${lock_basename}.timer.pid"
 
   # 2. Start gitwatch in the background
-  # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -s 10 "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -s 10 "$target_path" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   local test_pid=$GITWATCH_PID
   sleep 1 # Allow watcher to initialize and acquire main lock
 
   # 3. Assert the main lockfile was created
-  assert_file_exist "$LOCKFILE" "Main lockfile was not created"
+  assert_file_exist "$LOCKFILE" "Main lockfile was not created at $LOCKFILE"
 
   # 4. Trigger a change to create the timer PID file
   echo "trigger for timer file" >> signal_test.txt
   sleep 0.5 # Give time for the debounce logic to start and create the PID file
 
   # Find the timer PID file
-  local timer_file
-  timer_file=$(find "${TMPDIR:-/tmp}" -name "gitwatch_timer_*.pid" 2>/dev/null)
-  assert_file_exist "$timer_file" "Timer PID file was not created after change"
+  assert_file_exist "$TIMER_PID_FILE" "Timer PID file was not created at $TIMER_PID_FILE"
 
   # 5. Send SIGTERM (graceful shutdown) to the main gitwatch process
   echo "# DEBUG: Sending SIGTERM to PID $test_pid" >&3
@@ -69,7 +75,7 @@ load 'bats-custom/startup-shutdown'
 
   # 8. Assert the cleanup trap worked
   assert_file_not_exist "$LOCKFILE" "Main lockfile was not cleaned up by trap"
-  assert_file_not_exist "$timer_file" "Timer PID file was not cleaned up by trap"
+  assert_file_not_exist "$TIMER_PID_FILE" "Timer PID file was not cleaned up by trap"
 
   # 9. Assert the log shows the signal was received
   run cat "$output_file"

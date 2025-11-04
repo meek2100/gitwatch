@@ -20,9 +20,11 @@ load 'bats-custom/startup-shutdown'
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  local target_path="$testdir/local/$TEST_SUBDIR_NAME"
 
   # 1. Determine the .git path from the test repo
-  cd "$testdir/local/$TEST_SUBDIR_NAME"
+  cd "$target_path"
   local GIT_DIR_PATH
   GIT_DIR_PATH=$(git rev-parse --absolute-git-dir)
   assert_success "Failed to find git directory path"
@@ -57,27 +59,33 @@ load 'bats-custom/startup-shutdown'
   echo "# DEBUG: Successfully hid hash commands via PATH manipulation." >&3
 
   # 4. Start gitwatch, which should fall back because of unwritable .git AND missing hash tools
-  # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$target_path" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
+
   # 5. Wait for initialization and check log
   sleep 2
 
   # 6. Assert: Check log output confirms fallback and the path-based name format
-  local escaped_path_hash
-  # The expected output is the path with slashes replaced by underscores (//\//_)
-  escaped_path_hash="${GIT_DIR_PATH//\//_}"
-
   run cat "$output_file"
   assert_output --partial "Warning: Cannot write lockfile to $GIT_DIR_PATH. Falling back to temporary directory." \
     "Did not log the expected fallback warning"
+  assert_output --partial "Warning: Neither 'sha256sum' nor 'md5sum' found."
 
-  # Assert that the path contains /tmp/gitwatch- and the path-based "hash"
-  assert_output --partial "/tmp/gitwatch-$escaped_path_hash.lock" "Did not log a temporary lockfile path with path-based name"
+  # 6a. Calculate the expected path-based "hash" name
+  local target_abs_path
+  target_abs_path=$(cd "$target_path" && pwd -P)
+  local repo_hash_path
+  repo_hash_path="${GIT_DIR_PATH//\//_}" # Replaces / with _
+  local target_hash_path
+  target_hash_path="${target_abs_path//\//_}" # Replaces / with _
+  local expected_basename="gitwatch-repo_${repo_hash_path}-target_${target_hash_path}"
+
+  # Assert that the path contains /tmp/ and the path-based "hash"
+  assert_output --partial "/tmp/${expected_basename}.lock" "Did not log a temporary lockfile path with path-based name"
 
   # 7. Trigger change and verify commit using the fallback lock
-  cd "$testdir/local/$TEST_SUBDIR_NAME"
+  cd "$target_path"
   local initial_hash
   initial_hash=$(git log -1 --format=%H)
 

@@ -77,3 +77,9 @@ services:
       # NEW: Overrides the default 150-character truncation for *individual lines*
       # in the -l/-L commit log. Does not affect the number of lines.
       GW_LOG_LINE_LENGTH: 150
+
+      # --- NEW: Advanced Backoff Tuning (Optional) ---
+      # Number of consecutive git failures before entering cool-down
+      # GW_MAX_FAIL_COUNT: 5
+      # Cool-down time in seconds after hitting max failures
+      # GW_COOL_DOWN_SECONDS: 600
