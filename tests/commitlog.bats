@@ -62,7 +62,8 @@ load 'bats-custom/startup-shutdown'
 
   # Generate 10 lines of content (which should exceed the max_lines=5 limit)
   local expected_total_lines=10
-  for i in $(seq 1 $expected_total_lines); do
+  for i in $(seq 1 $expected_total_lines);
+  do
     echo "Line number $i" >> long_file.txt
   done
 
@@ -182,7 +183,8 @@ load 'bats-custom/startup-shutdown'
 
   # Generate 10 lines of content
   local expected_total_lines=10
-  for i in $(seq 1 $expected_total_lines); do
+  for i in $(seq 1 $expected_total_lines);
+  do
     echo "Line number $i for unlimited test" >> long_file_unlimited.txt
   done
 
@@ -268,7 +270,8 @@ load 'bats-custom/startup-shutdown'
   initial_hash=$(git log -1 --format=%H)
 
   # 3. Create a file with *multiple* long lines
-  for i in $(seq 1 $line_count); do
+  for i in $(seq 1 $line_count);
+  do
     echo "Line $i: $long_line" >> long_truncated_file.txt
   done
 
@@ -294,5 +297,41 @@ load 'bats-custom/startup-shutdown'
 
   # 6. Cleanup
   unset GW_LOG_LINE_LENGTH
+  cd /tmp
+}
+
+# --- NEW TEST FOR BINARY FILES ---
+@test "commit_log_binary: -l flag logs binary file changes" {
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+
+  # 1. Create and commit a dummy file
+  echo "deleteme" > dummy.txt
+  git add .
+  git commit -q -m "Initial dummy"
+  local initial_hash
+  initial_hash=$(git log -1 --format=%H)
+
+  # 2. Start gitwatch with -l
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
+  GITWATCH_PID=$!
+  sleep 1 # Allow watcher to initialize
+
+  # 3. Create a binary file (e.g., a gzip file)
+  echo "This is a binary file" | gzip > binary_file.gz
+
+  # 4. Wait for the new commit to appear
+  run wait_for_git_change 20 0.5 git log -1 --format=%H
+  assert_success "Commit for binary file timed out"
+  assert_not_equal "$initial_hash" "$output" "Commit hash did not change"
+
+  # 5. Verify the commit message contains the binary file change string
+  run git log -1 --pretty=%B
+  assert_success
+  assert_output --partial "binary_file.gz:?: Binary file changed" \
+    "Commit message did not contain the expected binary file change string"
+
   cd /tmp
 }

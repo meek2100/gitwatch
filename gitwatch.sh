@@ -1008,6 +1008,17 @@ diff-lines() {
       continue
     elif [[ "$stripped_reply" =~ ^old\ mode\ ([0-9]+) ]]; then
       continue # Ignore old mode line, wait for new mode line
+
+      # --- NEW: Match binary file changes ---
+    elif [[ "$stripped_reply" =~ ^Binary\ files\ (.*)\ and\ (.*)\ differ ]]; then
+      # Use BASH_REMATCH[1] which contains the 'a/path'
+      local binary_path_a
+      binary_path_a=$(_trim_spaces "$(_strip_color "${BASH_REMATCH[1]}")")
+      # Strip the 'a/' prefix
+      echo "${binary_path_a#a/}:?: Binary file changed."
+      continue
+      # --- END NEW ---
+
     fi
 
     # --- Match Content Lines and Output ---
@@ -1083,13 +1094,23 @@ generate_commit_message() {
     local DIFF_COMMITMSG
     set +e # Temporarily disable exit on error for this pipeline
     # Use --staged or --cached to show diff of what's about to be committed
-    DIFF_COMMITMSG=$(bash -c "$GIT diff --staged -U0 '$LISTCHANGES_COLOR'" | diff-lines)
-    local diff_lines_status=$?
-    #set -e # Re-enable exit on error (Keep disabled if set -e is globally off)
-    if [ $diff_lines_status -ne 0 ]; then
-      stderr 'Warning: diff-lines pipeline failed. Commit message may be incomplete.'
+
+    # --- MODIFICATION: Add timeout and check PIPESTATUS ---
+    local diff_cmd
+    diff_cmd=$(printf "%s -s 9 %s %s diff --staged -U0 %q" "$TIMEOUT_CMD" "$TIMEOUT" "$GIT" "$LISTCHANGES_COLOR")
+    DIFF_COMMITMSG=$(bash -c "$diff_cmd" | diff-lines)
+    local timeout_status=${PIPESTATUS[0]}
+    local diff_lines_status=${PIPESTATUS[1]}
+    set -e # Re-enable exit on error
+
+    if [ "$timeout_status" -eq 124 ]; then
+      stderr "Warning: 'git diff' for commit message timed out after $TIMEOUT seconds."
+      DIFF_COMMITMSG=""
+    elif [ "$timeout_status" -ne 0 ] || [ "$diff_lines_status" -ne 0 ]; then
+      stderr "Warning: diff-lines pipeline failed (codes: $timeout_status, $diff_lines_status). Commit message may be incomplete."
       DIFF_COMMITMSG=""
     fi
+    # --- END MODIFICATION ---
 
     local LENGTH_DIFF_COMMITMSG=0
     # Count lines using wc -l (more robust than bash loop for potentially large diffs)

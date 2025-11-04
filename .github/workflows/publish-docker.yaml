@@ -31,6 +31,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # --- NEW STEP ---
+      - name: Substitute Version Number into gitwatch.sh
+        shell: bash
+        run: |
+          # Extract version from the tag (e.g., "v1.2.3" -> "1.2.3")
+          VERSION_NUMBER=${{ github.ref_name#v }}
+          sed -i "s/%%GITWATCH_VERSION%%/${VERSION_NUMBER}/g" gitwatch.sh
+          echo "Substituted version ${VERSION_NUMBER} into gitwatch.sh for Docker build."
+      # --- END NEW STEP ---
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f

@@ -122,6 +122,10 @@ gitwatch -r origin -b main "C:\Users\YourUser\Documents\MyNotes"
 The wrapper automatically handles path translation, and `gitwatch` will use
 your existing Windows `.gitconfig` and SSH keys.
 
+**Note:** The `gitwatch.bat` wrapper requires the target path to be the
+**final argument** in the command. All flags (like `-r` or `-b`) must come
+_before_ the path.
+
 ### From Source
 
 `gitwatch` can be installed from source using the provided `Makefile`. This
@@ -255,11 +259,12 @@ The following environment variables are available for configuring the
 | Variable             | Default Value          | Description                                                                                                                       |
 | :------------------- | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------------- |
 | `PUID`               | `1000`                 | **Optional.** Sets the User ID (UID) for the container's non-root user to match the host user, preventing file permission issues. |
-| `PGID`               | `(blank)`              | **Optional but Recommended.** Sets the Group ID (GID) for the container's user. Run `id -g` on your host to find this value.      |
+| `PGID`               | `1000`                 | **Optional but Recommended.** Sets the Group ID (GID) for the container's user. Run `id -g` on your host to find this value.      |
 | `GIT_WATCH_DIR`      | `/app/watched-repo`    | The directory inside the container to watch for changes. This must match the container path you set in the `volumes` section.     |
 | `GIT_REMOTE`         | `origin`               | The name of the remote repository to push to.                                                                                     |
 | `GIT_BRANCH`         | `main`                 | The branch to push to.                                                                                                            |
 | `GIT_EXTERNAL_DIR`   | `""`                   | Use with the `-g` flag (e.g., `/app/.git`) to specify an external Git directory.                                                  |
+| `GIT_TIMEOUT`        | `60`                   | Timeout in seconds for critical Git operations (commit, pull, push) (`-t`).                                                       |
 | `PULL_BEFORE_PUSH`   | `"false"`              | Set to `"true"` to run `git pull --rebase` before every push (`-R`).                                                              |
 | `SLEEP_TIME`         | `2`                    | Time in seconds to wait after a file change before committing (`-s`).                                                             |
 | `COMMIT_MSG`         | `"Auto-commit: %d"`    | The commit message format (`-m`). Ignored if `COMMIT_CMD` is set.                                                                 |
