@@ -43,7 +43,8 @@ incorporating all changes **after** commit `5cdaeb49dc`._
   - Improved POSIX compliance (e.g., using `command -v` instead of `hash`,
     POSIX-compliant parameter expansions).
   - Added support for specifying alternative binary paths via environment
-    variables (`GW_GIT_BIN`, `GW_INW_BIN`, `GW_FLOCK_BIN`, `GW_TIMEOUT_BIN`).
+    variables (`GW_GIT_BIN`, `GW_INW_BIN`, `GW_FLOCK_BIN`,
+    `GW_TIMEOUT_BIN`).
   - Uses `pwd -P` for path resolution, removing dependency on
     `readlink`/`greadlink`.
   - Added check for `sha256sum`/`md5sum` needed for unique lockfile names
@@ -108,7 +109,8 @@ incorporating all changes **after** commit `5cdaeb49dc`._
 ### New Contributors (Since v0.5)
 
 - @meek2100 (Darin Theurer) performed the major refactor. _(Note: List any
-  other \_new_ contributors specifically to the v0.6 changes if applicable)\_
+  other \_new_ contributors specifically to the v0.6 changes if
+  applicable)\_
 
 ## [0.5] - YYYY-MM-DD (Unreleased)
 

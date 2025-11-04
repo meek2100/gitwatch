@@ -76,8 +76,8 @@ That's really up to you, but here are some examples:
 ### macOS (via Homebrew)
 
 While `gitwatch` is not yet in the official Homebrew repository, the
-easiest way to run it on macOS is to first install its dependencies
-using Homebrew, and then install the script.
+easiest way to run it on macOS is to first install its dependencies using
+Homebrew, and then install the script.
 
 ```shell
 # 1. Install required dependencies
@@ -90,36 +90,43 @@ brew install fswatch flock coreutils
 
 ### Windows 11 (via WSL Installer)
 
-`gitwatch` is fully supported on Windows 11 through the Windows Subsystem for Linux (WSL).
-A `.exe` installer is provided to make setup seamless.
+`gitwatch` is fully supported on Windows 11 through the Windows Subsystem
+for Linux (WSL). A `.exe` installer is provided to make setup seamless.
 
-1.  **Download** the latest `gitwatch-setup.exe` from the
-    [GitHub Releases page](https://github.com/gitwatch/gitwatch/releases/latest).
-2.  **Run** the installer. It will automatically:
-    - Request Administrator privileges.
-    - Check for and install WSL if it's not already present (this may take a few minutes).
-    - **Attempt to auto-detect your WSL distribution** (e.g., Ubuntu, Fedora, Alpine) and install required Linux dependencies (`git`, `flock`, `timeout`, `inotify-tools`) using the correct package manager.
-    - Install the `gitwatch.sh` script into WSL.
-    - Install a `gitwatch.bat` wrapper on your Windows system and add it to your `PATH`.
+1. **Download** the latest `gitwatch-setup.exe` from the
+   [GitHub Releases page](https://github.com/gitwatch/gitwatch/releases/latest).
+2. **Run** the installer. It will automatically:
+   - Request Administrator privileges.
+   - Check for and install WSL if it's not already present (this may take a
+     few minutes).
+   - **Attempt to auto-detect your WSL distribution** (e.g., Ubuntu,
+     Fedora, Alpine) and install required Linux dependencies (`git`,
+     `flock`, `timeout`, `inotify-tools`) using the correct package
+     manager.
+   - Install the `gitwatch.sh` script into WSL.
+   - Install a `gitwatch.bat` wrapper on your Windows system and add it to
+     your `PATH`.
 
-**Note:** The installer works best with major distributions. If you use a custom or unrecognized WSL distribution, you may be prompted to install the dependencies manually.
+**Note:** The installer works best with major distributions. If you use a
+custom or unrecognized WSL distribution, you may be prompted to install the
+dependencies manually.
 
-After installation, you can open any Windows Command Prompt or PowerShell terminal and use
-`gitwatch` as if it were a native application:
+After installation, you can open any Windows Command Prompt or PowerShell
+terminal and use `gitwatch` as if it were a native application:
 
 ```shell
 # Example: Watch a directory in your Windows "Documents" folder
 gitwatch -r origin -b main "C:\Users\YourUser\Documents\MyNotes"
 ```
 
-The wrapper automatically handles path translation, and `gitwatch` will use your existing
-Windows `.gitconfig` and SSH keys.
+The wrapper automatically handles path translation, and `gitwatch` will use
+your existing Windows `.gitconfig` and SSH keys.
 
 ### From Source
 
-`gitwatch` can be installed from source using the provided `Makefile`. This is
-the recommended method for building from source as it uses standard `install`
-commands.
+`gitwatch` can be installed from source using the provided `Makefile`. This
+is the recommended method for building from source as it uses standard
+`install` commands.
 
 ```sh
 git clone https://github.com/gitwatch/gitwatch.git
@@ -335,11 +342,11 @@ To run this script, you must have installed and globally available:
 - **File Watcher:** Either `inotifywait` (part of
   **[inotify-tools](https://github.com/rvoicilas/inotify-tools)**, for
   Linux) or `fswatch` (for macOS/BSD).
-- **Locking:** `flock` (part of `util-linux` on most
-  Linux distributions). This is required for process locking unless explicitly
-  disabled with the `-n` flag.
-- **Timeout:** `timeout` (part of `coreutils` on most
-  Linux/macOS distributions) for robust Git operations.
+- **Locking:** `flock` (part of `util-linux` on most Linux distributions).
+  This is required for process locking unless explicitly disabled with the
+  `-n` flag.
+- **Timeout:** `timeout` (part of `coreutils` on most Linux/macOS
+  distributions) for robust Git operations.
 
 The script automatically detects the appropriate watcher tool based on your
 operating system.
@@ -351,8 +358,8 @@ testing. The easiest way to run the full test suite is by using the
 provided `Makefile`.
 
 1. **Install Dependencies**: Follow the instructions in `CONTRIBUTING.md`
-   to install the runtime and testing dependencies (like
-   `bats-core`, `shellcheck`, etc.).
+   to install the runtime and testing dependencies (like `bats-core`,
+   `shellcheck`, etc.).
 
 2. **Install Hooks**: Install the `pre-commit` hooks, which will ensure all
    linting passes before you commit.
@@ -524,9 +531,11 @@ This service is designed to run in user space (`--user` flag).
 
 - If installed to a path other than `/usr/local/bin/gitwatch`, modify the
   `ExecStart` path within `examples/gitwatch@.service` to suit.
+
 - Create the user systemd directory if it does not exist and copy the
   systemd service file:
   `mkdir -p "$HOME/.config/systemd/user" && cp examples/gitwatch@.service $HOME/.config/systemd/user`
+
 - Start and enable the service for a given path and arguments by running
   the following command. The arguments are passed to the service after
   being escaped.
@@ -536,8 +545,8 @@ This service is designed to run in user space (`--user` flag).
   ```
 
   **Note on persistence:** By default, `systemd` user services are
-  terminated when the user logs out. To ensure `gitwatch` runs
-  even when you are not logged in, you must enable "lingering" for your user:
+  terminated when the user logs out. To ensure `gitwatch` runs even when
+  you are not logged in, you must enable "lingering" for your user:
 
   ```shell
   loginctl enable-linger <your-username>

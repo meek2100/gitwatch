@@ -151,3 +151,19 @@ new mode 100755
   assert_output --regexp "script.sh:?: -old content"
   assert_output --regexp "script.sh:1: \+new content"
 }
+
+@test "diff_lines_9_path_with_color: Strips color codes from paths" {
+  local ESC=$'\033'
+  # Mock Git diff output with ANSI colors in the path
+  local DIFF_INPUT="
+  --- a/${ESC}[31mcolored_path.txt${ESC}[0m
+  +++ b/${ESC}[32mcolored_path.txt${ESC}[0m
+  @@ -1,1 +1,1 @@
+  +new line
+  "
+  run diff-lines <<< "$DIFF_INPUT"
+  assert_success
+  # The output path should be clean, but content color would be preserved (if present)
+  assert_output --regexp "colored_path.txt:1: \+new line"
+  refute_output --regexp "${ESC}" "Path should not contain color codes"
+}

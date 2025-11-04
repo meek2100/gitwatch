@@ -855,7 +855,8 @@ if [ "$NO_LOCK" -eq 0 ]; then
   # FD 9 is chosen arbitrarily, avoid 0, 1, 2.
   exec 9>"$LOCKFILE"
   "$FLOCK" -n 9 || {
-    stderr "Error: gitwatch is already running on this repository (lockfile: $LOCKFILE)."; exit 1;
+    # Exit with 69 (EX_UNAVAILABLE) to indicate the resource (lock) was busy
+    stderr "Error: gitwatch is already running on this repository (lockfile: $LOCKFILE)."; exit 69;
   }
   verbose_echo "Acquired main instance lock (FD 9) on $LOCKFILE"
 fi

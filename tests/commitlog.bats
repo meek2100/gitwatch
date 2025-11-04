@@ -62,8 +62,7 @@ load 'bats-custom/startup-shutdown'
 
   # Generate 10 lines of content (which should exceed the max_lines=5 limit)
   local expected_total_lines=10
-  for i in $(seq 1 $expected_total_lines);
-  do
+  for i in $(seq 1 $expected_total_lines); do
     echo "Line number $i" >> long_file.txt
   done
 
@@ -209,6 +208,7 @@ load 'bats-custom/startup-shutdown'
 
 @test "commit_log_env_var_override: GW_LOG_LINE_LENGTH overrides default" {
   # 1. Set a short, custom line length
+  # shellcheck disable=SC2030,SC2031 # Exporting for child process (gitwatch.sh)
   export GW_LOG_LINE_LENGTH=10
 
   local long_line="This line is definitely longer than 10 characters"
@@ -242,6 +242,55 @@ load 'bats-custom/startup-shutdown'
 
   # Assert that the *full* line is *not* present
   refute_output --partial "+${long_line}"
+
+  # 6. Cleanup
+  unset GW_LOG_LINE_LENGTH
+  cd /tmp
+}
+
+@test "commit_log_unlimited_with_env_var: -l 0 and GW_LOG_LINE_LENGTH truncates lines but not line count" {
+  # 1. Set a short, custom line length
+  # shellcheck disable=SC2030,SC2031 # Exporting for child process (gitwatch.sh)
+  export GW_LOG_LINE_LENGTH=10
+  local line_count=10
+  local long_line="This line is definitely longer than 10 characters"
+  local truncated_line="This line " # The first 10 chars
+  local initial_hash
+
+  # 2. Start gitwatch with -l 0 (unlimited lines)
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -l 0 "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
+  GITWATCH_PID=$!
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+  sleep 1
+
+  initial_hash=$(git log -1 --format=%H)
+
+  # 3. Create a file with *multiple* long lines
+  for i in $(seq 1 $line_count); do
+    echo "Line $i: $long_line" >> long_truncated_file.txt
+  done
+
+  # 4. Wait for the commit
+  run wait_for_git_change 20 0.5 git log -1 --format=%H
+  assert_success "Commit timed out"
+  assert_not_equal "$initial_hash" "$output" "Commit hash did not change"
+
+  # 5. Verify the commit message
+  run git log -1 --pretty=%B
+  assert_success
+
+  # 5a. Assert it did NOT use the "Too many lines" summary (proving -l 0 worked)
+  refute_output --partial "Too many lines changed"
+
+  # 5b. Assert it DID truncate the lines (proving GW_LOG_LINE_LENGTH worked)
+  assert_output --partial "+Line 1: $truncated_line"
+  assert_output --partial "+Line $line_count: $truncated_line"
+
+  # 5c. Assert it did NOT include the full lines
+  refute_output --partial "+Line 1: $long_line"
+  refute_output --partial "+Line $line_count: $long_line"
 
   # 6. Cleanup
   unset GW_LOG_LINE_LENGTH
