@@ -1,7 +1,7 @@
 # Makefile for gitwatch development
 
 # Use .PHONY to declare targets that are not files
-.PHONY: all test lint install uninstall install-hooks clean
+.PHONY: all test lint install uninstall install-hooks clean build-windows-installer
 
 # Default target
 all: test
@@ -40,6 +40,29 @@ uninstall:
 install-hooks:
 	@echo "Installing pre-commit hooks..."
 	pre-commit install
+
+# --- Windows Installer Build ---
+build-windows-installer:
+	@echo "Building Windows installer (gitwatch-setup.exe)..."
+	@echo "Checking for PowerShell (pwsh) and PS2EXE module..."
+	@if ! command -v pwsh &> /dev/null; then \
+		echo "Error: 'pwsh' (PowerShell) not found in PATH."; \
+		echo "Please install PowerShell (https://docs.microsoft.com/powershell/scripting/install/installing-powershell)."; \
+		exit 1; \
+	fi
+	@pwsh -Command "if (-not (Get-Module -ListAvailable -Name PS2EXE)) { echo 'Error: PS2EXE module not found. Please run: pwsh -Command \"Install-Module -Name PS2EXE -Scope CurrentUser\"'; exit 1; }"
+
+	@echo "Copying gitwatch.sh to examples/windows..."
+	@cp gitwatch.sh examples/windows/gitwatch.sh
+
+	@echo "Running PS2EXE..."
+	@pwsh -Command "Import-Module PS2EXE; \
+		ps2exe -inputFile 'examples/windows/install.ps1' -outputFile 'examples/windows/gitwatch-setup.exe' -title 'Gitwatch Installer' -noconsole -noOutput"
+
+	@echo "Cleaning up..."
+	@rm examples/windows/gitwatch.sh
+
+	@echo "Build complete: examples/windows/gitwatch-setup.exe"
 
 # Clean up build/test artifacts
 clean:

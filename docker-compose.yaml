@@ -21,12 +21,12 @@ services:
       # OPTIONAL: If your repo's .git directory is separate (e.g., for volume mounts)
       # - /path/to/external/.git:/app/.git
     environment:
-      # --- User Configuration (Recommended for host volume mounts) ---
-      # Set to your host user's UID (run `id -u` on your host)
-      PUID: 1000
-      # Set to your host user's GID (run `id -g` on your host)
+      # --- User Configuration (MUST SET FOR HOST VOLUMES) ---
+      # Set to your host user's UID and GID to avoid permission issues.
+      # Run 'id -u' and 'id -g' on your host to find these values.
       # This is critical for file permissions on mounted volumes.
-      PGID: 1000 # Example GID, change this to your host's GID
+      # PUID: 1000
+      # PGID: 1000
 
       # --- Watched Directory ---
       # This should match the container path in the 'volumes' section above
@@ -74,5 +74,6 @@ services:
       USE_SYSLOG: "false"
       # NEW: Set to "true" to disable file locking (-n).
       DISABLE_LOCKING: "false"
-      # NEW: Overrides the default 150-character truncation for commit log lines
+      # NEW: Overrides the default 150-character truncation for *individual lines*
+      # in the -l/-L commit log. Does not affect the number of lines.
       GW_LOG_LINE_LENGTH: 150
