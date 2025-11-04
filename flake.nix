@@ -1,11 +1,9 @@
 {
   description = "A bash script to watch a file or folder and commit changes to a git repo";
-
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
   };
-
   outputs =
     {
       self,
@@ -19,14 +17,26 @@
           pkgs = import nixpkgs {
             inherit system;
           };
+          # --- ADDED LINE ---
+          lib = nixpkgs.lib;
         in
         {
           packages = rec {
             gitwatch = pkgs.callPackage ./gitwatch.nix { };
             default = gitwatch;
           };
+          # --- ADDED BLOCK ---
+          apps = rec {
+            gitwatch = flake-utils.lib.mkApp { drv = packages.gitwatch; };
+            default = gitwatch;
+          };
+          # --- END ADDED BLOCK ---
         }
       );
     in
-    packages // { modules = [ ./module.nix ]; };
+    packages // {
+      modules = [ ./module.nix ];
+      # --- ADDED LINE ---
+      license = nixpkgs.lib.licenses.gpl3Plus;
+    };
 }

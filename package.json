@@ -1,6 +1,7 @@
 {
   "name": "gitwatch",
   "version": "0.6",
+  "license": "GPL-3.0-or-later",
   "description": "A script to watch a file or folder and automatically commit changes to a Git repo",
   "global": "1",
   "install": "install -b gitwatch.sh ${PREFIX:-/usr/local}/bin/gitwatch",

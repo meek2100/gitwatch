@@ -55,7 +55,8 @@ jobs:
         run: |
           sed -i "s/%%GITWATCH_VERSION%%/${{ steps.get_version.outputs.version_number }}/g" gitwatch.sh
 
-      - name: Update CHANGELOG.md and Extract Notes
+      # --- MODIFIED STEP ---
+      - name: Consolidate Changelog Fragments and Update CHANGELOG.md
         id: update_changelog
         run: |
           TAG_NAME="${{ steps.get_version.outputs.tag_name }}"
@@ -63,35 +64,56 @@ jobs:
           RELEASE_DATE=$(date +'%Y-%m-%d')
           UNRELEASED_HEADER="## [Unreleased]"
           NEW_VERSION_HEADER="## [${VERSION_NUMBER}] - ${RELEASE_DATE}"
-          ESCAPED_UNRELEASED_HEADER="## \\[Unreleased\\]" # For sed and awk
+          CHANGELOG_FILE="CHANGELOG.md"
+          FRAGMENT_DIR=".changelog"
+          RELEASE_NOTES_FILE="release_notes.txt"
 
-          if ! grep -q "^${ESCAPED_UNRELEASED_HEADER}$" CHANGELOG.md; then
-            echo "Error: Could not find '${UNRELEASED_HEADER}' section in CHANGELOG.md"
-            exit 1
+          # 1. Create a buffer for release notes
+          # We use a non-markdown format for the GITHUB_OUTPUT to avoid issues
+          echo "Release Notes for ${TAG_NAME}:" > $RELEASE_NOTES_FILE
+          echo "" >> $RELEASE_NOTES_FILE
+
+          # 2. Consolidate fragments if the directory exists
+          if [ -d "$FRAGMENT_DIR" ] && [ "$(ls -A $FRAGMENT_DIR | grep -v '.gitkeep')" ]; then
+            echo "Consolidating fragments from $FRAGMENT_DIR..."
+            # Find all markdown files, sort them, and append to release notes
+            find "$FRAGMENT_DIR" -type f -name "*.md" -print0 | sort -z | xargs -0 -I {} sh -c 'cat {}; echo;' >> $RELEASE_NOTES_FILE
+          else
+            echo "No fragments found in $FRAGMENT_DIR. Release notes will be minimal."
+            echo "* No specific changes documented for this release." >> $RELEASE_NOTES_FILE
           fi
 
-          # Extract release notes
-          awk -v start_header="$ESCAPED_UNRELEASED_HEADER" '
-            BEGIN { printing = 0; content = "" }
-            $0 == start_header { printing = 1; next }
-            printing && /^## \[/ { printing = 0 }
-            printing { gsub(/^[ \t]+|[ \t]+$/, ""); if (length($0) > 0) content = content $0 "\\n" }
-            END { print content }
-          ' CHANGELOG.md > release_notes.txt
-
-          # Replace the [Unreleased] header with the new version header
-          sed "s|^${ESCAPED_UNRELEASED_HEADER}$|${NEW_VERSION_HEADER}|" CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
-
-          if [ ! -s release_notes.txt ]; then
-              echo "Warning: Could not extract release notes from CHANGELOG.md"
-              echo "No release notes found." > release_notes.txt
+          # 3. Update CHANGELOG.md
+          if ! grep -q "^${UNRELEASED_HEADER}$" $CHANGELOG_FILE; then
+            echo "Error: Could not find '${UNRELEASED_HEADER}' section in CHANGELOG.md. Adding it."
+            awk 'NR==3{print "\n## [Unreleased]\n"} {print}' "${CHANGELOG_FILE}" > "${CHANGELOG_FILE}.tmp" && mv "${CHANGELOG_FILE}.tmp" "${CHANGELOG_FILE}"
           fi
 
-          NOTES=$(cat release_notes.txt)
+          # Read the consolidated notes into a variable for sed
+          # We must escape characters for awk
+          NOTES_CONTENT=$(cat $RELEASE_NOTES_FILE | sed -e 's/\\/\\\\/g' -e 's/&/\\&/g' -e 's/$/\\n/')
+
+          # Use awk to insert the new header and notes, replacing [Unreleased]
+          awk -v header="$NEW_VERSION_HEADER" -v notes="$NOTES_CONTENT" '
+          BEGIN { inserted = 0 }
+          /## \[Unreleased\]/ && !inserted {
+            print header
+            print notes
+            inserted = 1
+            next # Skip printing the "[Unreleased]" line
+          }
+          { print }
+          ' $CHANGELOG_FILE > $CHANGELOG_FILE.tmp && mv $CHANGELOG_FILE.tmp $CHANGELOG_FILE
+
+          # 4. Clear the fragments directory for the next cycle
+          rm -rf $FRAGMENT_DIR/*
+          echo "# Add changelog fragments here for the next release (e.g., 123.added.md)" > $FRAGMENT_DIR/.gitkeep
+
+          # 5. Set GitHub Action output
           echo "notes<<EOF" >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
+          cat $RELEASE_NOTES_FILE >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-
+      # --- END MODIFIED STEP ---
       - name: Install Formatting Tools
         run: |
           npm install -g prettier
@@ -107,7 +129,8 @@ jobs:
       - name: Commit updated files
         id: commit_files
         run: |
-          git add VERSION package.json CHANGELOG.md gitwatch.sh
+          # Add the .changelog directory's .gitkeep file
+          git add VERSION package.json CHANGELOG.md gitwatch.sh .changelog/
           if git diff --staged --quiet; then
             echo "No changes to commit."
             echo "committed=false" >> $GITHUB_OUTPUT

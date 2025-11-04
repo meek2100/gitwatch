@@ -62,7 +62,6 @@ load 'bats-custom/startup-shutdown'
 
   # --- Test 3: Remove file and directory ---
   lastcommit=$commit2
-
   lastremotecommit=$remote_commit2
   run rm subdir/file2.txt
   assert_success "rm subdir/file2.txt failed"
@@ -97,3 +96,41 @@ load 'bats-custom/startup-shutdown'
 
   cd /tmp
 }
+
+# --- NEW TEST ---
+@test "atomic_save_move: Handles atomic saves (move) correctly" {
+  # Start gitwatch
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
+  GITWATCH_PID=$!
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+
+  # 1. Create and commit the initial file
+  echo "initial" > file_atomic.txt
+  git add .
+  git commit -q -m "Initial atomic file"
+  local initial_hash
+  initial_hash=$(git log -1 --format=%H)
+  sleep 1
+
+  # 2. Simulate an atomic save (write to temp, move to final)
+  echo "atomic save content" > file_atomic.txt.tmp
+  run mv file_atomic.txt.tmp file_atomic.txt
+  assert_success "mv command for atomic save failed"
+
+  # 3. Wait for the commit to appear (triggered by the 'move' event)
+  run wait_for_git_change 20 0.5 git log -1 --format=%H
+  assert_success "Commit for atomic save (move) timed out"
+  local final_hash=$output
+  assert_not_equal "$initial_hash" "$final_hash" "Commit hash did not change"
+
+  # 4. Verify commit message
+  run git log -1 --pretty=%B
+  assert_success
+  assert_output --partial "file_atomic.txt"
+  assert_output --partial "atomic save content"
+
+  cd /tmp
+}
+# --- END NEW TEST ---

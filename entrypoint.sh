@@ -21,6 +21,11 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
     usermod -u "$PUID" "$CONTAINER_USER" 2>/dev/null || echo "Warning: Could not set UID for $CONTAINER_USER" >&2
     groupmod -g "$PGID" "$CONTAINER_USER" 2>/dev/null || echo "Warning: Could not set GID for $CONTAINER_USER" >&2
 
+    # --- ADDED LINE ---
+    # Take ownership of the home directory to ensure SSH/gitconfig mounts are readable
+    chown -R "$PUID":"$PGID" /home/appuser 2>/dev/null || true
+    # --- END ADDED LINE ---
+
     # NEW: Only chown critical files (like the scripts) and rely on gosu
     # to operate as the correct user on the mounted volumes. This avoids
     # slow recursive chown on large volumes.
