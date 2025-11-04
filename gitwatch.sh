@@ -1126,7 +1126,7 @@ generate_commit_message() {
 
     # --- MODIFICATION: Add timeout and check PIPESTATUS ---
     local diff_cmd
-    diff_cmd=$(printf "%s -s 9 %s %s %s diff --staged -U0 %q" "$TIMEOUT_CMD" "$TIMEOUT" "$GIT" "$LISTCHANGES_COLOR")
+    diff_cmd=$(printf "%s -s 9 %s %s diff --staged -U0 %q" "$TIMEOUT_CMD" "$TIMEOUT" "$GIT" "$LISTCHANGES_COLOR")
     DIFF_COMMITMSG=$(bash -c "$diff_cmd" | diff-lines)
     local timeout_status=${PIPESTATUS[0]}
     local diff_lines_status=${PIPESTATUS[1]}
@@ -1197,7 +1197,7 @@ generate_commit_message() {
       local_commit_msg="$commit_output"
     elif [ "$commit_exit_code" -eq 124 ]; then
       stderr "ERROR: Custom commit command '$COMMITCMD' timed out after $TIMEOUT seconds."
-      local_commit_msg="Custom commit command timed out" # Fallback message
+      local_commit_msg="Custom command timed out" # Fallback message
     else
       # Command failed
       stderr "ERROR: Custom commit command '$COMMITCMD' failed with exit code $commit_exit_code."

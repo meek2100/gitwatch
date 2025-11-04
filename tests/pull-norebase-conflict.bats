@@ -32,16 +32,21 @@ load 'bats-custom/startup-shutdown'
   cd "$testdir"
   run git clone -q remote local2
   assert_success "Cloning for local2 failed"
-  cd local2
-  echo "Upstream change" >> file_upstream.txt
-  git add .
-  git commit -q -m "Commit from local2 (upstream change)"
-  run git push -q origin master
-  assert_success "Push from local2 failed"
+
   local second_remote_hash
-  second_remote_hash=$(git rev-parse HEAD)
+  # Use a subshell for operations in local2 to avoid 'cd ..' (Fixes SC2103)
+  (
+    cd local2
+    echo "Upstream change" >> file_upstream.txt
+    git add .
+    git commit -q -m "Commit from local2 (upstream change)"
+    run git push -q origin master
+    assert_success "Push from local2 failed"
+    second_remote_hash=$(git rev-parse HEAD)
+  )
+  assert_success "Subshell for local2 operations failed"
+
   assert_not_equal "$first_remote_hash" "$second_remote_hash" "Upstream push failed"
-  cd ..
   rm -rf local2
 
   # 4. Make a conflicting local change (in gitwatch repo)
@@ -71,6 +76,5 @@ load 'bats-custom/startup-shutdown'
   # 9. Assert: Script is still running
   run kill -0 "$GITWATCH_PID"
   assert_success "Gitwatch process crashed after 'git push' failure, but it should have continued."
-
   cd /tmp
 }

@@ -36,7 +36,7 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
   CMD bash -c ' \
     # LIVENESS CHECK: Confirm the essential child watcher process is active.
     # Checks all process command lines for the watcher tool string ("inotifywait").
-    cat /proc/*/cmdline 2>/dev/null |
+    cat /proc/*/cmdline 2>/dev/null | \
     grep -q "inotifywait" \
   '
 
