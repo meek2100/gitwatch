@@ -15,17 +15,11 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - name: Reusable Setup (Checkout, Version)
+        uses: ./.github/workflows/reusable-setup.yaml
         with:
-          persist-credentials: false
-
-      - name: Substitute Version Number into gitwatch.sh
-        shell: bash
-        run: |
-          VERSION_NUMBER=$(cat VERSION)
-          sed -i "s/%%GITWATCH_VERSION%%/${VERSION_NUMBER}/g" gitwatch.sh
-          echo "Substituted version ${VERSION_NUMBER} into gitwatch.sh for testing."
+          os: windows-latest
+          setup-bats: false # This workflow doesn't use BATS
 
       - name: Run Windows Installer
         shell: powershell
@@ -50,7 +44,7 @@ jobs:
           Write-Host "Verifying gitwatch.bat is in PATH..."
           Get-Command gitwatch.bat
           Write-Host "Running gitwatch.bat --version..."
-          gitwatch.bat --version
+          gitwatch.bat -V
 
       - name: Run Windows functional test
         shell: powershell

@@ -16,10 +16,11 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - name: Reusable Setup (Checkout, Version)
+        uses: ./.github/workflows/reusable-setup.yaml
         with:
-          persist-credentials: false
+          os: ubuntu-latest
+          setup-bats: false # This workflow doesn't use BATS
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
@@ -31,15 +32,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # --- NEW STEP ---
-      - name: Substitute Version Number into gitwatch.sh
-        shell: bash
-        run: |
-          # Extract version from the tag (e.g., "v1.2.3" -> "1.2.3")
-          VERSION_NUMBER=${{ github.ref_name#v }}
-          sed -i "s/%%GITWATCH_VERSION%%/${VERSION_NUMBER}/g" gitwatch.sh
-          echo "Substituted version ${VERSION_NUMBER} into gitwatch.sh for Docker build."
-      # --- END NEW STEP ---
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f

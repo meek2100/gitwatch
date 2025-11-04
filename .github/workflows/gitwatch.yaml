@@ -25,25 +25,12 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - name: Reusable Setup (Checkout, BATS, Version)
+        uses: ./.github/workflows/reusable-setup.yaml
+        id: setup
         with:
-          # Submodules are no longer needed
-          fetch-depth: 0
-          persist-credentials: false
-
-      # NEW: Install BATS and its core helpers using the action.
-      # We install them into the workspace for cache support and accessibility.
-      - name: Setup BATS and Libraries
-        id: setup-bats
-        uses: bats-core/bats-action@42fcc8700f773c075a16a90eb11674c0318ad507
-        with:
-          # Explicitly set paths inside the workspace for caching and clear paths for BATS_LIB_PATH
-          support-path: "${{ github.workspace }}/tests/bats-support"
-          assert-path: "${{ github.workspace }}/tests/bats-assert"
-          file-path: "${{ github.workspace }}/tests/bats-file"
-          # Disable bats-detik which is not used in this project
-          detik-install: "false"
+          os: ${{ matrix.os }}
+          setup-bats: true
 
       - name: Install gitwatch OS dependencies
         shell: bash
@@ -57,18 +44,6 @@ jobs:
             echo "Unsupported OS: $RUNNER_OS"
             exit 1
           fi
-
-      - name: Substitute Version Number into gitwatch.sh
-        shell: bash
-        run: |
-          VERSION_NUMBER=$(cat VERSION)
-          # Handle macOS sed -i incompatibility
-          if [ "$RUNNER_OS" == "macOS" ]; then
-            sed -i '' "s/%%GITWATCH_VERSION%%/${VERSION_NUMBER}/g" gitwatch.sh
-          else
-            sed -i "s/%%GITWATCH_VERSION%%/${VERSION_NUMBER}/g" gitwatch.sh
-          fi
-          echo "Substituted version ${VERSION_NUMBER} into gitwatch.sh for testing."
 
       # - name: Setup upterm session # Preserved commented-out step
       #   uses: lhotari/action-upterm@v1
@@ -95,7 +70,7 @@ jobs:
         shell: bash
         # Set BATS_LIB_PATH to include action-installed libraries and our custom module
         env:
-          BATS_LIB_PATH: "${{ steps.setup-bats.outputs.lib-path }}:${{ github.workspace }}/tests"
+          BATS_LIB_PATH: "${{ steps.setup.outputs.bats-lib-path }}:${{ github.workspace }}/tests"
         run: |
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
