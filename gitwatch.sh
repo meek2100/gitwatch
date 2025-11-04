@@ -178,6 +178,11 @@ shelp() {
   echo "                  'close_write,move,move_self,delete,create,modify')"
   echo "                  (useful when using inotify-win, e.g. -e modify,delete,move)"
   echo "                  (for fswatch/macOS, see fswatch documentation for --event)"
+  echo ""
+  echo "  SECURITY WARNING: The -c flag executes arbitrary code. Use it only with"
+  echo "  commands you trust, especially when running gitwatch as a service or on"
+  echo "  repositories with untrusted content."
+  echo ""
   echo " -f               Commit any pending changes on startup before watching."
   echo " -M               Prevent commits when there is an ongoing merge in the repo"
   echo " -S               Log all messages to syslog (daemon mode)."
@@ -1223,6 +1228,7 @@ generate_commit_message() {
       # Command succeeded
       local_commit_msg="$commit_output"
     elif [ "$commit_exit_code" -eq 124 ]; then
+      # Timeout
       stderr "ERROR: Custom commit command '$COMMITCMD' timed out after $TIMEOUT seconds."
       local_commit_msg="Custom command timed out" # Fallback message
     else

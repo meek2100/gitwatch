@@ -224,7 +224,6 @@ load 'bats-custom/startup-shutdown'
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
-
   # 6. Make another file change to trigger the watcher loop
   echo "Another trigger event" >> some_other_file.txt
   # Note: gitwatch will run 'git add --all .', staging this new file
@@ -245,5 +244,107 @@ load 'bats-custom/startup-shutdown'
 
   # 9. Cleanup: Abort the rebase so teardown can clean the repo
   git rebase --abort
+  cd /tmp
+}
+
+# --- NEW: Test for CHERRY_PICK_HEAD ---
+@test "skip_if_merging_M_cherry_pick: -M flag prevents commit during a cherry-pick conflict" {
+  local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  output_file=$(mktemp "$testdir/output.XXXXX")
+  local GIT_DIR_PATH
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+  GIT_DIR_PATH=$(git rev-parse --absolute-git-dir)
+
+  # 1. Create a commit on a separate branch to pick
+  git checkout -b feature
+  echo "feature change" > feature.txt
+  git add .
+  git commit -q -m "Feature commit"
+  local feature_commit_hash
+  feature_commit_hash=$(git log -1 --format=%H)
+  git checkout -q master
+
+  # 2. Create a conflicting change on master
+  echo "master change" > feature.txt
+  git add .
+  git commit -q -m "Master commit"
+  local initial_commit_hash
+  initial_commit_hash=$(git log -1 --format=%H)
+
+  # 3. Trigger the cherry-pick conflict
+  run git cherry-pick "$feature_commit_hash"
+  assert_failure "Cherry-pick should have failed"
+  assert_file_exist "$GIT_DIR_PATH/CHERRY_PICK_HEAD" "Failed to establish a cherry-pick-in-progress state"
+
+  # 4. Start gitwatch with -M
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
+  GITWATCH_PID=$!
+
+  # 5. Trigger watcher
+  echo "trigger" >> another_file.txt
+  sleep "$WAITTIME"
+
+  # 6. Assert: Commit hash has NOT changed
+  run git log -1 --format=%H
+  assert_equal "$initial_commit_hash" "$output" "Commit hash should NOT change while in cherry-pick state"
+
+  # 7. Assert: Log output confirms the skip
+  run cat "$output_file"
+  assert_output --partial "Skipping commit - repo is merging"
+
+  # 8. Cleanup
+  git cherry-pick --abort
+  cd /tmp
+}
+
+# --- NEW: Test for REVERT_HEAD ---
+@test "skip_if_merging_M_revert: -M flag prevents commit during a revert conflict" {
+  local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  output_file=$(mktemp "$testdir/output.XXXXX")
+  local GIT_DIR_PATH
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+  GIT_DIR_PATH=$(git rev-parse --absolute-git-dir)
+
+  # 1. Create a commit to revert
+  echo "original content" > revert_file.txt
+  git add .
+  git commit -q -m "Commit to revert"
+  local revert_commit_hash
+  revert_commit_hash=$(git log -1 --format=%H)
+
+  # 2. Create a conflicting change
+  echo "new conflicting content" > revert_file.txt
+  git add .
+  git commit -q -m "Conflicting commit"
+  local initial_commit_hash
+  initial_commit_hash=$(git log -1 --format=%H)
+
+  # 3. Trigger the revert conflict
+  run git revert --no-commit "$revert_commit_hash"
+  assert_failure "Revert should have failed"
+  assert_file_exist "$GIT_DIR_PATH/REVERT_HEAD" "Failed to establish a revert-in-progress state"
+
+  # 4. Start gitwatch with -M
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
+  GITWATCH_PID=$!
+
+  # 5. Trigger watcher
+  echo "trigger" >> another_file.txt
+  sleep "$WAITTIME"
+
+  # 6. Assert: Commit hash has NOT changed
+  run git log -1 --format=%H
+  assert_equal "$initial_commit_hash" "$output" "Commit hash should NOT change while in revert state"
+
+  # 7. Assert: Log output confirms the skip
+  run cat "$output_file"
+  assert_output --partial "Skipping commit - repo is merging"
+
+  # 8. Cleanup
+  git revert --abort
   cd /tmp
 }
