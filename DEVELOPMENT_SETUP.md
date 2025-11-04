@@ -60,3 +60,13 @@ For other editors (Sublime Text, Atom, JetBrains IDEs):
    `pre-commit install`) is active. This hook acts as the final quality
    gate, guaranteeing all formatting and linting rules are passed before a
    commit is created.
+
+## 3. Build Dependencies
+
+If you plan to build the Windows installer using the Makefile (`make build-windows-installer`), you will need the following tools installed on your development machine (Linux or macOS):
+
+- **PowerShell (`pwsh`):** This is required to run the `PS2EXE` build script.
+  - _macOS:_ `brew install powershell`
+  - _Linux:_ Follow official Microsoft install guides.
+- **PS2EXE Module:** This PowerShell module bundles the installer.
+  - _Install via pwsh:_ `pwsh -Command "Install-Module -Name PS2EXE -Scope CurrentUser"`

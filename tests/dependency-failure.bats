@@ -301,3 +301,30 @@ EOF
   unset GW_TIMEOUT_BIN
   cd /tmp
 }
+
+@test "dependency_failure_pkill: Exits with code 2 if 'pkill' command is missing" {
+  # shellcheck disable=SC2031 # PATH modification is intentional for mocking
+  local path_backup="$PATH"
+  # 1. Hide 'pkill'
+  local new_path
+  # shellcheck disable=SC2155,SC2031 # PATH modification is intentional for mocking
+  new_path="$(echo "$PATH" | tr ':' '\n' | grep -vE '(/usr/local/)?(s)?bin' | tr '\n' ':')"
+  # shellcheck disable=SC2030,SC2031 # PATH modification is intentional for mocking
+  export PATH="$new_path"
+  run command -v pkill
+  refute_success "Failed to simulate missing 'pkill' command"
+
+  # 2. Run gitwatch
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  run "${BATS_TEST_DIRNAME}/../gitwatch.sh" "$testdir/local/$TEST_SUBDIR_NAME"
+
+  # 3. Assert exit code 2 and the error message
+  assert_failure
+  assert_exit_code 2
+  assert_output --partial "Error: Required command 'pkill' not found."
+  assert_output --partial "procps" # Part of the hint
+
+  # 4. Cleanup
+  export PATH="$path_backup"
+  cd /tmp
+}

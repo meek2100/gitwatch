@@ -235,6 +235,11 @@ The `docker-compose.yml` file is configured using environment variables.
 You can either edit the `environment` section directly in the file or
 create a `.env` file in the same directory to set the values.
 
+**Warning:** To avoid file permission errors when mounting a local directory (volume),
+you **must** set the `PUID` and `PGID` environment variables to match your host
+user's ID. You can find these on your host machine by running `id -u` (for PUID)
+and `id -g` (for PGID).
+
 Here's a breakdown of the important parts of the `docker-compose.yml` file:
 
 - **`volumes`**: This is the most critical section to configure.
@@ -258,8 +263,8 @@ The following environment variables are available for configuring the
 
 | Variable             | Default Value          | Description                                                                                                                             |
 | :------------------- | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------------------- |
-| `PUID`               | `1000`                 | **Optional.** Sets the User ID (UID) for the container's non-root user to match the host user, preventing file permission issues.       |
-| `PGID`               | `1000`                 | **Optional but Recommended.** Sets the Group ID (GID) for the container's user. Run `id -g` on your host to find this value.            |
+| `PUID`               | `1000`                 | **Required.** Sets the User ID (UID) for the container's non-root user to match the host user, preventing file permission issues.       |
+| `PGID`               | `1000`                 | **Required.** Sets the Group ID (GID) for the container's user. Run `id -g` on your host to find this value.                            |
 | `GIT_WATCH_DIR`      | `/app/watched-repo`    | The directory inside the container to watch for changes. This must match the container path you set in the `volumes` section.           |
 | `GIT_REMOTE`         | `origin`               | The name of the remote repository to push to.                                                                                           |
 | `GIT_BRANCH`         | `main`                 | The branch to push to.                                                                                                                  |

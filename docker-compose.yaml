@@ -25,8 +25,8 @@ services:
       # Set to your host user's UID and GID to avoid permission issues.
       # Run 'id -u' and 'id -g' on your host to find these values.
       # This is critical for file permissions on mounted volumes.
-      # PUID: 1000
-      # PGID: 1000
+      PUID: 1000
+      PGID: 1000
 
       # --- Watched Directory ---
       # This should match the container path in the 'volumes' section above

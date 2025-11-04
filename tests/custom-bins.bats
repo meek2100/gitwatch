@@ -29,7 +29,7 @@ create_dummy_bin() {
   echo "$dummy_path"
 }
 
-@test "custom_bins_env_vars: Uses GW_GIT_BIN, GW_INW_BIN, GW_FLOCK_BIN, GW_TIMEOUT_BIN if set" {
+@test "custom_bins_env_vars: Uses GW_GIT_BIN, GW_INW_BIN, GW_FLOCK_BIN, GW_TIMEOUT_BIN, GW_PKILL_BIN if set" {
   # Skip if running on macOS as fswatch replacement is more complex
   if [ "$RUNNER_OS" == "macOS" ]; then
     skip "Custom bins test skipped: requires Linux environment for simple inotifywait setup."
@@ -65,11 +65,20 @@ create_dummy_bin() {
   dummy_timeout=$(create_dummy_bin "timeout" "$real_timeout_path" "TIMEOUT_OK")
   # --- End new dummy timeout ---
 
+  # --- NEW: Create dummy pkill ---
+  local real_pkill_path
+  real_pkill_path=$(command -v pkill)
+  local dummy_pkill
+  # shellcheck disable=SC2155 # Declared on previous line
+  dummy_pkill=$(create_dummy_bin "pkill" "$real_pkill_path" "PKILL_OK")
+  # --- End new dummy pkill ---
+
   # 2. Set environment variables
   export GW_GIT_BIN="$dummy_git"
   export GW_INW_BIN="$dummy_inw"
   export GW_FLOCK_BIN="$dummy_flock"
   export GW_TIMEOUT_BIN="$dummy_timeout" # --- NEW: Export dummy timeout bin ---
+  export GW_PKILL_BIN="$dummy_pkill"     # --- NEW: Export dummy pkill bin ---
 
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -77,7 +86,7 @@ create_dummy_bin() {
 
   # 3. Start gitwatch (should use the dummy binaries)
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -s 1 "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -98,10 +107,22 @@ create_dummy_bin() {
   # The create_dummy_bin helper *does* forward all args, so this test is valid.
   assert_output --partial "*** DUMMY BIN: TIMEOUT_OK ***" "Dummy Timeout command was not executed or its message not captured"
 
+  # --- NEW: Trigger debounce logic to check for pkill ---
+  echo "change_for_pkill_1" >> file_dummy.txt
+  sleep 0.1 # Must be less than script sleep time (1s)
+  echo "change_for_pkill_2" >> file_dummy.txt
+  sleep 3 # Wait for debounce/commit to finish
+
+  run cat "$output_file"
+  assert_output --partial "*** DUMMY BIN: PKILL_OK ***" "Dummy pkill command was not executed or its message not captured"
+  # --- End new pkill check ---
+
+
   # 6. Cleanup environment variables for next test
   unset GW_GIT_BIN
   unset GW_INW_BIN
   unset GW_FLOCK_BIN
   unset GW_TIMEOUT_BIN # --- NEW: Unset dummy timeout bin ---
+  unset GW_PKILL_BIN   # --- NEW: Unset dummy pkill bin ---
   cd /tmp
 }
