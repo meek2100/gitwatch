@@ -102,7 +102,7 @@ for Linux (WSL). A `.exe` installer is provided to make setup seamless.
      few minutes).
    - **Attempt to auto-detect your WSL distribution** (e.g., Ubuntu,
      Fedora, Alpine) and install required Linux dependencies (`git`,
-     `flock`, `timeout`, `inotify-tools`) using the correct package
+     `coreutils`, `util-linux`, `inotify-tools`) using the correct package
      manager.
    - Install the `gitwatch.sh` script into WSL.
    - Install a `gitwatch.bat` wrapper on your Windows system and add it to
