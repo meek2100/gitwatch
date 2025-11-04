@@ -6,14 +6,12 @@ load 'bats-custom/bats-config'
 load 'bats-custom/custom-helpers'
 
 # Provides setup (default) and setup_with_spaces.
-
 # --- HELPER FUNCTIONS ---
 
 # _cleanup_remotedirs: Safely removes directories used for remote repo tests
 _cleanup_remotedirs() {
   # shellcheck disable=SC2154 # BATS_TEST_TMPDIR is set by BATS
-  if [ -d "$BATS_TEST_TMPDIR/remotedirs" ];
-  then
+  if [ -d "$BATS_TEST_TMPDIR/remotedirs" ]; then
     verbose_echo "Cleaning up remote test directories..."
     rm -rf "$BATS_TEST_TMPDIR/remotedirs"
   fi
@@ -22,8 +20,7 @@ _cleanup_remotedirs() {
 # Dumps debug information if a test fails
 debug_on_failure() {
   # This function is called by teardown if the test failed ($BATS_TEST_STATUS -ne 0)
-  if [ "$BATS_TEST_STATUS" -ne 0 ];
-  then
+  if [ "$BATS_TEST_STATUS" -ne 0 ]; then
     verbose_echo "--- DEBUG: Test '$BATS_TEST_NAME' FAILED! ---" >&3
 
     # Dump the gitwatch log file (if it exists)
@@ -31,8 +28,7 @@ debug_on_failure() {
     # Search for a log file, which we assume is named output.* in the testdir
     log_file=$(find "$testdir" -name "output.*" 2>/dev/null | head -n 1)
 
-    if [ -n "$log_file" ] && [ -f "$log_file" ];
-    then
+    if [ -n "$log_file" ] && [ -f "$log_file" ]; then
       verbose_echo "--- Log File Content ($log_file) ---" >&3
       # Dump log to descriptor 3
       cat "$log_file" >&3
@@ -43,8 +39,7 @@ debug_on_failure() {
 
     # Dump git status from the test repo
     local repo_path="$testdir/local/$TEST_SUBDIR_NAME"
-    if [ -d "$repo_path/.git" ];
-    then
+    if [ -d "$repo_path/.git" ]; then
       verbose_echo "--- Git Status ($repo_path) ---" >&3
       (cd "$repo_path" && git status) >&3
       verbose_echo "--- End Git Status ---" >&3
@@ -61,8 +56,7 @@ _common_teardown() {
   debug_on_failure
 
   # 1. Terminate the gitwatch process if it's running
-  if [ -n "${GITWATCH_PID:-}" ] && kill -0 "$GITWATCH_PID" &>/dev/null;
-  then
+  if [ -n "${GITWATCH_PID:-}" ] && kill -0 "$GITWATCH_PID" &>/dev/null; then
     verbose_echo "# Attempting to terminate gitwatch process PID: $GITWATCH_PID"
     # Send SIGTERM first to allow graceful cleanup (e.g., trap)
     kill -s TERM "$GITWATCH_PID" &>/dev/null
@@ -70,8 +64,7 @@ _common_teardown() {
     wait_for_process_to_die "$GITWATCH_PID" 20 0.1
 
     # If it's still alive, kill it forcefully
-    if kill -0 "$GITWATCH_PID" &>/dev/null;
-    then
+    if kill -0 "$GITWATCH_PID" &>/dev/null; then
       verbose_echo "# Process $GITWATCH_PID did not exit gracefully, sending SIGKILL."
       kill -9 "$GITWATCH_PID" &>/dev/null || true
     fi
@@ -82,8 +75,7 @@ _common_teardown() {
 
   # 2. Failsafe: Clean up any lingering watcher processes from the test
   verbose_echo "# Cleaning up potential lingering watcher processes..."
-  pkill -f "inotifywait.*$testdir" &>/dev/null ||
-  true
+  pkill -f "inotifywait.*$testdir" &>/dev/null || true
   pkill -f "fswatch.*$testdir" &>/dev/null || true
 
   # 3. Cleanup for Dependency Mocks
@@ -93,16 +85,14 @@ _common_teardown() {
   fi
 
   # 4. Remove test directory (ensure quoting handles spaces)
-  if [ -n "$testdir" ] && [ -d "$testdir" ];
-  then
+  if [ -n "$testdir" ] && [ -d "$testdir" ]; then
     verbose_echo "# Removing test directory: $testdir"
     rm -rf "$testdir"
   fi
 
   # 5. Handle special cleanup cases
   # shellcheck disable=SC2154 # BATS_TEST_DESCRIPTION is set by BATS
-  if [[ "$BATS_TEST_DESCRIPTION" == *"remotedirs"* ]];
-  then
+  if [[ "$BATS_TEST_DESCRIPTION" == *"remotedirs"* ]]; then
     _cleanup_remotedirs
   fi
 
@@ -133,8 +123,7 @@ _common_setup() {
 
   # 3. Initialize the local repositories
   git init "$local_repo_dir/$TEST_SUBDIR_NAME"
-  cd "$local_repo_dir/$TEST_SUBDIR_NAME" ||
-  return 1
+  cd "$local_repo_dir/$TEST_SUBDIR_NAME" || return 1
   git config user.email "test@example.com"
   git config user.name "BATS Test"
   git config --local commit.gpgsign false # Disable signing for tests
@@ -147,8 +136,7 @@ _common_setup() {
   verbose_echo "# Setup: Initial commit hash: $initial_hash"
 
   # 4. Create the bare remote repo if requested
-  if [ "$create_remote" -eq 1 ];
-  then
+  if [ "$create_remote" -eq 1 ]; then
     git init --bare "$remote_repo_dir/upstream.git"
     # Set the 'origin' remote to the bare repo
     git remote add origin "$remote_repo_dir/upstream.git"
@@ -157,8 +145,7 @@ _common_setup() {
   fi
 
   # 5. Set the current directory for the test
-  cd "$local_repo_dir" ||
-  return 1
+  cd "$local_repo_dir" || return 1
   verbose_echo "# Setup complete, current directory: $(pwd)"
   verbose_echo "# Testdir: $testdir"
   verbose_echo "# Local clone dir: $local_repo_dir/$TEST_SUBDIR_NAME"
@@ -212,8 +199,7 @@ setup_for_remotedirs() {
 
   # 3. Create initial commit *from the work tree*
   # We must 'cd' into the work-tree for git-dir/work-tree commands to function
-  cd "$work_tree" ||
-  return 1
+  cd "$work_tree" || return 1
   echo "test" > file.txt
   # Run git commands with explicit git-dir and work-tree
   git --git-dir="$git_dir_vault" --work-tree="$work_tree" add .

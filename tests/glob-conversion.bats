@@ -22,7 +22,7 @@ run_conversion() {
   PROCESSED_PATTERN=$(IFS=\|; echo "${PATTERN_ARRAY[*]}")
   PROCESSED_PATTERN=${PROCESSED_PATTERN//./\\.}
   PROCESSED_PATTERN=${PROCESSED_PATTERN//\*/.*}
-  PROCESSED_PATTERN=${PROCESSED_PATTERN//\?/.} # MODIFIED: Added '?' conversion
+  PROCESSED_PATTERN=${PROCESSED_PATTERN//\?/.} # MODIFIED: Added '?'
 
   echo "$PROCESSED_PATTERN"
 }
@@ -49,7 +49,7 @@ run_conversion() {
   run run_conversion ""
   assert_output "" "Empty string conversion failed"
 
-  # Case 6: NEW - Test '?' glob
+  # Case 6: NEW - Test '?'
   run run_conversion "file?.log,data*"
   assert_output "file.\.log|data.*" "Glob '?' conversion failed: file?.log,data* -> file.\.log|data.*"
 }

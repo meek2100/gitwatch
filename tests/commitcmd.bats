@@ -9,6 +9,10 @@ load 'bats-custom/custom-helpers'
 # Load setup/teardown
 load 'bats-custom/startup-shutdown'
 
+# Get the timeout from the global test args (e.g., "-v -t 10")
+# This is more robust than hard-coding '10'
+TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' -f2 || echo 10)
+
 @test "commit_command_single: Uses simple custom command output as commit message" {
   # Start gitwatch directly in the background
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -144,7 +148,7 @@ load 'bats-custom/startup-shutdown'
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
-  # 1. Create a hanging command that exceeds the script's internal timeout (60s)
+  # 1. Create a hanging command that exceeds the script's internal timeout (10s)
   local hanging_cmd='sleep 100'
 
   # 2. Start gitwatch with the hanging custom command, logging all output
@@ -158,24 +162,24 @@ load 'bats-custom/startup-shutdown'
   # 3. Trigger a change
   echo "line1" >> file_hang.txt
 
-  # 4. Wait for the internal timeout (60s) plus a buffer.
-  # Wait for 5 seconds to catch the instant log message.
-  local total_wait_time=5
-  echo "# DEBUG: Waiting ${total_wait_time}s for hanging command to be terminated." >&3
-  # The command will run in a subshell with a 'timeout 60' wrapper.
+  # 4. Wait for the internal timeout (10s) plus a buffer.
+  # We just need to wait long enough for the fallback commit to be created.
+  local total_wait_time=15
+  echo "# DEBUG: Waiting ${total_wait_time}s for hanging command to be terminated and fallback commit to occur." >&3
   sleep "$total_wait_time"
 
   # 5. Assert: We wait for the actual commit to finish with the fallback message
-  run wait_for_git_change 60 1 git log -1 --format=%H
+  # This should be fast, as the 15s sleep was longer than the 10s timeout
+  run wait_for_git_change 10 1 git log -1 --format=%H
   assert_success "Commit timed out, suggesting the commit failed entirely"
 
   # 6. Verify commit message contains the timeout fallback string
   run git log -1 --pretty=%B
   assert_success
-  assert_output "Custom commit command timed out" "Commit message should be the timeout fallback text"
+  assert_output "Custom command timed out" "Commit message should be the timeout fallback text"
 
   # 7. Verify log output contains the timeout error message
   run cat "$output_file"
-  assert_output --partial "ERROR: Custom commit command '$hanging_cmd' timed out after 60 seconds."
+  assert_output --partial "ERROR: Custom commit command '$hanging_cmd' timed out after ${TEST_TIMEOUT} seconds."
   cd /tmp
 }

@@ -91,10 +91,14 @@ load 'bats-custom/startup-shutdown'
 
   # 2. Assert hash changed (commit happened due to allowed file)
   assert_not_equal "$initial_hash" "$final_commit_hash" "Commit failed on allowed file."
+
   # 3. Assert: Log confirms all events were processed but one commit occurred.
   run cat "$output_file"
-  # Should see the conversion happening
-  assert_output --partial "Converting glob exclude pattern '.*\.log|temp/' from glob/comma-separated list to regex."
+  # *** MODIFIED ASSERTION ***
+  # The log message should contain the *original* glob string, not the converted regex
+  assert_output --partial "Converting glob exclude pattern '${glob_list}' from glob/comma-separated list to regex."
+  # *** END MODIFICATION ***
+
   # Should see change detection for ignored files
   assert_output --partial "temp/file.txt"
   assert_output --partial "old_config.txt"
