@@ -1158,7 +1158,7 @@ generate_commit_message() {
     # --- MODIFICATION: Add timeout and check PIPESTATUS ---
     local diff_cmd
     # --- FIX for SC2183: Removed extra %s ---
-    diff_cmd=$(printf "%s -s 9 %s %s %s diff --staged -U0 %q" "$TIMEOUT_CMD" "$TIMEOUT" "$GIT" "$LISTCHANGES_COLOR")
+    diff_cmd=$(printf "%s -s 9 %s %s diff --staged -U0 %q" "$TIMEOUT_CMD" "$TIMEOUT" "$GIT" "$LISTCHANGES_COLOR")
     DIFF_COMMITMSG=$(bash -c "$diff_cmd" | diff-lines)
     local timeout_status=${PIPESTATUS[0]}
     local diff_lines_status=${PIPESTATUS[1]}
@@ -1460,7 +1460,8 @@ verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
     time_since_fail=$((current_time - LAST_FAIL_TIME))
 
     if [ "$time_since_fail" -lt "$COOL_DOWN_SECONDS" ]; then
-      local remaining_wait=$((COOL_DOWN_SECONDS - time_since_fail))
+      # FIX for SC2168: Remove 'local'
+      remaining_wait=$((COOL_DOWN_SECONDS - time_since_fail))
       verbose_echo "In cool-down mode. Skipping trigger. ($remaining_wait seconds remaining)"
       continue # Skip this file change event
     else
