@@ -34,20 +34,20 @@ load 'bats-custom/startup-shutdown'
   assert_success "Cloning for local2 failed"
 
   local second_remote_hash
-  # Use a subshell for operations in local2 to avoid 'cd ..' (Fixes SC2103)
-  (
-    cd local2
-    echo "Upstream change" >> file_upstream.txt
-    git add .
-    git commit -q -m "Commit from local2 (upstream change)"
-    run git push -q origin master
-    assert_success "Push from local2 failed"
-    second_remote_hash=$(git rev-parse HEAD)
-  )
-  assert_success "Subshell for local2 operations failed"
+  cd local2
+  echo "Upstream change" >> file_upstream.txt
+  git add .
+  git commit -q -m "Commit from local2 (upstream change)"
+  run git push -q origin master
+  assert_success "Push from local2 failed"
+  second_remote_hash=$(git rev-parse HEAD)
+
+  # shellcheck disable=SC2103 # This is safe in a BATS test teardown context
+  cd ..
+  rm -rf local2
 
   assert_not_equal "$first_remote_hash" "$second_remote_hash" "Upstream push failed"
-  rm -rf local2
+
 
   # 4. Make a conflicting local change (in gitwatch repo)
   cd "$testdir/local/$TEST_SUBDIR_NAME"
