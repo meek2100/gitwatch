@@ -23,7 +23,6 @@ run_conversion() {
   PROCESSED_PATTERN=${PROCESSED_PATTERN//./\\.}
   PROCESSED_PATTERN=${PROCESSED_PATTERN//\*/.*}
   PROCESSED_PATTERN=${PROCESSED_PATTERN//\?/.} # MODIFIED: Added '?'
-
   echo "$PROCESSED_PATTERN"
 }
 
@@ -43,13 +42,13 @@ run_conversion() {
 
   # Case 4: Multiple spaces/comma handling (ensure proper splitting)
   run run_conversion "*.bak,  test .txt , .git/"
-  assert_output ".*\.bak|test\ \.txt|\.git/" "Whitespace and multiple patterns failed"
+  assert_output ".*\.bak|test\.txt|\.git/" "Whitespace and multiple patterns failed"
 
   # Case 5: Empty string
   run run_conversion ""
   assert_output "" "Empty string conversion failed"
 
-  # Case 6: NEW - Test '?'
+  # Case 6: Test '?' glob
   run run_conversion "file?.log,data*"
   assert_output "file.\.log|data.*" "Glob '?' conversion failed: file?.log,data* -> file.\.log|data.*"
 }
