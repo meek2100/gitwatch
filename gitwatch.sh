@@ -53,7 +53,7 @@ PKG_MANAGER=""
 OS_TYPE=$(uname)
 
 if [ "$OS_TYPE" = "Linux" ] && [ -f /etc/os-release ]; then
-  # Source the os-release file to get $ID
+  # shellcheck disable=SC1091
   . /etc/os-release
   PKG_MANAGER="$ID"
   case "$ID" in
@@ -485,7 +485,7 @@ for cmd in "$BASE_GIT_CMD" "$INW"; do
       # macOS/BSD hints
       case "$cmd" in
         "$BASE_GIT_CMD")
-          local hint="  Hint: Install 'git'."
+          hint="  Hint: Install 'git'."
           if [ -n "$INSTALL_CMD" ]; then
             if [ "$PKG_MANAGER" = "brew" ]; then
               hint="  Hint: Run \`$INSTALL_CMD git\` or \`xcode-select --install\`"
@@ -496,7 +496,7 @@ for cmd in "$BASE_GIT_CMD" "$INW"; do
           stderr "$hint"
           ;;
         "$INW")
-          local hint="  Hint: '$INW' is part of the 'fswatch' package."
+          hint="  Hint: '$INW' is part of the 'fswatch' package."
           if [ "$PKG_MANAGER" = "brew" ]; then
             hint="  Hint: Run \`$INSTALL_CMD fswatch\`"
           fi
@@ -507,7 +507,7 @@ for cmd in "$BASE_GIT_CMD" "$INW"; do
       # Linux hints
       case "$cmd" in
         "$BASE_GIT_CMD")
-          local hint="  Hint: Install 'git'."
+          hint="  Hint: Install 'git'."
           if [ -n "$INSTALL_CMD" ]; then
             if [ "$PKG_MANAGER" = "brew" ]; then
               hint="  Hint: Run \`$INSTALL_CMD git\` or \`xcode-select --install\`"
@@ -518,7 +518,7 @@ for cmd in "$BASE_GIT_CMD" "$INW"; do
           stderr "$hint"
           ;;
         "$INW")
-          local hint="  Hint: '$INW' is part of the 'inotify-tools' package."
+          hint="  Hint: '$INW' is part of the 'inotify-tools' package."
           if [ -n "$INSTALL_CMD" ]; then
             hint="  Hint: Run \`$INSTALL_CMD inotify-tools\`"
           fi
@@ -532,7 +532,7 @@ done
 
 # 'timeout' (GNU version) is required for production robustness
 if ! is_command "$TIMEOUT_CMD"; then
-  local hint="  Hint: Install 'timeout' (part of 'coreutils')."
+  hint="  Hint: Install 'timeout' (part of 'coreutils')."
   if [ -n "$INSTALL_CMD" ]; then
     hint="  Hint: Run \`$INSTALL_CMD coreutils\`"
   fi
@@ -544,7 +544,7 @@ fi
 # Check for GNU coreutils version
 # Use a subshell and check exit status + output to be safe
 if ! ("$TIMEOUT_CMD" --version 2>&1 | grep -q "GNU coreutils"); then
-  local hint="  Hint: Install 'coreutils' (e.g., 'brew install coreutils' on macOS)."
+  hint="  Hint: Install 'coreutils' (e.g., 'brew install coreutils' on macOS)."
   if [ -n "$INSTALL_CMD" ] && [ "$PKG_MANAGER" != "brew" ]; then
     hint="  Hint: Run \`$INSTALL_CMD coreutils\`"
   fi
@@ -558,7 +558,7 @@ fi
 # 'logger' is a special case, we only check if syslog is requested
 if [ "$USE_SYSLOG" -eq 1 ] && ! is_command "logger"; then
   stderr "Error: Required command 'logger' not found (for -S syslog option)."
-  local hint="  Hint: 'logger' is usually part of 'util-linux' or 'bsd-utils'."
+  hint="  Hint: 'logger' is usually part of 'util-linux' or 'bsd-utils'."
   if [ -n "$INSTALL_CMD" ]; then
     if [ "$PKG_MANAGER" = "apt" ]; then
       hint="  Hint: Run \`$INSTALL_CMD bsd-utils\`"
@@ -574,7 +574,7 @@ fi
 # Only check for flock if locking is *not* disabled
 if [ "$NO_LOCK" -eq 0 ]; then
   if ! is_command "$FLOCK"; then
-    local flock_hint="  Hint: Install 'flock' (usually part of 'util-linux')."
+    flock_hint="  Hint: Install 'flock' (usually part of 'util-linux')."
     if [ -n "$INSTALL_CMD" ]; then
       if [ "$PKG_MANAGER" = "brew" ]; then
         flock_hint="  Hint: Run \`$INSTALL_CMD flock\`"
