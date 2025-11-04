@@ -40,7 +40,7 @@ load 'bats-custom/startup-shutdown'
   run git log -1 --pretty=%B
   assert_success
   # The commit message logic will use the 'file changes' summary
-  assert_output --partial "File changes detected:  M initial_file.txt"
+  assert_output --partial "File changes detected:  A file_to_commit.txt"
 
   cd /tmp
 }
@@ -74,7 +74,7 @@ load 'bats-custom/startup-shutdown'
   # 5. Verify the local commit message
   run git log -1 --pretty=%B
   assert_success
-  assert_output --partial "File changes detected:  M initial_file.txt"
+  assert_output --partial "File changes detected:  A file_to_push.txt"
 
   cd /tmp
 }
@@ -163,7 +163,7 @@ load 'bats-custom/startup-shutdown'
 
   # 4. Verify log output confirms no commit was made
   run cat "$output_file"
-  assert_output --partial "No relevant changes detected by git status (porcelain check)." "Gitwatch should report no changes detected"
+  assert_output --partial "No relevant changes detected by git status (porcelain check)."
   refute_output --partial "Running git commit command:" "Should not show a commit command run"
 
   cd /tmp
@@ -242,7 +242,8 @@ load 'bats-custom/startup-shutdown'
   local original_perms
 
   # 1. Get original permissions of the target directory
-  if [ "$RUNNER_OS" == "Linux" ]; then
+  if [ "$RUNNER_OS" == "Linux" ];
+  then
     original_perms=$(stat -c "%a" "$target_dir")
   else
     # Use stat -f "%A" for macOS/BSD permissions
@@ -331,19 +332,35 @@ load 'bats-custom/startup-shutdown'
   cd /tmp
 }
 
-@test "startup_shelp_flags: Help output contains all expected flags including new ones" {
+@test "startup_shelp_flags: Help output contains all expected flags (exhaustive)" {
   # 1. Run gitwatch without arguments to get the help message
   run "${BATS_TEST_DIRNAME}/../gitwatch.sh"
   assert_failure # Should fail because no target is given (exit 0 after help is fine too)
 
-  # 2. Assert that the required flags are present
-  assert_output --partial "-s <secs>" "Missing debounce delay (-s)"
-  assert_output --partial "-t <secs>" "Missing timeout option (-t)"
-  assert_output --partial "-R" "Missing pull/rebase flag (-R)"
-  assert_output --partial "-M" "Missing skip if merging flag (-M)"
-  assert_output --partial "-f" "Missing commit on start flag (-f)"
-  assert_output --partial "-S" "Missing syslog flag (-S)"
-  assert_output --partial "-V" "Missing version flag (-V)"
+  # 2. Assert that all flags are present
+  assert_output --partial "-s <secs>"
+  assert_output --partial "-t <secs>"
+  assert_output --partial "-d <fmt>"
+  assert_output --partial "-r <remote>"
+  assert_output --partial "-R"
+  assert_output --partial "-b <branch>"
+  assert_output --partial "-g <path>"
+  assert_output --partial "-l <lines>"
+  assert_output --partial "-L <lines>"
+  assert_output --partial "-m <msg>"
+  assert_output --partial "-c <command>"
+  assert_output --partial "-C"
+  assert_output --partial "-e <events>"
+  assert_output --partial "-f"
+  assert_output --partial "-M"
+  assert_output --partial "-S"
+  assert_output --partial "-v"
+  assert_output --partial "-q"
+  assert_output --partial "-n"
+  assert_output --partial "-V"
+  assert_output --partial "-x <regex>"
+  assert_output --partial "-X <glob/list>"
+  assert_output --partial "SECURITY WARNING: The -c flag executes arbitrary code"
 }
 
 @test "startup_help_h: -h flag prints help and exits with success" {
