@@ -140,7 +140,6 @@ load 'bats-custom/startup-shutdown'
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
-
   # 6. Make another file change to trigger the watcher loop
   echo "Another trigger event" >> some_other_file.txt
   # Note: gitwatch.sh will run `git add --all .`, staging this change
@@ -165,8 +164,86 @@ load 'bats-custom/startup-shutdown'
   # 9. Assert: The gitwatch process is *still running*
   run kill -0 "$GITWATCH_PID"
   assert_success "Gitwatch process crashed after 'git commit' failure, but it should have continued."
-
   # 10. Cleanup: Abort the merge so teardown can clean the repo
   git merge --abort
+  cd /tmp
+}
+
+@test "skip_if_merging_M_rebase: -M flag prevents commit during a rebase conflict" {
+  local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  output_file=$(mktemp "$testdir/output.XXXXX")
+  local conflict_file="conflict_file.txt"
+  local initial_commit_hash
+  # We must use git rev-parse to ensure the correct path for asserting
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+  local GIT_DIR_PATH
+  # shellcheck disable=SC2155 # Declared on previous line
+  GIT_DIR_PATH=$(git rev-parse --absolute-git-dir)
+
+  # 1. Create a base commit
+  echo "Initial content" > "$conflict_file"
+  git add "$conflict_file"
+  git commit -q -m "Initial conflict file commit"
+  git push -q origin master
+  local base_hash
+  base_hash=$(git log -1 --format=%H)
+  echo "# Base hash: $base_hash" >&3
+
+  # 2. Simulate Upstream Change (local2)
+  # shellcheck disable=SC2103 # cd is necessary here
+  cd "$testdir"
+  run git clone -q remote local2
+  assert_success "Cloning for local2 failed"
+  cd local2
+  echo "Upstream change A" > "$conflict_file"
+  git add "$conflict_file"
+  git commit -q -m "Commit from local2 (upstream change A)"
+  run git push -q origin master
+  assert_success "Push from local2 failed"
+  run rm -rf local2
+  assert_success "Cleanup of local2 failed"
+
+  # 3. Create a conflicting local commit *before* starting gitwatch
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+  echo "Local change B" > "$conflict_file"
+  git add "$conflict_file"
+  git commit -q -m "Local conflicting commit"
+  initial_commit_hash=$(git log -1 --format=%H) # This is the new local HEAD
+  assert_not_equal "$base_hash" "$initial_commit_hash"
+
+  # 4. Trigger the rebase conflict
+  # This will fail and leave the repo in a rebase state (rebase-apply dir)
+  run git pull --rebase origin master
+  assert_failure "Git pull --rebase should fail with a conflict"
+  assert_dir_exist "$GIT_DIR_PATH/rebase-apply" "Failed to establish a rebase-in-progress state"
+
+  # 5. Start gitwatch with -M flag
+  echo "# DEBUG: Starting gitwatch with -M in a rebase conflict state" >&3
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
+  GITWATCH_PID=$!
+
+  # 6. Make another file change to trigger the watcher loop
+  echo "Another trigger event" >> some_other_file.txt
+  # Note: gitwatch will run 'git add --all .', staging this new file
+
+  # Wait for the commit attempt to be skipped
+  echo "# DEBUG: Waiting $WAITTIME seconds for the commit attempt to be skipped..." >&3
+  sleep "$WAITTIME"
+
+  # 7. Assert: Commit hash has NOT changed (it's still the local commit)
+  run git log -1 --format=%H
+  assert_success
+  local after_watch_hash=$output
+  assert_equal "$initial_commit_hash" "$after_watch_hash" "Commit hash should NOT change while in rebase state"
+
+  # 8. Assert: Log output confirms the skip
+  run cat "$output_file"
+  assert_output --partial "Skipping commit - repo is merging" "Gitwatch should report skipping the commit due to rebase"
+
+  # 9. Cleanup: Abort the rebase so teardown can clean the repo
+  git rebase --abort
   cd /tmp
 }

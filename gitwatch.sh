@@ -31,7 +31,7 @@
 #       (but heavily modified by now)
 #
 #   Requires the command 'inotifywait' (Linux) or 'fswatch' (macOS/BSD),
-#   'git', 'timeout', and 'flock'.
+#   'git', 'timeout', 'flock', and 'pkill'.
 #   Checks for these and provides installation hints.
 #
 
@@ -188,11 +188,12 @@ shelp() {
   echo "config and restarting it afterwards."
   echo ""
   echo 'By default, gitwatch tries to use the binaries "git", "inotifywait" (or "fswatch" on macOS/BSD),'
-  echo "and \"flock\" (required for robust locking), expecting to find them in the PATH (it uses 'command -v' to check this"
+  echo '"flock" (required for robust locking), "timeout", and "pkill" (for debouncing).'
+  echo "It expects to find them in the PATH (it uses 'command -v' to check this"
   echo "and will abort with an error if they cannot be found). If you want to use"
   echo "binaries that are named differently and/or located outside of your PATH, you can"
-  echo "define replacements in the environment variables GW_GIT_BIN, GW_INW_BIN, GW_FLOCK_BIN, and"
-  echo "GW_TIMEOUT_BIN for git, inotifywait/fswatch, flock, and timeout, respectively."
+  echo "define replacements in the environment variables GW_GIT_BIN, GW_INW_BIN, GW_FLOCK_BIN,"
+  echo "GW_TIMEOUT_BIN, and GW_PKILL_BIN."
   echo "The read timeout for the drain loop can be set using the GW_READ_TIMEOUT environment variable."
   echo "The line length for diffs in commit logs can be set with GW_LOG_LINE_LENGTH (default 150)."
 }
@@ -274,7 +275,17 @@ is_command() {
 is_merging () {
   # Execute in subshell to handle potential errors from rev-parse if not a repo yet
   # Use bash -c to correctly interpret the $GIT string with its arguments
-  ( bash -c "$GIT rev-parse --git-dir" &>/dev/null && [ -f "$(bash -c "$GIT rev-parse --git-dir")"/MERGE_HEAD ] ) || return 1
+  (
+    bash -c "$GIT rev-parse --git-dir" &>/dev/null || return 1
+    local git_dir
+    git_dir=$(bash -c "$GIT rev-parse --git-dir")
+    # Check for merge, rebase, or cherry-pick/revert conflicts
+    [ -f "$git_dir/MERGE_HEAD" ] || \
+      [ -f "$git_dir/REBASE_HEAD" ] || \
+      [ -d "$git_dir/rebase-apply" ] || \
+      [ -f "$git_dir/CHERRY_PICK_HEAD" ] || \
+      [ -f "$git_dir/REVERT_HEAD" ]
+  ) || return 1
 }
 
 # Check for git user.name and user.email
@@ -304,7 +315,7 @@ check_git_config() {
   fi
 }
 
-###############################################################################
+#############################################################################
 
 # --- Signal Trapping ---
 # Note: The trap for EXIT/INT/TERM is redefined later to include PID file cleanup
@@ -473,11 +484,15 @@ if [ -z "${GW_FLOCK_BIN:-}" ]; then FLOCK="flock"; else FLOCK="$GW_FLOCK_BIN"; f
 # Use GW_TIMEOUT_BIN if set, otherwise default to "timeout"
 if [ -z "${GW_TIMEOUT_BIN:-}" ]; then TIMEOUT_CMD="timeout"; else TIMEOUT_CMD="$GW_TIMEOUT_BIN"; fi
 
+# --- Check for 'pkill' dependency ---
+# Use GW_PKILL_BIN if set, otherwise default to "pkill"
+if [ -z "${GW_PKILL_BIN:-}" ]; then PKILL="pkill"; else PKILL="$GW_PKILL_BIN"; fi
 
-# Check availability of selected binaries (uses final $GIT, $INW, $FLOCK values)
+
+# Check availability of selected binaries (uses final $GIT, $INW, $FLOCK, $PKILL values)
 # Check the base git command before potential modification by -g
 read -r BASE_GIT_CMD _ <<< "$GIT" # Get base git command
-for cmd in "$BASE_GIT_CMD" "$INW"; do
+for cmd in "$BASE_GIT_CMD" "$INW" "$PKILL"; do
   is_command "$cmd" || {
     stderr "Error: Required command '$cmd' not found."
     # ... (Platform-specific hints remain the same) ...
@@ -502,6 +517,13 @@ for cmd in "$BASE_GIT_CMD" "$INW"; do
           fi
           stderr "$hint"
           ;;
+        "$PKILL")
+          hint="  Hint: '$PKILL' is part of the 'proctools' package."
+          if [ "$PKG_MANAGER" = "brew" ]; then
+            hint="  Hint: Run \`$INSTALL_CMD proctools\`"
+          fi
+          stderr "$hint"
+          ;;
       esac
     else
       # Linux hints
@@ -521,6 +543,13 @@ for cmd in "$BASE_GIT_CMD" "$INW"; do
           hint="  Hint: '$INW' is part of the 'inotify-tools' package."
           if [ -n "$INSTALL_CMD" ]; then
             hint="  Hint: Run \`$INSTALL_CMD inotify-tools\`"
+          fi
+          stderr "$hint"
+          ;;
+        "$PKILL")
+          hint="  Hint: '$PKILL' is part of the 'procps' or 'procps-ng' package."
+          if [ -n "$INSTALL_CMD" ]; then
+            hint="  Hint: Run \`$INSTALL_CMD procps\`"
           fi
           stderr "$hint"
           ;;
@@ -630,7 +659,7 @@ fi
 verbose_echo "Using read timeout: $READ_TIMEOUT seconds (Bash version: ${bash_major_version:-unknown})"
 
 
-###############################################################################
+#############################################################################
 
 # --- Convert User-Friendly Exclude Pattern (glob/comma-sep) to Regex (for -X) ---
 PROCESSED_GLOB_PATTERN="" # Initialize for safety
@@ -1097,7 +1126,7 @@ generate_commit_message() {
 
     # --- MODIFICATION: Add timeout and check PIPESTATUS ---
     local diff_cmd
-    diff_cmd=$(printf "%s -s 9 %s %s diff --staged -U0 %q" "$TIMEOUT_CMD" "$TIMEOUT" "$GIT" "$LISTCHANGES_COLOR")
+    diff_cmd=$(printf "%s -s 9 %s %s %s diff --staged -U0 %q" "$TIMEOUT_CMD" "$TIMEOUT" "$GIT" "$LISTCHANGES_COLOR")
     DIFF_COMMITMSG=$(bash -c "$diff_cmd" | diff-lines)
     local timeout_status=${PIPESTATUS[0]}
     local diff_lines_status=${PIPESTATUS[1]}
@@ -1412,7 +1441,7 @@ verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
   if [[ -n "$OLD_TIMER_PID" ]] && kill -0 "$OLD_TIMER_PID" &>/dev/null; then
     verbose_echo "Debounce: Timer (PID $OLD_TIMER_PID) is active. Killing it forcefully (SIGKILL)."
     # Kill children first, then parent, using SIGKILL
-    pkill -9 -P "$OLD_TIMER_PID" &>/dev/null || true
+    "$PKILL" -9 -P "$OLD_TIMER_PID" &>/dev/null || true
     kill -9 "$OLD_TIMER_PID" &>/dev/null || true
     # Give a tiny moment for the OS to process the kill
     sleep 0.05

@@ -352,6 +352,8 @@ To run this script, you must have installed and globally available:
   `-n` flag.
 - **Timeout:** `timeout` (part of `coreutils` on most Linux/macOS
   distributions) for robust Git operations.
+- **Debouncing:** `pkill` (part of `procps` on Linux or `proctools` on
+  macOS) for robustly managing debounce timers.
 
 The script automatically detects the appropriate watcher tool based on your
 operating system.
