@@ -28,7 +28,7 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[nix]": {
-    "editor.defaultFormatter": "jnoortheen.nix-ide"
+    "editor.defaultFormatter": "brettm12345.nixfmt-vscode"
   },
   "shellcheck.enable": true,
   "shellcheck.customArgs": ["--rcfile", ".config/.shellcheckrc"],

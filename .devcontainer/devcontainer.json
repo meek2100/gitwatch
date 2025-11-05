@@ -11,7 +11,7 @@
         "EditorConfig.EditorConfig",
         "timonwong.shellcheck",
         "foxundermoon.shell-format",
-        "raichu.vscode-bats",
+        "jetmartin.bats",
         "esbenp.prettier-vscode",
         "redhat.vscode-yaml",
         "DavidAnson.vscode-markdownlint",
