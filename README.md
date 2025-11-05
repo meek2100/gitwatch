@@ -488,6 +488,10 @@ untrusted users.
 - **Empty Commit Prevention:** `gitwatch` prevents commits if only metadata
   (like timestamps) has changed, ensuring only meaningful file content or
   file count changes result in a new commit.
+- **Symlink Behavior:** `gitwatch` does not follow symlinks. On Linux
+  (`inotifywait`) this is the default, and on macOS (`fswatch`) the `-X`
+  flag is used to ensure symlinks pointing outside the watched directory
+  are ignored.
 
 ### Advanced Environment Variables (non-Docker)
 
