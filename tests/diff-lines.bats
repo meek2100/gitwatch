@@ -167,3 +167,13 @@ new mode 100755
   assert_output --regexp "colored_path.txt:1: \+new line"
   refute_output --regexp "${ESC}" "Path should not contain color codes"
 }
+
+@test "diff_lines_10_binary_file: Handles binary file diff" {
+  local DIFF_INPUT="
+diff --git a/logo.png b/logo.png
+Binary files a/logo.png and b/logo.png differ
+"
+  run diff-lines <<< "$DIFF_INPUT"
+  assert_success
+  assert_output "logo.png:?: Binary file changed."
+}
