@@ -183,8 +183,6 @@ _Ended at commit `338430af`._
 
 ### New Contributors
 
-_(No new contributors identified between v0.2 and v0.3 based on commit history)_
-
 **Full Changelog**: `v0.2...v0.3`
 
 ## [0.2] - 2023-12-12
@@ -203,8 +201,6 @@ _Ended at commit `45c629c4`._
 - Improved handling of detached HEAD state when pushing with `-b`.
 
 ### New Contributors
-
-_(No new contributors identified between v0.1 and v0.2 based on commit history)_
 
 **Full Changelog**: `v0.1...v0.2`
 
