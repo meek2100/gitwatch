@@ -87,7 +87,7 @@ let
             (if cfg.quiet then quietFlag else verboseFlag)
             disableLockingFlag
             messageAndLogArgs
-          (lib.strings.escapeShellArg cfg.path)
+            (lib.strings.escapeShellArg cfg.path)
           ]
         );
         cloneBranchArg = if cfg.branch != null then "-b ${lib.strings.escapeShellArg cfg.branch}" else "";

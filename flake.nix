@@ -34,7 +34,8 @@
         }
       );
     in
-    packages // {
+    packages
+    // {
       modules = [ ./module.nix ];
       # --- ADDED LINE ---
       license = nixpkgs.lib.licenses.gpl3Plus;
