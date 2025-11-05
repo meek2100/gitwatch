@@ -952,7 +952,7 @@ fi
 
 # --- Prepare Pull/Push Command Strings (No eval needed here) ---
 PULL_CMD="" # Ensure PULL_CMD is initialized for set -u
-PUSH_CMD="" # Ensure PULL_CMD is initialized for set -u
+PUSH_CMD="" # Ensure PUSH_CMD is initialized for set -u
 
 if [ -n "${REMOTE:-}" ]; then        # are we pushing to a remote?
   verbose_echo "Push remote selected: $REMOTE"
@@ -1443,16 +1443,24 @@ fi
 TIMER_PID_FILE="${TMPDIR:-/tmp}/${LOCKFILE_BASENAME}.timer.pid"
 # --- End modification ---
 
+# --- NEW: Health Status File ---
+# Fixed path for Docker HEALTHCHECK to find
+HEALTH_STATUS_FILE="${TMPDIR:-/tmp}/gitwatch.status"
+# --- End Health Status File ---
+
 
 # Cleanup PID file on exit
-# Redefine trap to include PID file removal
-trap 'rm -f "$TIMER_PID_FILE"; cleanup "$?"' EXIT INT TERM
+# Redefine trap to include PID file removal AND health file removal
+trap 'rm -f "$TIMER_PID_FILE" "$HEALTH_STATUS_FILE"; cleanup "$?"' EXIT INT TERM
 
 
 # main program loop: wait for changes and commit them
 verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
+touch "$HEALTH_STATUS_FILE" # NEW: Signal healthy on startup
 # Execute the watcher and pipe its output to the read loop
 "${INW}" "${INW_ARGS[@]}" | while IFS= read -r line; do # Use IFS= to preserve leading spaces
+
+  touch "$HEALTH_STATUS_FILE" # NEW: Heartbeat! Proves the loop is alive.
 
   # --- NEW: Exponential Backoff Check ---
   if [ "$GIT_FAIL_COUNT" -ge "$MAX_FAIL_COUNT" ]; then
@@ -1460,12 +1468,14 @@ verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
     time_since_fail=$((current_time - LAST_FAIL_TIME))
 
     if [ "$time_since_fail" -lt "$COOL_DOWN_SECONDS" ]; then
-      # FIX for SC2168: Removed 'local'
+      # FIX for SC2168: Removed 'local' from remaining_wait
       remaining_wait=$((COOL_DOWN_SECONDS - time_since_fail))
       verbose_echo "In cool-down mode. Skipping trigger. ($remaining_wait seconds remaining)"
+      rm -f "$HEALTH_STATUS_FILE" # NEW: Signal "unhealthy" (in cool-down)
       continue # Skip this file change event
     else
       verbose_echo "Cool-down period finished. Resetting failure count and retrying."
+      touch "$HEALTH_STATUS_FILE" # NEW: Signal "healthy" again
       GIT_FAIL_COUNT=0
       LAST_FAIL_TIME=0
     fi
@@ -1543,5 +1553,7 @@ WATCHER_EXIT_CODE=$?
 verbose_echo "File watcher process ended (or failed) with exit code $WATCHER_EXIT_CODE. Exiting via loop termination."
 # Ensure PID file is removed if loop terminates unexpectedly
 rm -f "$TIMER_PID_FILE"
+# Ensure health file is removed if loop terminates unexpectedly (trap will also get this)
+rm -f "$HEALTH_STATUS_FILE"
 # Exit with the watcher's exit code to signal failure if not 0
 exit "$WATCHER_EXIT_CODE"
