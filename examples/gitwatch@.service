@@ -10,8 +10,7 @@ Environment="SCRIPT_ARGS=%I"
 # This ensures git, flock, and timeout are found.
 Environment="PATH=/usr/local/bin:/usr/bin:/bin"
 # Specify dependency packages for clarity (though PATH is the fix)
-# This is a good place to document what gitwatch needs.
-# Requires=git, util-linux (flock), coreutils (timeout), inotify-tools
+# Requires=git, util-linux (flock), coreutils (timeout), inotify-tools, procps (pkill)
 ExecStart=/usr/bin/bash -c "/usr/local/bin/gitwatch ${SCRIPT_ARGS}"
 ExecStop=/bin/true
 Restart=on-failure

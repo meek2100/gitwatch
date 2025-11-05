@@ -27,6 +27,8 @@
       <string>/opt/homebrew/bin/flock</string>
       <key>GW_TIMEOUT_BIN</key>
       <string>/opt/homebrew/bin/gtimeout</string>
+      <key>GW_PKILL_BIN</key>
+      <string>/opt/homebrew/bin/pkill</string>
     </dict>
  <!-- remove comment to log output from gitwatch
     <key>StandardOutPath</key>
