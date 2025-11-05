@@ -22,7 +22,7 @@
   "[markdown]": {
     "editor.defaultFormatter": "bittorala.mdformat",
     "editor.wordWrap": "on",
-    "editor.rulers": [90]
+    "editor.rulers": [80]
   },
   "[dockerfile]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
