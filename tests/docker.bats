@@ -9,6 +9,7 @@ load 'bats-custom/custom-helpers'
 
 # --- GLOBAL VARS ---
 export DOCKER_IMAGE_NAME="gitwatch-test-image"
+export DOCKER_HEALTHCHECK_IMAGE_NAME="gitwatch-healthcheck-test-image"
 export DOCKER_CONTAINER_NAME_PREFIX="gitwatch-test"
 export TEST_REPO_HOST_DIR="" # Set in setup
 export RUNNER_UID=""
@@ -27,11 +28,32 @@ setup_file() {
     echo "$output"
   fi
   assert_success "Docker image build failed"
+
+  # --- NEW: Build the fast-healthcheck image ---
+  verbose_echo "# DEBUG: Building fast-healthcheck image..."
+  # Create a temporary Dockerfile that uses a fast interval
+  cat > "${BATS_TEST_TMPDIR}/Dockerfile.healthcheck" << EOF
+FROM ${DOCKER_IMAGE_NAME}
+HEALTHCHECK --interval=3s --timeout=2s --start-period=5s --retries=2 \
+  CMD test -f /tmp/gitwatch.status && \
+      find /tmp -maxdepth 1 -name gitwatch.status -mmin -1 | grep -q . || \
+      exit 1
+EOF
+
+  run docker build -t "$DOCKER_HEALTHCHECK_IMAGE_NAME" -f "${BATS_TEST_TMPDIR}/Dockerfile.healthcheck" .
+  if [ "$status" -ne 0 ];
+then
+    echo "# DEBUG: Docker healthcheck image build failed"
+    echo "$output"
+  fi
+  assert_success "Healthcheck Docker image build failed"
+  # --- END NEW ---
 }
 
 teardown_file() {
-  # Clean up the Docker image
+  # Clean up the Docker images
   docker rmi "$DOCKER_IMAGE_NAME" 2>/dev/null || true
+  docker rmi "$DOCKER_HEALTHCHECK_IMAGE_NAME" 2>/dev/null || true
 }
 
 setup() {
@@ -69,9 +91,62 @@ teardown() {
   fi
 }
 
+# --- NEW: Helper to create a failing mock git ---
+create_failing_mock_git() {
+  local real_path="$1"
+  local dummy_path="$2" # Pass in the full path
+  local dummy_dir
+  dummy_dir=$(dirname "$dummy_path")
+  mkdir -p "$dummy_dir"
+
+  cat > "$dummy_path" << EOF
+#!/usr/bin/env bash
+# Mock Git script
+echo "# MOCK_GIT: Received command: \$@" >&2
+
+if [ "\$1" = "push" ]; then
+  echo "# MOCK_GIT: Push command FAILING" >&2
+  exit 1 # Always fail the push
+else
+  # Pass all other commands (commit, rev-parse, etc.) to the real git
+  exec $real_path "\$@"
+fi
+EOF
+
+  chmod +x "$dummy_path"
+}
+
+# --- NEW: Helper to wait for a specific health status ---
+wait_for_health_status() {
+  local container_name="$1"
+  local expected_status="$2"
+  local max_attempts=10 # Total wait 20s
+  local delay=2
+  local attempt=1
+
+  while (( attempt <= max_attempts )); do
+    run docker inspect --format '{{.State.Health.Status}}' "$container_name"
+    assert_success "Docker inspect failed"
+
+    if [ "$output" = "$expected_status" ]; then
+      verbose_echo "# Health status is '$output' as expected."
+      return 0
+    fi
+    verbose_echo "# Waiting for health status '$expected_status', currently '$output' (Attempt $attempt/$max_attempts)..."
+    sleep "$delay"
+    (( attempt++ ))
+  done
+
+  verbose_echo "# Timeout: Health status did not become '$expected_status'. Final status: '$output'"
+  return 1
+}
+
+
 # Helper to run a container and wait for it to be ready
 run_container() {
   local container_name="$1"
+  shift
+  local image_name="$1" # <-- MODIFIED: Accept image name
   shift
   local docker_args=( "$@" ) # The rest are docker args
 
@@ -82,7 +157,7 @@ run_container() {
     --cap-add=SETUID \
     -v "$TEST_REPO_HOST_DIR:/app/watched-repo" \
     "${docker_args[@]}" \
-    "$DOCKER_IMAGE_NAME"
+    "$image_name"
 
   # Wait for 5 seconds for it to initialize
   sleep 5
@@ -98,7 +173,7 @@ get_container_logs() {
 
 @test "docker_puid_gid: Entrypoint correctly switches user" {
   local container_name="${DOCKER_CONTAINER_NAME_PREFIX}-1"
-  run_container "$container_name" \
+  run_container "$container_name" "$DOCKER_IMAGE_NAME" \
     -e PUID="$RUNNER_UID" \
     -e PGID="$RUNNER_GID"
 
@@ -115,7 +190,7 @@ get_container_logs() {
 
 @test "docker_env_vars: Entrypoint correctly passes flags" {
   local container_name="${DOCKER_CONTAINER_NAME_PREFIX}-2"
-  run_container "$container_name" \
+  run_container "$container_name" "$DOCKER_IMAGE_NAME" \
     -e VERBOSE=true \
     -e COMMIT_ON_START=true \
     -e EXCLUDE_PATTERN="*.log,tmp/" # Test the -X flag
@@ -135,7 +210,7 @@ get_container_logs() {
   local container_name="${DOCKER_CONTAINER_NAME_PREFIX}-3"
   local custom_message="Custom Docker Commit"
 
-  run_container "$container_name" \
+  run_container "$container_name" "$DOCKER_IMAGE_NAME" \
     -e SLEEP_TIME=1 \
     -e COMMIT_CMD="echo '$custom_message'" # Set a custom commit command
 
@@ -155,7 +230,7 @@ get_container_logs() {
 @test "docker_env_vars_advanced: Entrypoint correctly handles QUIET and DISABLE_LOCKING" {
   local container_name="${DOCKER_CONTAINER_NAME_PREFIX}-4"
 
-  run_container "$container_name" \
+  run_container "$container_name" "$DOCKER_IMAGE_NAME" \
     -e QUIET=true \
     -e DISABLE_LOCKING=true
 
@@ -198,7 +273,7 @@ get_container_logs() {
   local long_line="This is a very long line that should be truncated"
   local truncated_line="This is a " # First 10 chars
 
-  run_container "$container_name" \
+  run_container "$container_name" "$DOCKER_IMAGE_NAME" \
     -e SLEEP_TIME=1 \
     -e LOG_DIFF_LINES=10 \
     -e GW_LOG_LINE_LENGTH=10 \
@@ -226,4 +301,62 @@ get_container_logs() {
 
   # 5. Assert that the *full* line is *not* present
   refute_output --partial "+${long_line}"
+}
+
+# --- NEW TEST ---
+@test "docker_healthcheck: Container becomes unhealthy on cool-down and recovers" {
+  local container_name="${DOCKER_CONTAINER_NAME_PREFIX}-health"
+  local real_git_path
+  real_git_path=$(command -v git)
+  local mock_git_path="$TEST_REPO_HOST_DIR/mock-bin/git"
+
+  # 1. Create the mock git binary on the host
+  create_failing_mock_git "$real_git_path" "$mock_git_path"
+  verbose_echo "# DEBUG: Created failing mock git at $mock_git_path"
+
+  # 2. Run the *healthcheck* container
+  run_container "$container_name" "$DOCKER_HEALTHCHECK_IMAGE_NAME" \
+    -e SLEEP_TIME=1 \
+    -e GW_MAX_FAIL_COUNT=2 \
+    -e GW_COOL_DOWN_SECONDS=10 \
+    -e GIT_REMOTE=origin \
+    -e GW_GIT_BIN="/usr/local/bin/git" \
+    -v "$mock_git_path:/usr/local/bin/git:ro" # Mount the mock git
+
+  verbose_echo "# DEBUG: Container started. Waiting for 'healthy' status..."
+
+  # 3. Check initial health (should be 'healthy' after start-period)
+  run wait_for_health_status "$container_name" "healthy"
+  assert_success "Container did not become 'healthy' after starting"
+
+  # 4. Trigger failures (GW_MAX_FAIL_COUNT=2)
+  verbose_echo "# DEBUG: Triggering 2 failures..."
+  echo "change 1" >> "$TEST_REPO_HOST_DIR/health_file.txt"
+  sleep 3 # Wait for commit/push to fail
+  echo "change 2" >> "$TEST_REPO_HOST_DIR/health_file.txt"
+  sleep 3 # Wait for commit/push to fail
+
+  # 5. Check for 'unhealthy'
+  verbose_echo "# DEBUG: Failures triggered. Waiting for 'unhealthy' status..."
+  run wait_for_health_status "$container_name" "unhealthy"
+  assert_success "Container did not become 'unhealthy' after entering cool-down"
+
+  # 6. Check container logs to confirm cool-down
+  run get_container_logs "$container_name"
+  assert_output --partial "Incrementing failure count to 1/2"
+  assert_output --partial "Incrementing failure count to 2/2"
+  assert_output --partial "Max failures reached. Entering cool-down period for 10 seconds."
+
+  # 7. Wait for recovery
+  # (10s cool-down + 3s health interval + 3s buffer)
+  verbose_echo "# DEBUG: Waiting 16s for cool-down to end and health to recover..."
+  sleep 16
+
+  # 8. Check for 'healthy' again
+  run wait_for_health_status "$container_name" "healthy"
+  assert_success "Container did not return to 'healthy' status after cool-down"
+
+  # 9. Check logs for recovery message
+  run get_container_logs "$container_name"
+  assert_output --partial "Cool-down period finished. Resetting failure count and retrying."
 }
