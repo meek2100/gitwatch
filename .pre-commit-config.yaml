@@ -6,7 +6,7 @@ repos:
     rev: "v3.6.2"
     hooks:
       - id: prettier
-        # Prettier now relies on auto-detection via .prettierrc.yaml.
+      args: ["--config", ".config/.prettierrc.yaml"]
   # - repo: https://github.com/executablebooks/mdformat
   #   rev: 1.0.0
   #   hooks:
@@ -27,9 +27,7 @@ repos:
     hooks:
       - id: markdownlint
         name: Lint Markdown
-        args:
-          - --config
-          - .config/.markdownlint.yaml
+        args: ["--config", ".config/.markdownlint.yaml"]
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -61,9 +59,7 @@ repos:
     rev: v2.4.1
     hooks:
       - id: codespell
-        args:
-          - "--config"
-          - ".config/.codespellrc"
+      args: ["--config", ".config/.codespellrc"]
   - repo: https://github.com/IamTheFij/docker-pre-commit
     rev: v3.0.1
     hooks:
@@ -80,7 +76,7 @@ repos:
   #  rev: v6.4.2
   #  hooks:
   #    - id: beautysh
-  #      args: [--config, .beautyshrc]
+  #      args: ["--config", ".beautyshrc"]
   #      exclude: ^gitwatch.sh$
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1
@@ -93,7 +89,7 @@ repos:
     hooks:
       - id: hadolint
         name: Lint Dockerfiles
-        args: [--config, ".config/.hadolint.yaml"]
+        args: ["--config", ".config/.hadolint.yaml"]
   - repo: https://github.com/NixOS/nixfmt
     rev: v1.1.0
     hooks:
