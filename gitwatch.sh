@@ -127,88 +127,90 @@ NO_LOCK=0 # No-lock flag
 
 # Print a message about how to use this script
 shelp() {
-  echo "gitwatch - watch file or directory and git commit all changes as they happen"
-  echo ""
-  echo "Usage:"
-  echo "${0##*/} [-s <secs>] [-t <secs>] [-d <fmt>] [-r <remote> [-b <branch>]]"
-  echo "          [-m <msg>] [-l|-L <lines>] [-x <regex>] [-X <glob/list>] [-M] [-S] [-v] [-q] [-n] [-f] [-V] <target>"
-  echo ""
-  echo "Where <target> is the file or folder which should be watched. The target needs"
-  echo "to be in a Git repository, or in the case of a folder, it may also be the top"
-  echo "folder of the repo."
-  echo ""
-  echo " -s <secs>        After detecting a change to the watched file or directory,"
-  echo "                  wait <secs> seconds until committing, to allow for more"
-  echo "                  write actions of the same batch to finish; default is 2sec"
-  echo " -t <secs>        Timeout for critical Git operations (commit, pull, push)."
-  echo "                  Can also be set via GW_TIMEOUT environment variable; default is 60sec"
-  echo " -d <fmt>         The format string used for the timestamp in the commit"
-  echo "                  message; see 'man date' for details; default is "
-  echo '                  "+%Y-%m-%d %H:%M:%S"'
-  echo " -r <remote>      If given and non-empty, a 'git push' to the given <remote>"
-  echo "                  is done after every commit; default is empty, i.e. no push"
-  echo " -R               If given along with -r, a 'git pull --rebase <remote>' is done before any push"
-  echo " -b <branch>      The branch which should be pushed automatically;"
-  echo "                - if not given, the push command used is  'git push <remote>',"
-  echo "                    thus doing a default push (see git man pages for details)"
-  echo "                - if given and"
-  echo "                  + repo is in a detached HEAD state (at launch)"
-  echo "                    then the command used is  'git push <remote> <branch>'"
-  echo "                  + repo is NOT in a detached HEAD state (at launch)"
-  echo "                    then the command used is"
-  echo "                    'git push <remote> <current branch>:<branch>'  where"
-  echo "                    <current branch> is the target of HEAD (at launch)"
-  echo "                  if no remote was defined with -r, this option has no effect"
-  echo " -g <path>        Location of the .git directory, if stored elsewhere in"
-  echo "                  a remote location. This specifies the --git-dir parameter"
-  echo " -l <lines>       Log the actual changes made in this commit, up to a given"
-  echo "                  number of lines, or all lines if 0 is given"
-  echo " -L <lines>       Same as -l but without colored formatting"
-  echo " -m <msg>         The commit message used for each commit; all occurrences of"
-  echo "                  %d in the string will be replaced by the formatted date/time"
-  echo "                  (unless the <fmt> specified by -d is empty, in which case %d"
-  echo "                  is replaced by an empty string); the default message is:"
-  echo '                  "Auto-commit: %d"'
-  echo " -c <command>     The command to be run to generate a commit message. If empty,"
-  echo "                  defaults to the standard commit message. This option overrides -m,"
-  echo "                  -d, and -l. Executed via bash -c."
-  echo " -C               Pass list of diffed files to <command> via pipe. Has no effect if"
-  echo "                  -c is not given."
-  echo " -e <events>      Events passed to inotifywait to watch (defaults to "
-  echo "                  'close_write,move,move_self,delete,create,modify')"
-  echo "                  (useful when using inotify-win, e.g. -e modify,delete,move)"
-  echo "                  (for fswatch/macOS, see fswatch documentation for --event)"
-  echo ""
-  echo "  SECURITY WARNING: The -c flag executes arbitrary code. Use it only with"
-  echo "  commands you trust, especially when running gitwatch as a service or on"
-  echo "  repositories with untrusted content."
-  echo ""
-  echo " -f               Commit any pending changes on startup before watching."
-  echo " -M               Prevent commits when there is an ongoing merge in the repo"
-  echo " -S               Log all messages to syslog (daemon mode)."
-  echo " -v               Run in verbose mode for debugging. Enables informational messages."
-  echo " -q               Quiet mode. Suppress all stdout and stderr output (overridden by -S)."
-  echo " -n               Disable file locking. Bypasses the 'flock' dependency check."
-  echo " -V               Print version information and exit."
-  echo " -x <regex>       Raw regex pattern to exclude files/directories from being monitored (backward compatible)."
-  echo " -X <glob/list>   A comma-separated list of glob patterns to exclude (e.g., '*.log,tmp/'). Converted to regex and combined with -x."
-  echo ""
-  echo "As indicated, several conditions are only checked once at launch of the"
-  echo "script. You can make changes to the repo state and configurations even while"
-  echo "the script is running, but that may lead to undefined and unpredictable (even"
-  echo "destructive) behavior!"
-  echo "It is therefore recommended to terminate the script before changing the repo's"
-  echo "config and restarting it afterwards."
-  echo ""
-  echo 'By default, gitwatch tries to use the binaries "git", "inotifywait" (or "fswatch" on macOS/BSD),'
-  echo '"flock" (required for robust locking), "timeout", and "pkill" (for debouncing).'
-  echo "It expects to find them in the PATH (it uses 'command -v' to check this"
-  echo "and will abort with an error if they cannot be found). If you want to use"
-  echo "binaries that are named differently and/or located outside of your PATH, you can"
-  echo "define replacements in the environment variables GW_GIT_BIN, GW_INW_BIN, GW_FLOCK_BIN,"
-  echo "GW_TIMEOUT_BIN, and GW_PKILL_BIN."
-  echo "The read timeout for the drain loop can be set using the GW_READ_TIMEOUT environment variable."
-  echo "The line length for diffs in commit logs can be set with GW_LOG_LINE_LENGTH (default 150)."
+  cat << EOF
+gitwatch - watch file or directory and git commit all changes as they happen
+
+Usage:
+  ${0##*/} [-s <secs>] [-t <secs>] [-d <fmt>] [-r <remote> [-b <branch>]]
+            [-m <msg>] [-l|-L <lines>] [-x <regex>] [-X <glob/list>] [-M] [-S] [-v] [-q] [-n] [-f] [-V] <target>
+
+Where <target> is the file or folder which should be watched. The target needs
+to be in a Git repository, or in the case of a folder, it may also be the top
+folder of the repo.
+
+ -s <secs>        After detecting a change to the watched file or directory,
+                  wait <secs> seconds until committing, to allow for more
+                  write actions of the same batch to finish; default is 2sec
+ -t <secs>        Timeout for critical Git operations (commit, pull, push).
+                  Can also be set via GW_TIMEOUT environment variable; default is 60sec
+ -d <fmt>         The format string used for the timestamp in the commit
+                  message; see 'man date' for details; default is
+                  "+%Y-%m-%d %H:%M:%S"
+ -r <remote>      If given and non-empty, a 'git push' to the given <remote>
+                  is done after every commit; default is empty, i.e. no push
+ -R               If given along with -r, a 'git pull --rebase <remote>' is done before any push
+ -b <branch>      The branch which should be pushed automatically;
+                - if not given, the push command used is  'git push <remote>',
+                    thus doing a default push (see git man pages for details)
+                - if given and
+                  + repo is in a detached HEAD state (at launch)
+                    then the command used is  'git push <remote> <branch>'
+                  + repo is NOT in a detached HEAD state (at launch)
+                    then the command used is
+                    'git push <remote> <current branch>:<branch>'  where
+                    <current branch> is the target of HEAD (at launch)
+                  if no remote was defined with -r, this option has no effect
+ -g <path>        Location of the .git directory, if stored elsewhere in
+                  a remote location. This specifies the --git-dir parameter
+ -l <lines>       Log the actual changes made in this commit, up to a given
+                  number of lines, or all lines if 0 is given
+ -L <lines>       Same as -l but without colored formatting
+ -m <msg>         The commit message used for each commit; all occurrences of
+                  %d in the string will be replaced by the formatted date/time
+                  (unless the <fmt> specified by -d is empty, in which case %d
+                  is replaced by an empty string); the default message is:
+                  "Auto-commit: %d"
+ -c <command>     The command to be run to generate a commit message. If empty,
+                  defaults to the standard commit message. This option overrides -m,
+                  -d, and -l. Executed via bash -c.
+ -C               Pass list of diffed files to <command> via pipe. Has no effect if
+                  -c is not given.
+ -e <events>      Events passed to inotifywait to watch (defaults to
+                  'close_write,move,move_self,delete,create,modify')
+                  (useful when using inotify-win, e.g. -e modify,delete,move)
+                  (for fswatch/macOS, see fswatch documentation for --event)
+
+  SECURITY WARNING: The -c flag executes arbitrary code. Use it only with
+  commands you trust, especially when running gitwatch as a service or on
+  repositories with untrusted content.
+
+ -f               Commit any pending changes on startup before watching.
+ -M               Prevent commits when there is an ongoing merge in the repo
+ -S               Log all messages to syslog (daemon mode).
+ -v               Run in verbose mode for debugging. Enables informational messages.
+ -q               Quiet mode. Suppress all stdout and stderr output (overridden by -S).
+ -n               Disable file locking. Bypasses the 'flock' dependency check.
+ -V               Print version information and exit.
+ -x <regex>       Raw regex pattern to exclude files/directories from being monitored (backward compatible).
+ -X <glob/list>   A comma-separated list of glob patterns to exclude (e.g., '*.log,tmp/'). Converted to regex and combined with -x.
+
+As indicated, several conditions are only checked once at launch of the
+script. You can make changes to the repo state and configurations even while
+the script is running, but that may lead to undefined and unpredictable (even
+destructive) behavior!
+It is therefore recommended to terminate the script before changing the repo's
+config and restarting it afterwards.
+
+By default, gitwatch tries to use the binaries "git", "inotifywait" (or "fswatch" on macOS/BSD),
+"flock" (required for robust locking), "timeout", and "pkill" (for debouncing).
+It expects to find them in the PATH (it uses 'command -v' to check this
+and will abort with an error if they cannot be found). If you want to use
+binaries that are named differently and/or located outside of your PATH, you can
+define replacements in the environment variables GW_GIT_BIN, GW_INW_BIN, GW_FLOCK_BIN,
+GW_TIMEOUT_BIN, and GW_PKILL_BIN.
+The read timeout for the drain loop can be set using the GW_READ_TIMEOUT environment variable.
+The line length for diffs in commit logs can be set with GW_LOG_LINE_LENGTH (default 150).
+EOF
 }
 
 # print all arguments to stderr

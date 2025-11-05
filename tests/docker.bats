@@ -42,7 +42,7 @@ EOF
 
   run docker build -t "$DOCKER_HEALTHCHECK_IMAGE_NAME" -f "${BATS_TEST_TMPDIR}/Dockerfile.healthcheck" .
   if [ "$status" -ne 0 ];
-then
+  then
     echo "# DEBUG: Docker healthcheck image build failed"
     echo "$output"
   fi
