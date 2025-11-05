@@ -643,6 +643,16 @@ running and will retry on the next file change.
 `gitwatch` creates a unique lockfile for each path it watches, so you can
 safely watch `/repo/docs` and `/repo/src` with separate processes.
 
+**Q: What happens if I use the `-R` (rebase) flag and a merge conflict
+occurs?**
+
+**A:** `gitwatch` will gracefully handle the error. It will log the failure
+from `git pull --rebase`, skip the push, and then **stop**. This is by
+design. It leaves the repository in a conflicted state (e.g., `git status`
+will show unmerged paths) so that you can manually resolve the conflict.
+Once you have resolved the conflict and finished the rebase (e.g.,
+`git rebase --continue`), you must restart `gitwatch`.
+
 ## Other Articles
 
 ### On the Gitwatch Wiki
