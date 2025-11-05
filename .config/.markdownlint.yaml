@@ -28,10 +28,11 @@ MD007:
   indent: 2
 
 # MD013: Set line length to 80
-# and disable line length checks for tables (for README.md)
+# and disable line length checks for tables and code blocks
 MD013:
   line_length: 80
   tables: false
+  code_blocks: false
 
 # MD049: Set emphasis style to UNDERSCORE (to match Prettier/existing files)
 MD049:
