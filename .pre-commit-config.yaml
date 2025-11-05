@@ -32,7 +32,7 @@ repos:
     rev: v6.0.0
     hooks:
       - id: no-commit-to-branch
-        args: [--branch, main]
+        args: [--branch, master]
       - id: check-yaml
         exclude: ^(docker-compose\.yml|.*/release-drafter\.yml)$
       - id: debug-statements
