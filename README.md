@@ -49,26 +49,25 @@
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/gitwatch/gitwatch)](https://github.com/gitwatch/gitwatch/releases/latest)
 [![Docker Image](https://img.shields.io/badge/ghcr.io-gitwatch%2Fgitwatch-blue)](https://github.com/gitwatch/gitwatch/pkgs/container/gitwatch)
 
-A Bash script to watch a file or folder and commit changes to a Git
-repository
+A Bash script to watch a file or folder and commit changes to a Git repository
 
 ## What to use it for?
 
 That's really up to you, but here are some examples:
 
-- **config files**: some programs auto-write their config files, without
-  waiting for you to click an 'Apply' button; or even if there is such a
-  button, most programs offer you no way of going back to an earlier
-  version of your settings. If you commit your config file(s) to a Git
-  repository, you can track changes and go back to older versions. This
-  script makes it convenient, to have all changes recorded automatically.
+- **config files**: some programs auto-write their config files, without waiting
+  for you to click an 'Apply' button; or even if there is such a button, most
+  programs offer you no way of going back to an earlier version of your
+  settings. If you commit your config file(s) to a Git repository, you can track
+  changes and go back to older versions. This script makes it convenient, to
+  have all changes recorded automatically.
 - **document files**: if you use an editor that does not have built-in Git
   support (or maybe if you don't like the Git support it has), you can use
-  gitwatch to automatically commit your files when you save them, or
-  combine it with the editor's auto-save feature to fully automatically and
-  regularly track your changes
-- _more stuff!_ If you have any other uses, or can think of ones, please
-  let us know, and we can add them to this list!
+  gitwatch to automatically commit your files when you save them, or combine it
+  with the editor's auto-save feature to fully automatically and regularly track
+  your changes
+- _more stuff!_ If you have any other uses, or can think of ones, please let us
+  know, and we can add them to this list!
 
 ## Installation
 
@@ -76,9 +75,9 @@ That's really up to you, but here are some examples:
 
 ### macOS (via Homebrew)
 
-While `gitwatch` is not yet in the official Homebrew repository, the
-easiest way to run it on macOS is to first install its dependencies using
-Homebrew, and then install the script.
+While `gitwatch` is not yet in the official Homebrew repository, the easiest way
+to run it on macOS is to first install its dependencies using Homebrew, and then
+install the script.
 
 ```shell
 # 1. Install required dependencies
@@ -92,25 +91,24 @@ brew install fswatch flock coreutils
 
 ### Windows 11 (via WSL Installer)
 
-`gitwatch` is fully supported on Windows 11 through the Windows Subsystem
-for Linux (WSL). A `.exe` installer is provided to make setup seamless.
+`gitwatch` is fully supported on Windows 11 through the Windows Subsystem for
+Linux (WSL). A `.exe` installer is provided to make setup seamless.
 
 1. **Download** the latest `gitwatch-setup.exe` from the
    [GitHub Releases page](https://github.com/gitwatch/gitwatch/releases/latest).
 2. **Run** the installer. It will automatically:
    - Request Administrator privileges.
-   - Check for and install WSL if it's not already present (this may take a
-     few minutes).
-   - **Attempt to auto-detect your WSL distribution** (e.g., Ubuntu,
-     Fedora, Alpine) and install required Linux dependencies (`git`,
-     `coreutils`, `util-linux`, `inotify-tools`) using the correct package
-     manager.
+   - Check for and install WSL if it's not already present (this may take a few
+     minutes).
+   - **Attempt to auto-detect your WSL distribution** (e.g., Ubuntu, Fedora,
+     Alpine) and install required Linux dependencies (`git`, `coreutils`,
+     `util-linux`, `inotify-tools`) using the correct package manager.
    - Install the `gitwatch.sh` script into WSL.
-   - Install a `gitwatch.bat` wrapper on your Windows system and add it to
-     your `PATH`.
+   - Install a `gitwatch.bat` wrapper on your Windows system and add it to your
+     `PATH`.
 
-**Note:** The installer works best with major distributions. If you use a
-custom or unrecognized WSL distribution, you may be prompted to install the
+**Note:** The installer works best with major distributions. If you use a custom
+or unrecognized WSL distribution, you may be prompted to install the
 dependencies manually.
 
 After installation, you can open any Windows Command Prompt or PowerShell
@@ -121,14 +119,14 @@ terminal and use `gitwatch` as if it were a native application:
 gitwatch -r origin -b main "C:\Users\YourUser\Documents\MyNotes"
 ```
 
-The wrapper automatically handles path translation, and `gitwatch` will use
-your existing Windows `.gitconfig` and SSH keys.
+The wrapper automatically handles path translation, and `gitwatch` will use your
+existing Windows `.gitconfig` and SSH keys.
 
 ### From Source
 
-`gitwatch` can be installed from source using the provided `Makefile`. This
-is the recommended method for building from source as it uses standard
-`install` commands.
+`gitwatch` can be installed from source using the provided `Makefile`. This is
+the recommended method for building from source as it uses standard `install`
+commands.
 
 ```sh
 git clone https://github.com/gitwatch/gitwatch.git
@@ -136,18 +134,18 @@ cd gitwatch
 [sudo] make install
 ```
 
-This will install `gitwatch.sh` to `/usr/local/bin/gitwatch` by default.
-You can uninstall it at any time with `[sudo] make uninstall`.
+This will install `gitwatch.sh` to `/usr/local/bin/gitwatch` by default. You can
+uninstall it at any time with `[sudo] make uninstall`.
 
 ### Releases
 
-For the most stable version, you can download the `gitwatch.sh` script
-directly from the project's
+For the most stable version, you can download the `gitwatch.sh` script directly
+from the project's
 [GitHub Releases page](https://github.com/gitwatch/gitwatch/releases/latest).
 
-This is a simple way to get the latest tagged script without cloning the
-entire repository. A common way to install it is to download it directly
-into your local bin path:
+This is a simple way to get the latest tagged script without cloning the entire
+repository. A common way to install it is to download it directly into your
+local bin path:
 
 ```sh
 # Download the latest version to /usr/local/bin (you may need sudo)
@@ -160,15 +158,15 @@ chmod +x /usr/local/bin/gitwatch
 #### Update
 
 If you installed `gitwatch` from source, you can update it by following the
-exact same steps (or `git pull` rather than clone if you kept the
-repository around).
+exact same steps (or `git pull` rather than clone if you kept the repository
+around).
 
 ### bpkg
 
-`gitwatch` can be installed with [bpkg](https://github.com/bpkg/bpkg). Make
-sure you have [bpkg](https://github.com/bpkg/bpkg) installed before running
-the command below. You may need to invoke `bpkg` with `sudo` when using the
-`-g` flag.
+`gitwatch` can be installed with [bpkg](https://github.com/bpkg/bpkg). Make sure
+you have [bpkg](https://github.com/bpkg/bpkg) installed before running the
+command below. You may need to invoke `bpkg` with `sudo` when using the `-g`
+flag.
 
 ```sh
 [sudo] bpkg install -g gitwatch/gitwatch
@@ -176,18 +174,18 @@ the command below. You may need to invoke `bpkg` with `sudo` when using the
 
 ### Archlinux
 
-There is an [AUR](https://aur.archlinux.org/packages/gitwatch-git/) package
-for Archlinux. Install it with you favorite aur helper.
+There is an [AUR](https://aur.archlinux.org/packages/gitwatch-git/) package for
+Archlinux. Install it with you favorite aur helper.
 
 ### NixOS
 
-Starting from NixOS 24.11 this package available in mainline. Additionally,
-you can use receipts from this repository.
+Starting from NixOS 24.11 this package available in mainline. Additionally, you
+can use receipts from this repository.
 
 #### As Module
 
-Each watching path should be described in _submodule_ `services.gitwatch.*`
-like next:
+Each watching path should be described in _submodule_ `services.gitwatch.*` like
+next:
 
 ```nix
 services.gitwatch.<service name> = {
@@ -200,8 +198,7 @@ services.gitwatch.<service name> = {
 ```
 
 This will make NixOS to create `systemd` service named
-`gitwatch-<service name>`. More details you can see at
-`man configuration.nix`.
+`gitwatch-<service name>`. More details you can see at `man configuration.nix`.
 
 #### As Package
 
@@ -215,34 +212,33 @@ isolating dependencies and ensuring a consistent environment.
 ### Docker Compose (Recommended)
 
 The easiest way to run `gitwatch` with Docker is by using the provided
-[`docker-compose.yaml`](./docker-compose.yaml) file. This file is
-configured using environment variables.
+[`docker-compose.yaml`](./docker-compose.yaml) file. This file is configured
+using environment variables.
 
 **1. Prerequisites:**
 
 - **Docker and Docker Compose**: Make sure you have both installed.
-- **A Git Repository**: You need a local directory that is a Git repository
-  you want to watch.
-- **SSH Key**: For pushing to a remote repository, the container needs
-  access to an SSH key that is authorized with your Git provider.
+- **A Git Repository**: You need a local directory that is a Git repository you
+  want to watch.
+- **SSH Key**: For pushing to a remote repository, the container needs access to
+  an SSH key that is authorized with your Git provider.
 
 **2. Configuration:**
 
-You must configure the `docker-compose.yaml` file before running it,
-primarily the `volumes` and `environment` sections.
+You must configure the `docker-compose.yaml` file before running it, primarily
+the `volumes` and `environment` sections.
 
-**Warning:** To avoid file permission errors when mounting a local
-directory (volume), you **must** set the `PUID` and `PGID` environment
-variables in the `docker-compose.yaml` file to match your host user's ID.
-You can find these on your host machine by running `id -u` (for PUID) and
-`id -g` (for PGID). Please review the comments within the
-[`docker-compose.yaml`](./docker-compose.yaml) file for detailed
-instructions on setting volumes and environment variables.
+**Warning:** To avoid file permission errors when mounting a local directory
+(volume), you **must** set the `PUID` and `PGID` environment variables in the
+`docker-compose.yaml` file to match your host user's ID. You can find these on
+your host machine by running `id -u` (for PUID) and `id -g` (for PGID). Please
+review the comments within the [`docker-compose.yaml`](./docker-compose.yaml)
+file for detailed instructions on setting volumes and environment variables.
 
-**3. Environment Variables**
+**3. Environment Variables:**
 
-The following environment variables are available for configuring the
-`gitwatch` container:
+The following environment variables are available for configuring the `gitwatch`
+container:
 
 | Variable               | Default Value          | Description                                                                                                                             |
 | :--------------------- | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------------------- |
@@ -302,8 +298,8 @@ The following environment variables are available for configuring the
 ### Using the Dockerfile
 
 If you prefer to build the Docker image yourself, you can use the provided
-`Dockerfile`. This is useful if you want to customize the image with
-additional tools or dependencies.
+`Dockerfile`. This is useful if you want to customize the image with additional
+tools or dependencies.
 
 **1. Build the image:**
 
@@ -330,8 +326,8 @@ docker run -d \
     gitwatch
 ```
 
-**Important:** Remember to replace `/path/to/your/repo` with the actual
-path to the Git repository you want to watch.
+**Important:** Remember to replace `/path/to/your/repo` with the actual path to
+the Git repository you want to watch.
 
 ## Requirements
 
@@ -340,28 +336,26 @@ To run this script, you must have installed and globally available:
 - **Git:** ([Git](https://github.com/git/git) |
   [git-scm](http://www.git-scm.com))
 - **File Watcher:** Either `inotifywait` (part of
-  **[inotify-tools](https://github.com/rvoicilas/inotify-tools)**, for
-  Linux) or `fswatch` (for macOS/BSD).
-- **Locking:** `flock` (part of `util-linux` on most Linux distributions).
-  This is required for process locking unless explicitly disabled with the
-  `-n` flag.
-- **Timeout:** `timeout` (part of `coreutils` on most Linux/macOS
-  distributions) for robust Git operations.
-- **Debouncing:** `pkill` (part of `procps` on Linux or `proctools` on
-  macOS) for robustly managing debounce timers.
+  **[inotify-tools](https://github.com/rvoicilas/inotify-tools)**, for Linux) or
+  `fswatch` (for macOS/BSD).
+- **Locking:** `flock` (part of `util-linux` on most Linux distributions). This
+  is required for process locking unless explicitly disabled with the `-n` flag.
+- **Timeout:** `timeout` (part of `coreutils` on most Linux/macOS distributions)
+  for robust Git operations.
+- **Debouncing:** `pkill` (part of `procps` on Linux or `proctools` on macOS)
+  for robustly managing debounce timers.
 
 The script automatically detects the appropriate watcher tool based on your
 operating system.
 
 ## Local Testing
 
-This project uses [BATS](https://github.com/bats-core/bats-core) for
-testing. The easiest way to run the full test suite is by using the
-provided `Makefile`.
+This project uses [BATS](https://github.com/bats-core/bats-core) for testing.
+The easiest way to run the full test suite is by using the provided `Makefile`.
 
-1. **Install Dependencies**: Follow the instructions in `CONTRIBUTING.md`
-   to install the runtime and testing dependencies (like `bats-core`,
-   `shellcheck`, etc.).
+1. **Install Dependencies**: Follow the instructions in `CONTRIBUTING.md` to
+   install the runtime and testing dependencies (like `bats-core`, `shellcheck`,
+   etc.).
 
 2. **Install Hooks**: Install the `pre-commit` hooks, which will ensure all
    linting passes before you commit.
@@ -380,44 +374,42 @@ provided `Makefile`.
 
 When you start the script, it first performs critical checks:
 
-1. **Permission Check:** Verifies the user has read/write/execute
-   permissions on the target directory and the `.git` directory.
+1. **Permission Check:** Verifies the user has read/write/execute permissions on
+   the target directory and the `.git` directory.
 2. **Locking Check:** Attempts to acquire a non-blocking process lock using
-   `flock` to prevent multiple instances from running concurrently on the
-   same repository.
-3. **Optional Startup Commit:** If the `-f` flag is provided, it commits
-   any pending staged changes before starting the watch loop.
+   `flock` to prevent multiple instances from running concurrently on the same
+   repository.
+3. **Optional Startup Commit:** If the `-f` flag is provided, it commits any
+   pending staged changes before starting the watch loop.
 
 Then it enters the main loop, which runs forever (until forcefully
 stopped/killed), where it:
 
 - **Watches for changes** using `inotifywait` (Linux) or `fswatch` (macOS),
   which block until an event occurs.
-- **Debounces changes** for the configured `SLEEP_TIME` (default 2
-  seconds). The advanced debounce logic is PID-file-based and kills
-  outdated commit timers when new changes arrive, ensuring only one commit
-  runs for a rapid burst of changes.
+- **Debounces changes** for the configured `SLEEP_TIME` (default 2 seconds). The
+  advanced debounce logic is PID-file-based and kills outdated commit timers
+  when new changes arrive, ensuring only one commit runs for a rapid burst of
+  changes.
 - **Stages changes:**
   - Case file: `git add <file>`
   - Case directory: `git add --all .`
-- **Avoids empty commits:** It compares the staged file tree with the HEAD
-  file tree. If only metadata (like file timestamps) has changed, the
-  commit is skipped, and any spurious index entries are unstaged with
-  `git reset --mixed`.
-- **Commits changes:**
-  `git commit -m "Scripted auto-commit on change (<date>)"`
+- **Avoids empty commits:** It compares the staged file tree with the HEAD file
+  tree. If only metadata (like file timestamps) has changed, the commit is
+  skipped, and any spurious index entries are unstaged with `git reset --mixed`.
+- **Commits changes:** `git commit -m "Scripted auto-commit on change (<date>)"`
 - **Optional Pull/Push:** If a remote is defined (`-r`):
   - If `-R` is used, it runs `git pull --rebase <remote>` before pushing.
   - It then pushes to the configured remote/branch (`-b`).
 
 Notes:
 
-- The debouncing mechanism handles rapid, consecutive changes robustly,
-  ensuring one successful commit per burst.
-- `gitwatch` includes graceful shutdown handling (`INT`, `TERM`) and
-  automatic cleanup of lockfiles and timer PIDs via `trap`.
-- Repositories are always watched recursively by default when a directory
-  is the target.
+- The debouncing mechanism handles rapid, consecutive changes robustly, ensuring
+  one successful commit per burst.
+- `gitwatch` includes graceful shutdown handling (`INT`, `TERM`) and automatic
+  cleanup of lockfiles and timer PIDs via `trap`.
+- Repositories are always watched recursively by default when a directory is the
+  target.
 
 ## Usage
 
@@ -460,31 +452,29 @@ Where `<target>` is the file or folder to be watched.
 
 **Arbitrary Code Execution via `-c`**
 
-The `-c` (custom command) flag is a powerful feature that executes
-arbitrary shell commands. This is by design, but it carries inherent
-security risks, especially if `gitwatch` is run as a privileged user or in
-an environment where the repository content (which could be pulled from a
-remote) is not fully trusted.
+The `-c` (custom command) flag is a powerful feature that executes arbitrary
+shell commands. This is by design, but it carries inherent security risks,
+especially if `gitwatch` is run as a privileged user or in an environment where
+the repository content (which could be pulled from a remote) is not fully
+trusted.
 
-**Warning:** Only use the `-c` flag with trusted commands. Never run
-`gitwatch` as root if watching a repository that could be modified by
-untrusted users.
+**Warning:** Only use the `-c` flag with trusted commands. Never run `gitwatch`
+as root if watching a repository that could be modified by untrusted users.
 
 ### Behavior Notes
 
-- **Repository Requirement:** The watched file or directory must already be
-  part of a Git repository.
+- **Repository Requirement:** The watched file or directory must already be part
+  of a Git repository.
 - **Automatic Staging:** For a file target, only the file is staged
   (`` `git add <file>` ``). For a directory target, all changes (adds,
   modifications, deletions) in the directory are staged recursively
   (`` `git add --all .` ``).
 - **Empty Commit Prevention:** `gitwatch` prevents commits if only metadata
-  (like timestamps) has changed, ensuring only meaningful file content or
-  file count changes result in a new commit.
+  (like timestamps) has changed, ensuring only meaningful file content or file
+  count changes result in a new commit.
 - **Symlink Behavior:** `gitwatch` does not follow symlinks. On Linux
-  (`inotifywait`) this is the default, and on macOS (`fswatch`) the `-X`
-  flag is used to ensure symlinks pointing outside the watched directory
-  are ignored.
+  (`inotifywait`) this is the default, and on macOS (`fswatch`) the `-X` flag is
+  used to ensure symlinks pointing outside the watched directory are ignored.
 
 ### Advanced Environment Variables (non-Docker)
 
@@ -492,8 +482,8 @@ For advanced use cases (e.g., running from source or via systemd), you can
 override default script behavior using environment variables:
 
 - `GW_GIT_BIN`: Specify the full path to the `git` binary.
-- `GW_INW_BIN`: Specify the full path to the watcher binary (`inotifywait`
-  or `fswatch`).
+- `GW_INW_BIN`: Specify the full path to the watcher binary (`inotifywait` or
+  `fswatch`).
 - `GW_FLOCK_BIN`: Specify the full path to the `flock` binary.
 - `GW_TIMEOUT_BIN`: Specify the full path to the `timeout` binary (e.g.,
   `gtimeout` on macOS).
@@ -501,34 +491,34 @@ override default script behavior using environment variables:
 - `GW_READ_TIMEOUT`: Overrides the auto-detected event drain timeout (e.g.,
   `0.1` or `1`).
 - `GW_LOG_LINE_LENGTH`: Overrides the default 150-character truncation for
-  _individual lines_ in the `-l`/`-L` commit log. Does not affect the
-  number of lines.
+  _individual lines_ in the `-l`/`-L` commit log. Does not affect the number of
+  lines.
 
 ### Starting on Boot
 
-If you want to have the script auto-started upon boot, the method to do
-this depends on your operating system and distribution.
+If you want to have the script auto-started upon boot, the method to do this
+depends on your operating system and distribution.
 
 Please also note that if either of the paths involved (script or target)
 contains spaces or special characters, you need to escape them accordingly.
 
 #### SysVInit
 
-A central place to put startup scripts on Linux is generally
-`/etc/rc.local`. This file, if it has the +x bit, will be executed upon
-startup, **by the root user account**. If you want to start `gitwatch` from
-`rc.local`, the recommended way to call it is:
+A central place to put startup scripts on Linux is generally `/etc/rc.local`.
+This file, if it has the +x bit, will be executed upon startup, **by the root
+user account**. If you want to start `gitwatch` from `rc.local`, the recommended
+way to call it is:
 
 ```shell
 su -c "/absolute/path/to/script/gitwatch.sh /absolute/path/to/watched/file/or/folder" -l <username> &
 ```
 
-The `<username>` bit should be replaced with your username or that of any
-other (non-root) user account; it only needs write-access to the Git
-repository of the file/folder you want to watch. The ampersand (`&`) at the
-end sends the launched process into the background (this is important if
-you have other calls in `rc.local` after the mentioned line, because the
-`gitwatch` call does not usually return).
+The `<username>` bit should be replaced with your username or that of any other
+(non-root) user account; it only needs write-access to the Git repository of the
+file/folder you want to watch. The ampersand (`&`) at the end sends the launched
+process into the background (this is important if you have other calls in
+`rc.local` after the mentioned line, because the `gitwatch` call does not
+usually return).
 
 #### systemd
 
@@ -537,21 +527,21 @@ This service is designed to run in user space (`--user` flag).
 - If installed to a path other than `/usr/local/bin/gitwatch`, modify the
   `ExecStart` path within `examples/gitwatch@.service` to suit.
 
-- Create the user systemd directory if it does not exist and copy the
-  systemd service file:
+- Create the user systemd directory if it does not exist and copy the systemd
+  service file:
   `mkdir -p "$HOME/.config/systemd/user" && cp examples/gitwatch@.service $HOME/.config/systemd/user`
 
-- Start and enable the service for a given path and arguments by running
-  the following command. The arguments are passed to the service after
-  being escaped.
+- Start and enable the service for a given path and arguments by running the
+  following command. The arguments are passed to the service after being
+  escaped.
 
   ```shell
   systemctl --user --now enable gitwatch@$(systemd-escape -- "'-r url/to/repository' /path/to/folder").service
   ```
 
-  **Note on persistence:** By default, `systemd` user services are
-  terminated when the user logs out. To ensure `gitwatch` runs even when
-  you are not logged in, you must enable "lingering" for your user:
+  **Note on persistence:** By default, `systemd` user services are terminated
+  when the user logs out. To ensure `gitwatch` runs even when you are not logged
+  in, you must enable "lingering" for your user:
 
   ```shell
   loginctl enable-linger <your-username>
@@ -559,42 +549,40 @@ This service is designed to run in user space (`--user` flag).
 
 ### Troubleshooting / FAQ
 
-**Q: My logs show "ERROR: 'git push' failed." and mention
-"non-fast-forward". What do I do?**
+**Q: My logs show "ERROR: 'git push' failed." and mention "non-fast-forward".
+What do I do?**
 
-**A:** This means the remote repository (e.g., `origin`) has changes that
-your local repository does not have. `gitwatch` will not overwrite these
-changes. To fix this:
+**A:** This means the remote repository (e.g., `origin`) has changes that your
+local repository does not have. `gitwatch` will not overwrite these changes. To
+fix this:
 
 1. Stop `gitwatch`.
-2. In your watched repository, run `git pull --rebase` to fetch and apply
-   the remote changes.
+2. In your watched repository, run `git pull --rebase` to fetch and apply the
+   remote changes.
 3. Resolve any merge conflicts that may occur.
 4. Restart `gitwatch`.
 
-To have `gitwatch` attempt this for you automatically, run it with the
-**`-R`** flag.
+To have `gitwatch` attempt this for you automatically, run it with the **`-R`**
+flag.
 
-**Q: My logs show "CRITICAL PERMISSION ERROR: Cannot Access Target
-Directory".**
+**Q: My logs show "CRITICAL PERMISSION ERROR: Cannot Access Target Directory".**
 
-**A:** This means the user running `gitwatch` does not have Read, Write,
-and Execute permissions on the directory it's trying to watch.
+**A:** This means the user running `gitwatch` does not have Read, Write, and
+Execute permissions on the directory it's trying to watch.
 
 - **On Linux/macOS:** Ensure you own the directory. Run
   `sudo chown -R $USER:$USER /path/to/your/repo`.
 - **In Docker:** This is a common problem. You **must** set the `PUID` and
-  `PGID` environment variables in your `docker-compose.yaml` to match your
-  host user's ID. You can find these by running `id -u` and `id -g` on your
-  host machine.
+  `PGID` environment variables in your `docker-compose.yaml` to match your host
+  user's ID. You can find these by running `id -u` and `id -g` on your host
+  machine.
 
 **Q: Can I run multiple `gitwatch` scripts on the same repository?**
 
-**A:** Yes. As of version 0.6+, `gitwatch` creates a unique lockfile based
-on a hash of the _target path_ you are watching. This allows you to run
-multiple instances on the same repository, as long as they are watching
-different files or sub-directories (e.g., one for `/repo/docs` and one for
-`/repo/src`).
+**A:** Yes. As of version 0.6+, `gitwatch` creates a unique lockfile based on a
+hash of the _target path_ you are watching. This allows you to run multiple
+instances on the same repository, as long as they are watching different files
+or sub-directories (e.g., one for `/repo/docs` and one for `/repo/src`).
 
 **Q: My Docker container is "unhealthy". Is it broken?**
 
@@ -603,24 +591,23 @@ container is "unhealthy," it can mean one of two things:
 
 1. The script has crashed (check logs with `docker-compose logs -f`).
 2. The script has entered its automatic "cool-down" period after repeated
-   failures (e.g., it couldn't reach your Git remote). This is normal
-   behavior to prevent spamming. The script will be marked "healthy" again
-   and resume operations after the cool-down period (default: 10 minutes)
-   expires.
+   failures (e.g., it couldn't reach your Git remote). This is normal behavior
+   to prevent spamming. The script will be marked "healthy" again and resume
+   operations after the cool-down period (default: 10 minutes) expires.
 
 **Q: Will `gitwatch` make a new commit if I just `touch` a file?**
 
-**A:** No, `gitwatch` compares file content hashes before committing. It
-will ignore changes that only affect file timestamps or metadata,
-preventing empty commits.
+**A:** No, `gitwatch` compares file content hashes before committing. It will
+ignore changes that only affect file timestamps or metadata, preventing empty
+commits.
 
 **Q: What happens if `gitwatch` tries to push but my remote is ahead
 (non-fast-forward)?**
 
-**A:** `gitwatch` will log an error and skip the push. It will not
-overwrite remote changes. To fix this, you must manually resolve the
-divergence (e.g., `git pull --rebase`). To have `gitwatch` attempt this for
-you automatically, run it with the **`-R`** flag.
+**A:** `gitwatch` will log an error and skip the push. It will not overwrite
+remote changes. To fix this, you must manually resolve the divergence (e.g.,
+`git pull --rebase`). To have `gitwatch` attempt this for you automatically, run
+it with the **`-R`** flag.
 
 **Q: What happens if my `pre-commit` or `pre-push` hook fails?**
 
@@ -630,19 +617,18 @@ running and will retry on the next file change.
 
 **Q: Can I run multiple `gitwatch` scripts on the same repository?**
 
-**A:** Yes, as long as they are watching _different target paths_.
-`gitwatch` creates a unique lockfile for each path it watches, so you can
-safely watch `/repo/docs` and `/repo/src` with separate processes.
+**A:** Yes, as long as they are watching _different target paths_. `gitwatch`
+creates a unique lockfile for each path it watches, so you can safely watch
+`/repo/docs` and `/repo/src` with separate processes.
 
-**Q: What happens if I use the `-R` (rebase) flag and a merge conflict
-occurs?**
+**Q: What happens if I use the `-R` (rebase) flag and a merge conflict occurs?**
 
-**A:** `gitwatch` will gracefully handle the error. It will log the failure
-from `git pull --rebase`, skip the push, and then **stop**. This is by
-design. It leaves the repository in a conflicted state (e.g., `git status`
-will show unmerged paths) so that you can manually resolve the conflict.
-Once you have resolved the conflict and finished the rebase (e.g.,
-`git rebase --continue`), you must restart `gitwatch`.
+**A:** `gitwatch` will gracefully handle the error. It will log the failure from
+`git pull --rebase`, skip the push, and then **stop**. This is by design. It
+leaves the repository in a conflicted state (e.g., `git status` will show
+unmerged paths) so that you can manually resolve the conflict. Once you have
+resolved the conflict and finished the rebase (e.g., `git rebase --continue`),
+you must restart `gitwatch`.
 
 ## Other Articles
 

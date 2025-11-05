@@ -39,6 +39,7 @@
   "hadolint.configFile": ".config/.hadolint.yaml",
   "markdownlint.config": ".config/.markdownlint.yaml",
   "prettier.configPath": ".config/.prettierrc.yaml",
+  "prettier.ignorePath": ".config/.prettierignore",
   "cSpell.enabled": true,
   "cSpell.words": ["hist", "thist"],
   "cSpell.ignorePaths": ["**/*.lock", "**/*.json"],

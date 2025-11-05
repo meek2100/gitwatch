@@ -1,0 +1,12 @@
+Ignore Markdown files (handled by mdformat)
+
+*.md
+
+Ignore Windows scripts
+
+This allows .editorconfig and .gitattributes to be the single
+
+source of truth for their 'crlf' line endings.
+
+*.bat
+*.ps1

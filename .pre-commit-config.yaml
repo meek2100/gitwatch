@@ -7,8 +7,14 @@ repos:
     hooks:
       - id: prettier
         name: Format Code (Prettier)
-        args: ["--config", ".config/.prettierrc.yaml", "--write"]
-        exclude: \.md$
+        args:
+          [
+            "--config",
+            ".config/.prettierrc.yaml",
+            "--write",
+            "--ignore-path",
+            ".config/.prettierignore",
+          ]
   - repo: https://github.com/executablebooks/mdformat
     rev: 1.0.0
     hooks:
@@ -17,7 +23,7 @@ repos:
         entry: mdformat
         language: python
         types: [markdown]
-        args: [--wrap, "75", --number]
+        args: [--wrap, "80", --number]
         additional_dependencies:
           - mdformat-toc
           - mdformat-config
