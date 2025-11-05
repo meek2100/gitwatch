@@ -99,3 +99,70 @@ load 'bats-custom/startup-shutdown'
   run chmod "$ORIGINAL_PERMS" "$GIT_DIR_PATH"
   export PATH="$path_backup"
 }
+
+# (At the end of the file tests/lockfile-nohash.bats)
+@test "lockfile_nohash_writable_git: Falls back to path-based name inside .git when hash commands are missing" {
+  # Skip if 'flock' is not available
+  if ! command -v flock &>/dev/null; then
+    skip "Test skipped: 'flock' command not found."
+  fi
+
+  local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  output_file=$(mktemp "$testdir/output.XXXXX")
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  local target_path="$testdir/local/$TEST_SUBDIR_NAME"
+
+  # 1. Determine the .git path
+  cd "$target_path"
+  local GIT_DIR_PATH
+  GIT_DIR_PATH=$(git rev-parse --absolute-git-dir)
+  assert_success "Failed to find git directory path"
+  cd /tmp # Move out of test dir
+
+  # 2. Temporarily hide hash commands
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  local DUMMY_BIN="$testdir/dummy-bin"
+  mkdir -p "$DUMMY_BIN"
+  local path_backup="$PATH"
+  export PATH="$DUMMY_BIN:$PATH"
+
+  # 3. Assert hash commands are hidden
+  if command -v sha256sum &>/dev/null || command -v md5sum &>/dev/null; then
+    export PATH="$path_backup"
+    fail "Test setup failed: Cannot reliably hide 'sha256sum'/'md5sum'."
+  fi
+
+  # 4. Start gitwatch (Note: .git IS writable)
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$target_path" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
+  GITWATCH_PID=$!
+  sleep 2
+
+  # 5. Assert: Check log output
+  run cat "$output_file"
+  # SHOULD NOT fall back to /tmp
+  refute_output --partial "Falling back to temporary directory."
+  # SHOULD warn about missing hash tools
+  assert_output --partial "Warning: Neither 'sha256sum' nor 'md5sum' found."
+
+  # 6. Calculate the expected path-based "hash" name
+  local target_abs_path
+  target_abs_path=$(cd "$target_path" && pwd -P)
+  local repo_hash_path
+  repo_hash_path="${GIT_DIR_PATH//\//_}" # Replaces / with _
+  local target_hash_path
+  target_hash_path="${target_abs_path//\//_}" # Replaces / with _
+  local expected_basename="gitwatch-repo_${repo_hash_path}-target_${target_hash_path}"
+
+  # Assert the lockfile path is in the .git dir
+  assert_output --partial "Acquired main instance lock (FD 9) on $GIT_DIR_PATH/${expected_basename}.lock"
+
+  # 7. Assert: Process is *still running*
+  run kill -0 "$GITWATCH_PID"
+  assert_success "Gitwatch process exited unexpectedly"
+
+  # 8. Cleanup
+  export PATH="$path_backup"
+  cd /tmp
+}

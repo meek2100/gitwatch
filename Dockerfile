@@ -29,15 +29,13 @@ ENV GITWATCH_DOCKER_ENV=true
 # Switch to the non-root user for build/runtime defaults
 USER appuser
 
-# Healthcheck: Checks if the watcher process is active.
-# The main process (PID 1)
-# is gitwatch.sh, and if it crashes, the container will stop automatically.
-HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
-  CMD bash -c ' \
-    # LIVENESS CHECK: Confirm the essential child watcher process is active.
-    # Checks all process command lines for the watcher tool string ("inotifywait").
-    cat /proc/*/cmdline 2>/dev/null | \
-    grep -q "inotifywait" \
-  '
+# Healthcheck: Checks for a status file managed by the script.
+# 1. `test -f`: Fails if the file is missing (e.g., script crashed or is in cool-down).
+# 2. `find ... -mmin -3`: Fails if the file exists but is "stale" (older than 3 minutes),
+#    indicating the main watch loop is hung on a read or git command.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD test -f /tmp/gitwatch.status && \
+      find /tmp -maxdepth 1 -name gitwatch.status -mmin -3 | grep -q . || \
+      exit 1
 
 ENTRYPOINT ["/app/entrypoint.sh"]
