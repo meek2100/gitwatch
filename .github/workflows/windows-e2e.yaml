@@ -109,3 +109,84 @@ jobs:
           Remove-Item "C:\gitwatch test dir with spaces" -Recurse -Force -ErrorAction SilentlyContinue
           Remove-Item "C:\gitwatch.log" -ErrorAction SilentlyContinue
           Remove-Item "C:\gitwatch.err" -ErrorAction SilentlyContinue
+  test-windows-installer-logic:
+    name: "Test Windows Installer Logic (${{ matrix.distro-name }})"
+    runs-on: windows-latest
+    needs:
+      - windows-e2e-test
+    strategy:
+      matrix:
+        include:
+          - distro-name: Fedora
+            os-id: ID=fedora
+            expected-pkg: dnf
+          - distro-name: Alpine
+            os-id: ID=alpine
+            expected-pkg: apk
+          - distro-name: openSUSE
+            os-id: ID=opensuse
+            expected-pkg: zypper
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - name: Create mock wsl.exe
+        shell: powershell
+        run: >
+          # Create a mock bin directory and add it to the start of the PATH
+          $mockDir = Join-Path $env:GITHUB_WORKSPACE "mock-bin"
+          New-Item -Path $mockDir -ItemType Directory
+          $env:PATH = "$mockDir;" + $env:PATH
+
+          # Create a mock wsl.bat that only responds to the 'cat
+          /etc/os-release' command
+          # It will echo the OS ID from the build matrix
+          $mockContent =
+          @"@echo off
+          if "%1 %2 %3" == "-e cat /etc/os-release" (
+          echo "${{ matrix.os-id }}"
+          ) else (
+          echo MOCK_WSL_ERROR: Unexpected call: %* >&2
+          exit 1
+          )
+          "@
+
+          New-Item -Path (Join-Path $mockDir "wsl.bat") -Value $mockContent
+          Write-Host "Mock wsl.bat created."
+          Write-Host "Updated PATH: $env:PATH"
+          Get-Command wsl.bat | Format-Table
+      - name: Run installer detection logic
+        shell: powershell
+        run: |
+          # This block is extracted directly from examples/windows/install.ps1
+          # It will now use our MOCK wsl.bat
+          Write-Host "Running detection logic with mock OS_ID: ${{ matrix.os-id
+          }}"
+
+          $osRelease = wsl.exe -e cat /etc/os-release
+          $pkgManager = ""
+
+          if ($osRelease -like "*ID=ubuntu*" -or $osRelease -like "*ID=debian*")
+          {
+              $pkgManager = "apt-get"
+          } elseif ($osRelease -like "*ID=fedora*" -or $osRelease -like
+          "*ID=rhel*" -or $osRelease -like "*ID=centos*") {
+              $pkgManager = "dnf"
+          } elseif ($osRelease -like "*ID=alpine*") {
+              $pkgManager = "apk"
+          } elseif ($osRelease -like "*ID=sles*" -or $osRelease -like
+          "*ID=opensuse*") {
+              $pkgManager = "zypper"
+          }
+
+          # Assert the expected package manager
+          $expectedManager = "${{ matrix.expected-pkg }}"
+
+          Write-Host "Detected package manager: $pkgManager"
+          Write-Host "Expected package manager: $expectedManager"
+
+          if ($pkgManager -ne $expectedManager) {
+              Write-Error "Test Failed: For OS_ID '${{ matrix.os-id }}', expected '$expectedManager' but got '$pkgManager'."
+              exit 1
+          }
+
+          Write-Host "Test Passed!" -ForegroundColor Green
