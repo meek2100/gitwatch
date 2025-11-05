@@ -50,7 +50,7 @@ repos:
         name: Fix Mixed Line Endings (LF)
         args: [--fix=lf]
         types: [text]
-        exclude: \.md$
+        exclude: \.bat$|\.ps1$
       - id: check-merge-conflict
         name: Check Merge Conflicts
       - id: check-executables-have-shebangs
