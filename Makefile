@@ -26,7 +26,7 @@ coverage:
 		exit 1; \
 	fi
 	@mkdir -p coverage
-	@kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats tests/*.bats
+	@kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats $(find tests -name "*.bats")
 	@echo "Coverage report generated in ./coverage/index.html"
 
 # Run all pre-commit hooks against all files

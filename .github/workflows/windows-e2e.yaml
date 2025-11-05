@@ -31,9 +31,26 @@ jobs:
           # Run the installer script with Administrator privileges
           Start-Process powershell -Verb RunAs -ArgumentList "-File .\examples\windows\install.ps1"
 
-          # Wait for the installer to finish and PATH to propagate
-          Write-Host "Waiting 30 seconds for installer and PATH to propagate..."
-          Start-Sleep -Seconds 30
+          # Poll for gitwatch.bat to be available in the PATH
+          Write-Host "Waiting up to 60 seconds for gitwatch.bat to be in PATH..."
+          $timeout = 60
+          $counter = 0
+          $found = $false
+          while ($counter -lt $timeout) {
+            # Reload the environment to get the new PATH
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            if (Get-Command gitwatch.bat -ErrorAction SilentlyContinue) {
+              Write-Host "gitwatch.bat found in PATH." -ForegroundColor Green
+              $found = $true
+              break
+            }
+            Start-Sleep -Seconds 1
+            $counter++
+          }
+          if (-not $found) {
+            Write-Error "Timeout: gitwatch.bat did not appear in PATH after 60 seconds."
+            exit 1
+          }
 
       - name: Verify gitwatch.bat --version
         shell: powershell
@@ -84,8 +101,25 @@ jobs:
           # 3. Trigger Change
           Write-Host "Triggering file change..."
           echo "new line" | Add-Content "$testDir\testfile.txt"
-          Write-Host "Waiting 10 seconds for commit to happen (debounce 2s + commit time)..."
-          Start-Sleep -Seconds 10
+
+          # Poll for the new commit hash
+          Write-Host "Waiting up to 30 seconds for new commit hash..."
+          $timeout = 30
+          $counter = 0
+          $newHash = $null
+          while ($counter -lt $timeout) {
+            $newHash = git -C $testDir log -1 --format=%H
+            if ($newHash -ne $initialHash) {
+              Write-Host "New commit detected: $newHash" -ForegroundColor Green
+              break
+            }
+            Start-Sleep -Seconds 1
+            $counter++
+          }
+          if ($newHash -eq $initialHash) {
+            Write-Warning "Timeout: Commit hash did not change after 30 seconds."
+            # Don't exit 1 here, let the final assertion handle the failure
+          }
 
           # 4. Verify Result
           Write-Host "Checking for new commit..."

@@ -34,6 +34,24 @@ jobs:
           os: ${{ matrix.os }}
           setup-bats: true
 
+      - name: Cache apt packages (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt
+          key: ${{ runner.os }}-apt-${{ hashFiles('**/gitwatch.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-apt-
+
+      - name: Cache brew packages (macOS)
+        if: matrix.os == 'macOS-latest'
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/Homebrew
+          key: ${{ runner.os }}-brew-${{ hashFiles('**/gitwatch.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-brew-
+
       - name: Install gitwatch OS dependencies
         shell: bash
         run: |

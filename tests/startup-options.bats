@@ -215,7 +215,7 @@ load 'bats-custom/startup-shutdown'
   expected_version_number=$(cat "$version_file")
 
   # 2. Run gitwatch with -V and verify output/exit status
-  run "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}"
+  run "${BATS_TEST_DIRNAME}/../gitwatch.sh" -V
   assert_success "Running gitwatch -V should exit successfully"
   assert_output "gitwatch.sh version $expected_version_number" "Output should be the version string"
 }
@@ -242,8 +242,7 @@ load 'bats-custom/startup-shutdown'
   local original_perms
 
   # 1. Get original permissions of the target directory
-  if [ "$RUNNER_OS" == "Linux" ];
-  then
+  if [ "$RUNNER_OS" == "Linux" ]; then
     original_perms=$(stat -c "%a" "$target_dir")
   else
     # Use stat -f "%A" for macOS/BSD permissions
@@ -368,4 +367,41 @@ load 'bats-custom/startup-shutdown'
   assert_success "Running gitwatch -h should exit successfully (code 0)"
   assert_output --partial "Usage:"
   assert_output --partial "gitwatch - watch file or directory and git commit all changes"
+}
+
+# --- NEW TEST: Empty Repository Startup ---
+@test "startup_commit_empty_repo: Creates first commit in an empty repository" {
+  local empty_repo_dir
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  empty_repo_dir=$(mktemp -d "$testdir/empty-repo.XXXXX")
+  cd "$empty_repo_dir"
+  git init -q
+  # Git config is required for the commit to succeed
+  git config user.email "test@example.com"
+  git config user.name "BATS Test"
+
+  # Get initial hash (should fail or be empty)
+  local initial_hash
+  initial_hash=$(git log -1 --format=%H 2>/dev/null || echo "no_commit")
+
+  # Start gitwatch
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$empty_repo_dir" &
+  # shellcheck disable=SC2034 # used by teardown
+  GITWATCH_PID=$!
+  sleep 1
+
+  # Create the first file
+  echo "first file" > first.txt
+
+  # Wait for the commit
+  run wait_for_git_change 20 0.5 git log -1 --format=%H
+  assert_success "First commit in empty repo timed out"
+  local final_hash=$output
+  assert_not_equal "$initial_hash" "$final_hash" "Commit hash did not change"
+
+  # Verify commit content
+  run git log -1 --pretty=%B
+  assert_output --partial "first.txt"
+
+  cd /tmp
 }

@@ -44,12 +44,10 @@ load 'bats-custom/startup-shutdown'
   verbose_echo "# DEBUG: --- End log content ---"
 
   # Touch the file (changes timestamp but not content recognized by git status)
-  ## NEW ##
   verbose_echo "# DEBUG: Touching file (touch file1.txt)"
   touch file1.txt
 
   # This is a negative test: wait to ensure a commit *does not* happen
-  ## NEW ##
   verbose_echo "# DEBUG: Sleeping for $WAITTIME seconds to wait for *no* commit..."
   sleep "$WAITTIME" # Use WAITTIME from setup
 
@@ -59,12 +57,14 @@ load 'bats-custom/startup-shutdown'
   assert_success
   local second_commit_hash=$output
 
-  ## NEW ##
-
   verbose_echo "# DEBUG: Second commit hash is $second_commit_hash"
   assert_equal "$first_commit_hash" "$second_commit_hash" "Commit occurred after touch, but shouldn't have"
 
-  ## NEW ##
+  verbose_echo "# DEBUG: Verifying git status is clean (reset worked)..."
+  run git status --porcelain
+  assert_success "git status command failed"
+  assert_output "" "Working directory should be clean after 'touch' (git reset failed)"
+
   verbose_echo "# DEBUG: --- Log content AFTER touch + sleep ---"
   cat "$output_file" >&3
   verbose_echo "# DEBUG: --- End log content ---"

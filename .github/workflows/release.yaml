@@ -55,7 +55,13 @@ jobs:
         run: |
           sed -i "s/%%GITWATCH_VERSION%%/${{ steps.get_version.outputs.version_number }}/g" gitwatch.sh
 
-      # --- MODIFIED STEP ---
+      - name: Update Man Page Date
+        run: |
+          RELEASE_DATE=$(date +'%B %Y')
+          VERSION_NUMBER="${{ steps.get_version.outputs.version_number }}"
+          # Use % as the sed delimiter
+          sed -i "s%.TH \"GITWATCH\" \"1\" \".*\" \"gitwatch.*\" \"User Commands\"%.TH \"GITWATCH\" \"1\" \"${RELEASE_DATE}\" \"gitwatch ${VERSION_NUMBER}\" \"User Commands\"%" gitwatch.1
+
       - name: Consolidate Changelog Fragments and Update CHANGELOG.md
         id: update_changelog
         run: |
@@ -113,7 +119,7 @@ jobs:
           echo "notes<<EOF" >> $GITHUB_OUTPUT
           cat $RELEASE_NOTES_FILE >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-      # --- END MODIFIED STEP ---
+
       - name: Install Formatting Tools
         run: |
           npm install -g prettier
@@ -130,7 +136,9 @@ jobs:
         id: commit_files
         run: |
           # Add the .changelog directory's .gitkeep file
-          git add VERSION package.json CHANGELOG.md gitwatch.sh .changelog/
+          # --- MODIFICATION: Add gitwatch.1 ---
+          git add VERSION package.json CHANGELOG.md gitwatch.sh .changelog/ gitwatch.1
+          # --- END MODIFICATION ---
           if git diff --staged --quiet; then
             echo "No changes to commit."
             echo "committed=false" >> $GITHUB_OUTPUT
@@ -158,6 +166,7 @@ jobs:
           body: ${{ steps.update_changelog.outputs.notes }}
           files: |
             gitwatch.sh
+            gitwatch.1
           draft: false
           prerelease: false
         env:
