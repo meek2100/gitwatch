@@ -116,3 +116,43 @@ load 'bats-custom/startup-shutdown'
 
   cd /tmp
 }
+
+@test "symlinks: Ignores modifications to files outside the repo (via symlink)" {
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+
+  # 1. Create an external file (one level up from the repo)
+  local external_file="$testdir/local/external-file.txt"
+  echo "external data" > "$external_file"
+
+  # 2. Create a symlink pointing outside the repo and commit it
+  # We use a relative path for robustness
+  ln -s "../external-file.txt" link_to_external_file
+  git add .
+  git commit -q -m "Initial external symlink commit"
+  local initial_hash
+  initial_hash=$(git log -1 --format=%H)
+
+  # 3. Start gitwatch
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$testdir/local/$TEST_SUBDIR_NAME" &
+  # shellcheck disable=SC2034 # used by teardown
+  GITWATCH_PID=$!
+  sleep 1
+
+  # 4. Modify the *external* file
+  echo "new external data" >> "$external_file"
+
+  # 5. Wait to ensure NO commit happens
+  verbose_echo "# DEBUG: Waiting ${WAITTIME}s to ensure NO commit happens..."
+  sleep "$WAITTIME"
+
+  # 6. Assert commit hash has NOT changed
+  run git log -1 --format=%H
+  assert_success
+  assert_equal "$initial_hash" "$output" "Commit occurred on external file modify, but should not have."
+
+  # 7. Cleanup external file
+  rm -f "$external_file"
+  cd /tmp
+}
