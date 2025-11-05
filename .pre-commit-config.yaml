@@ -6,7 +6,7 @@ repos:
     rev: "v3.6.2"
     hooks:
       - id: prettier
-      args: ["--config", ".config/.prettierrc.yaml"]
+        args: ["--config", ".config/.prettierrc.yaml", "--write"]
   # - repo: https://github.com/executablebooks/mdformat
   #   rev: 1.0.0
   #   hooks:
@@ -59,7 +59,7 @@ repos:
     rev: v2.4.1
     hooks:
       - id: codespell
-      args: ["--config", ".config/.codespellrc"]
+        args: ["--config", ".config/.codespellrc"]
   - repo: https://github.com/IamTheFij/docker-pre-commit
     rev: v3.0.1
     hooks:
