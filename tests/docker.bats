@@ -149,3 +149,43 @@ get_container_logs() {
   assert_success
   assert_output "$custom_message"
 }
+
+@test "docker_env_vars_advanced: Entrypoint correctly handles QUIET and DISABLE_LOCKING" {
+  local container_name="${DOCKER_CONTAINER_NAME_PREFIX}-4"
+
+  run_container "$container_name" \
+    -e QUIET=true \
+    -e DISABLE_LOCKING=true
+
+  # 1. Check the container logs
+  local logs
+  logs=$(get_container_logs "$container_name")
+
+  # 2. Assert: Logs should NOT contain the startup message (due to QUIET=true)
+  # The entrypoint.sh itself still echoes, but gitwatch.sh will be quiet.
+  run echo "$logs"
+  # Check for the entrypoint message (which still runs)
+  assert_output --partial "Starting gitwatch with the following arguments:"
+  # Check for the flags
+  assert_output --partial " -q "
+  assert_output --partial " -n "
+  # Check that gitwatch.sh *itself* was quiet
+  refute_output --partial "Starting file watch. Command:"
+
+  # 3. Assert: Trigger a change and confirm no log output
+  sleep 2
+  echo "docker quiet change" >> "$TEST_REPO_HOST_DIR/quiet_file.txt"
+  sleep 3 # Wait for commit
+
+  logs=$(get_container_logs "$container_name")
+  run echo "$logs"
+  # The *only* output should be the entrypoint startup line
+  assert_output --partial "Starting gitwatch with the following arguments:"
+  refute_output --partial "Change detected:"
+  refute_output --partial "Running git commit command:"
+
+  # 4. Assert: The commit *did* happen silently
+  run git -C "$TEST_REPO_HOST_DIR" log -1 --format=%B
+  assert_success
+  assert_output --partial "quiet_file.txt"
+}

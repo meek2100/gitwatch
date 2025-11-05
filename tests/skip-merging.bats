@@ -336,3 +336,47 @@ load 'bats-custom/startup-shutdown'
   rm -f "$GIT_DIR_PATH/REVERT_HEAD"
   cd /tmp
 }
+
+@test "skip_if_merging_M_rebase_head: -M flag prevents commit when REBASE_HEAD exists" {
+local output_file
+# shellcheck disable=SC2154 # testdir is sourced via setup function
+output_file=$(mktemp "$testdir/output.XXXXX")
+cd "$testdir/local/$TEST_SUBDIR_NAME"
+local GIT_DIR_PATH
+# shellcheck disable=SC2155 # Declared on previous line
+GIT_DIR_PATH=$(git rev-parse --absolute-git-dir)
+local initial_commit_hash
+initial_commit_hash=$(git log -1 --format=%H)
+
+# 1. Manually create the REBASE_HEAD file to simulate state
+echo "dummy_hash" > "$GIT_DIR_PATH/REBASE_HEAD"
+assert_file_exist "$GIT_DIR_PATH/REBASE_HEAD"
+
+# 2. Start gitwatch with -M flag
+verbose_echo "# DEBUG: Starting gitwatch with -M in a REBASE_HEAD state"
+# shellcheck disable=SC2154 # testdir is sourced via setup function
+"${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+# shellcheck disable=SC2034 # used by teardown
+GITWATCH_PID=$!
+sleep 1
+
+# 3. Trigger a change
+echo "change during rebase_head" >> file_rebase_head.txt
+
+# 4. Wait for the commit attempt to be skipped
+verbose_echo "# DEBUG: Waiting $WAITTIME seconds for the commit attempt to be skipped..."
+sleep "$WAITTIME"
+
+# 5. Assert: Commit hash has NOT changed
+run git log -1 --format=%H
+assert_success
+assert_equal "$initial_commit_hash" "$output" "Commit hash should NOT change while in REBASE_HEAD state"
+
+# 6. Assert: Log output confirms the skip
+run cat "$output_file"
+assert_output --partial "Skipping commit - repo is merging" "Gitwatch should report skipping the commit due to REBASE_HEAD"
+
+# 7. Cleanup: Remove the file so teardown works
+rm -f "$GIT_DIR_PATH/REBASE_HEAD"
+cd /tmp
+}

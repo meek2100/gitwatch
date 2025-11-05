@@ -6,16 +6,12 @@
 }:
 let
   gitwatch = pkgs.callPackage ./gitwatch.nix { };
-  # Helper to generate flag arguments for options that have values (e.g., -s 2)
   getvar =
     flag: var: cfg:
-    # Check for null, empty string, and false for flexibility.
-    # Escape value for shell safety.
     if cfg."${var}" != null && cfg."${var}" != "" && cfg."${var}" != false then
       "${flag} ${lib.strings.escapeShellArg (toString cfg."${var}")}"
     else
       "";
-  # Helper to generate flag arguments for boolean options (e.g., -R)
   getflag =
     flag: var: cfg:
     if cfg."${var}" then "${flag}" else "";
@@ -23,27 +19,23 @@ let
     name: cfg:
     lib.nameValuePair "gitwatch-${name}" (
       let
-        # Options with values
         branchArg = getvar "-b" "branch" cfg;
         remoteArg = getvar "-r" "remote" cfg;
         messageArg = getvar "-m" "message" cfg;
         dateFmtArg = getvar "-d" "dateFmt" cfg;
         sleepTimeArg = getvar "-s" "sleepTime" cfg;
 
-        timeoutArg = getvar "-t" "timeout" cfg; # NEW: Timeout argument
+        timeoutArg = getvar "-t" "timeout" cfg;
         excludePatternArg = getvar "-x" "excludePattern" cfg;
         globExcludePatternArg = getvar "-X" "globExcludePattern" cfg;
         eventsArg = getvar "-e" "events" cfg;
         gitDirArg = getvar "-g" "gitDir" cfg;
-
-        # Log diff line options (-l or -L)
         logDiffLinesArg =
           if cfg.logDiffLines != null then
             getvar (if cfg.logDiffNoColor then "-L" else "-l") "logDiffLines" cfg
           else
             "";
 
-        # Boolean options (flags)
         pullBeforePushFlag = getflag "-R" "pullBeforePush" cfg;
         skipIfMergingFlag = getflag "-M" "skipIfMerging" cfg;
         commitOnStartFlag = getflag "-f" "commitOnStart" cfg;
@@ -51,16 +43,12 @@ let
         verboseFlag = getflag "-v" "verbose" cfg;
         quietFlag = getflag "-q" "quiet" cfg;
         passDiffsFlag = getflag "-C" "passDiffs" cfg;
-        disableLockingFlag = getflag "-n" "disableLocking" cfg; # NEW: No-lock flag
-
-        # NEW: Environment variable for log line length
+        disableLockingFlag = getflag "-n" "disableLocking" cfg;
         logLineLengthEnv =
           if cfg.logLineLength != null then
             "GW_LOG_LINE_LENGTH=${lib.strings.escapeShellArg (toString cfg.logLineLength)}"
           else
             "";
-
-        # Custom command args (special handling to use -c and override -m/-l if present)
         customCommandArgs =
           if cfg.customCommand != null then
             lib.strings.concatStringsSep " " (
@@ -71,7 +59,16 @@ let
             )
           else
             "";
-        # Combine all arguments into a single string
+        messageAndLogArgs =
+          if cfg.customCommand != null then
+            customCommandArgs
+          else
+            lib.strings.concatStringsSep " " (
+              lib.lists.filter (s: s != "") [
+                messageArg
+                logDiffLinesArg
+              ]
+            );
         allArgs = lib.strings.concatStringsSep " " (
           lib.lists.filter (s: s != "") [
             remoteArg
@@ -83,21 +80,16 @@ let
             globExcludePatternArg
             eventsArg
             gitDirArg
-            logDiffLinesArg # NEW: timeoutArg
             pullBeforePushFlag
             skipIfMergingFlag
             commitOnStartFlag
             useSyslogFlag
             (if cfg.quiet then quietFlag else verboseFlag)
-            disableLockingFlag # NEW: Added flag
-            # Special handling for commit message: custom command overrides -m
-            (if cfg.customCommand != null then customCommandArgs else messageArg)
-            # The path must be the last argument
-            (lib.strings.escapeShellArg cfg.path)
+            disableLockingFlag
+            messageAndLogArgs
+          (lib.strings.escapeShellArg cfg.path)
           ]
         );
-        # Determine initial fetch command (git clone)
-        # Only include branchArg if it's set and we are cloning
         cloneBranchArg = if cfg.branch != null then "-b ${lib.strings.escapeShellArg cfg.branch}" else "";
         fetcher =
           if cfg.remote == null then
@@ -111,7 +103,6 @@ let
       in
       {
         inherit (cfg) enable;
-        # Use simple for service type, as gitwatch handles backgrounding if necessary
         serviceConfig.Type = "simple";
         after = [ "network-online.target" ];
         wantedBy = [ "multi-user.target" ];
@@ -122,9 +113,8 @@ let
             gitwatch
             git
             openssh
-            # NEW: Add coreutils (for timeout), flock, and watcher tools
-            coreutils # Provides 'timeout'
-            flock # For robust locking
+            coreutils
+            flock
           ]
           ++ lib.optionals pkgs.stdenv.isLinux [ inotify-tools ]
           ++ lib.optionals pkgs.stdenv.isDarwin [ fswatch ];
@@ -201,7 +191,6 @@ in
             type = nullOr str;
             default = null;
           };
-          # NEW BOOLEAN OPTIONS (FLAGS)
           pullBeforePush = lib.mkOption {
             description = "If true, run 'git pull --rebase' before push (-R).";
             type = bool;
