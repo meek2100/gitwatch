@@ -1,7 +1,8 @@
 FROM alpine:3.20
 
 # Create a non-root user and group first
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# --- FIX: Added '-s /bin/bash' to set a valid login shell ---
+RUN addgroup -S appgroup && adduser -S -s /bin/bash appuser -G appgroup
 
 # Consolidate RUN commands, remove all version pins
 # This allows apk to resolve dependencies correctly.

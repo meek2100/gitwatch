@@ -24,5 +24,10 @@
   "remoteEnv": {
     "BATS_LIB_PATH": "/workspaces/gitwatch/tests"
   },
-  "overrideCommand": false
+  // --- FIX ---
+  // This overrides the Dockerfile's ENTRYPOINT.
+  // Instead of running entrypoint.sh (which runs gitwatch.sh),
+  // this keeps the container alive so VS Code can attach a shell for development.
+  "overrideCommand": true,
+  "command": "sleep infinity"
 }
