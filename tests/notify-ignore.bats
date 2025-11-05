@@ -91,7 +91,6 @@ load 'bats-custom/startup-shutdown'
 
   # 2. Assert hash changed (commit happened due to allowed file)
   assert_not_equal "$initial_hash" "$final_commit_hash" "Commit failed on allowed file."
-
   # 3. Assert: Log confirms all events were processed but one commit occurred.
   run cat "$output_file"
   # *** MODIFIED ASSERTION ***
@@ -159,6 +158,49 @@ load 'bats-custom/startup-shutdown'
   run git status --porcelain --ignored
   assert_output --partial "!! app.log"
   assert_output --partial "!! build/"
+
+  cd /tmp
+}
+
+# --- NEW TEST ---
+@test "notify_ignore_git_dir: -x ignores explicit watch on .git subdirectory" {
+  local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  output_file=$(mktemp "$testdir/output.XXXXX")
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+  local git_hooks_dir
+  git_hooks_dir=$(git rev-parse --git-path hooks)
+  local target_path="$git_hooks_dir" # Watch inside .git
+
+  # 1. Get initial hash
+  local initial_hash
+  initial_hash=$(git log -1 --format=%H)
+
+  # 2. Start gitwatch, explicitly targeting a path inside .git
+  # The script should *still* apply the default .git exclusion
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$target_path" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
+  GITWATCH_PID=$!
+  sleep 1 # Allow watcher to initialize
+
+  # 3. Create a change *inside* the watched .git/hooks directory
+  echo "#!/bin/bash" > "$git_hooks_dir/pre-commit"
+  chmod +x "$git_hooks_dir/pre-commit"
+
+  # 4. Wait to ensure no commit happens
+  verbose_echo "# DEBUG: Waiting ${WAITTIME}s to ensure NO commit happens on '.git' change..."
+  sleep "$WAITTIME"
+
+  # 5. Assert commit hash has NOT changed
+  run git log -1 --format=%H
+  assert_success
+  assert_equal "$initial_hash" "$output" "Commit occurred on a file inside .git, but it should have been ignored"
+
+  # 6. Verify log output confirms the watcher started but did not commit
+  run cat "$output_file"
+  assert_output --partial "Starting file watch. Command:"
+  refute_output --partial "Running git commit command:"
 
   cd /tmp
 }

@@ -617,6 +617,32 @@ container is "unhealthy," it can mean one of two things:
    and resume operations after the cool-down period (default: 10 minutes)
    expires.
 
+**Q: Will `gitwatch` make a new commit if I just `touch` a file?**
+
+**A:** No, `gitwatch` compares file content hashes before committing. It
+will ignore changes that only affect file timestamps or metadata,
+preventing empty commits.
+
+**Q: What happens if `gitwatch` tries to push but my remote is ahead
+(non-fast-forward)?**
+
+**A:** `gitwatch` will log an error and skip the push. It will not
+overwrite remote changes. To fix this, you must manually resolve the
+divergence (e.g., `git pull --rebase`). To have `gitwatch` attempt this for
+you automatically, run it with the **`-R`** flag.
+
+**Q: What happens if my `pre-commit` or `pre-push` hook fails?**
+
+**A:** `gitwatch` will gracefully handle the failure. It will log the error
+message from the hook and skip the commit or push. The script will continue
+running and will retry on the next file change.
+
+**Q: Can I run multiple `gitwatch` scripts on the same repository?**
+
+**A:** Yes, as long as they are watching _different target paths_.
+`gitwatch` creates a unique lockfile for each path it watches, so you can
+safely watch `/repo/docs` and `/repo/src` with separate processes.
+
 ## Other Articles
 
 ### On the Gitwatch Wiki

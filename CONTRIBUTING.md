@@ -77,7 +77,6 @@ for testing.
    errors. If it fails, fix the errors and run `git commit` again.
 
 5. **Open a Pull Request:** Push your branch to GitHub and open a Pull
-   Request against the `master` branch. The `CHANGELOG.md` will be updated
-   automatically when your PR is merged.
+   Request against the `master` branch.
 
 Thank you for contributing!

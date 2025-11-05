@@ -22,9 +22,7 @@
   "[markdown]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.wordWrap": "on",
-    "editor.rulers": [
-      90
-    ]
+    "editor.rulers": [90]
   },
   "[dockerfile]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
@@ -33,10 +31,7 @@
     "editor.defaultFormatter": "jnoortheen.nix-ide"
   },
   "shellcheck.enable": true,
-  "shellcheck.customArgs": [
-    "--rcfile",
-    ".config/.shellcheckrc"
-  ],
+  "shellcheck.customArgs": ["--rcfile", ".config/.shellcheckrc"],
   "yaml.validate": true,
   "yaml.lint.enable": true,
   "yaml.lint.config": ".config/.yamllint.yaml",
@@ -45,14 +40,8 @@
   "markdownlint.config": ".config/.markdownlint.yaml",
   "prettier.configPath": ".config/.prettierrc.yaml",
   "cSpell.enabled": true,
-  "cSpell.words": [
-    "hist",
-    "thist"
-  ],
-  "cSpell.ignorePaths": [
-    "**/*.lock",
-    "**/*.json"
-  ],
+  "cSpell.words": ["hist", "thist"],
+  "cSpell.ignorePaths": ["**/*.lock", "**/*.json"],
   "bats.testExplorer.paths": [
     {
       "pattern": "tests/**/*.bats",
