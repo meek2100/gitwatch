@@ -231,7 +231,6 @@ in
             type = bool;
             default = false;
           };
-          # NEW: No-lock option
           disableLocking = lib.mkOption {
             description = "If true, disable file locking and bypass flock dependency check (-n).";
             type = bool;

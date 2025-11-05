@@ -82,7 +82,7 @@ load 'bats-custom/startup-shutdown'
   # verbose_echo "# DEBUG: Commit count found: $commit_count"
   # assert_equal "$commit_count" "1" # Only the initial commit should have run
 
-  # --- NEW: Verify commit history directly (Robust) ---
+  # --- Verify commit history directly (Robust) ---
   # --- Verify commit history directly ---
   verbose_echo "# DEBUG: Verifying total commit count using git rev-list"
   # Count total commits: Initial commit (1) + commit from 'echo line1' (1) = 2

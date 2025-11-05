@@ -268,6 +268,8 @@ The following environment variables are available for configuring the
 | `DATE_FMT`             | `"+%Y-%m-%d %H:%M:%S"` | The date format used in the commit message (`-d`).                                                                                      |
 | `COMMIT_CMD`           | `""`                   | Custom shell command to generate the entire commit message (`-c`). Overrides `COMMIT_MSG`.                                              |
 | `PASS_DIFFS`           | `"false"`              | Set to `"true"` to pipe the list of changed files to `COMMIT_CMD` (`-C`).                                                               |
+| `LOG_DIFF_LINES`       | `""`                   | (Optional) Sets the number of diff lines to include in the commit message (`-l` or `-L`). Only used if `COMMIT_CMD` is empty.           |
+| `LOG_DIFF_NO_COLOR`    | `"false"`              | (Optional) Set to `"true"` to use `-L` (no color) with `LOG_DIFF_LINES`.                                                                |
 | `EVENTS`               | `""`                   | Events passed to the underlying watcher tool (`-e`). Uses platform defaults if empty.                                                   |
 | `EXCLUDE_PATTERN`      | `""`                   | A comma-separated list of glob patterns to exclude from monitoring (`-X`).                                                              |
 | `RAW_EXCLUDE_REGEX`    | `""`                   | A raw regex pattern to exclude from monitoring (`-x`).                                                                                  |
@@ -277,9 +279,14 @@ The following environment variables are available for configuring the
 | `QUIET`                | `"false"`              | Set to `"true"` to suppress all stdout/stderr output (`-q`). Overrides `VERBOSE`.                                                       |
 | `USE_SYSLOG`           | `"false"`              | Set to `"true"` to log all messages to syslog (`-S`).                                                                                   |
 | `DISABLE_LOCKING`      | `"false"`              | Set to `"true"` to disable file locking (`-n`). Bypasses `flock` dependency check.                                                      |
-| `GW_LOG_LINE_LENGTH`   | `150`                  | Overrides the default 150-character truncation for _individual lines_ in the `-l`/`-L` commit log. Does not affect the number of lines. |
+| `GW_LOG_LINE_LENGTH`   | `150`                  | Overrides the default 150-character truncation for *individual lines* in the `-l`/`-L` commit log. Does not affect the number of lines. |
 | `GW_MAX_FAIL_COUNT`    | `5`                    | (Optional) Number of consecutive git failures before entering cool-down.                                                                |
 | `GW_COOL_DOWN_SECONDS` | `600`                  | (Optional) Cool-down time in seconds after hitting max failures.                                                                        |
+| `GW_GIT_BIN`           | `""`                   | (Optional) Specify the full path *inside the container* to a custom `git` binary.                                                       |
+| `GW_INW_BIN`           | `""`                   | (Optional) Specify the full path *inside the container* to a custom `inotifywait` or `fswatch` binary.                                  |
+| `GW_FLOCK_BIN`         | `""`                   | (Optional) Specify the full path *inside the container* to a custom `flock` binary.                                                     |
+| `GW_TIMEOUT_BIN`       | `""`                   | (Optional) Specify the full path *inside the container* to a custom `timeout` binary.                                                   |
+| `GW_PKILL_BIN`         | `""`                   | (Optional) Specify the full path *inside the container* to a custom `pkill` binary.                                                     |
 
 <!-- prettier-ignore-end -->
 
@@ -441,7 +448,7 @@ Where `<target>` is the file or folder to be watched.
 | `-t`   | `<secs>`      | `60`                   | **Git Timeout.** Timeout in seconds for critical Git operations (commit, pull, push).                                                                                                                          |
 | `-d`   | `<fmt>`       | `"+%Y-%m-%d %H:%M:%S"` | **Date Format.** Format string for the timestamp (`%d`) in the commit message (see `man date`).                                                                                                                |
 | `-r`   | `<remote>`    | _None_                 | **Push Remote.** Specifies a remote to push to after every successful commit.                                                                                                                                  |
-| `-R`   | _None_        | _None_                 | **Pull/Rebase.** If used with `-r`, performs a `git pull --rebase` before the push.                                                                                                                            |
+| `-R`   | _None_        | _None_                 | **Pull/Rebase.** If used with `-r`, performs a `git pull --rebase` before the push. Note: To use `-R` when in a detached HEAD state, you must also provide `-b <branch>` to specify which branch to pull from. |
 | `-b`   | `<branch>`    | _Current_              | **Target Branch.** Specifies the branch to push to.                                                                                                                                                            |
 | `-g`   | `<path>`      | _None_                 | **Git Dir.** Specifies the path to an external `.git` directory (`--git-dir`).                                                                                                                                 |
 | `-l`   | `<lines>`     | `-1`                   | **Log Changes (Color).** Includes diff lines in the commit message, up to `<lines>` count (use `0` for unlimited).                                                                                             |
@@ -459,7 +466,6 @@ Where `<target>` is the file or folder to be watched.
 | `-q`   | _None_        | _None_                 | **Quiet.** Suppress all stdout and stderr output (overridden by `-S`).                                                                                                                                         |
 | `-n`   | _None_        | _None_                 | **No Lock.** Disables file locking and bypasses the `flock` dependency check.                                                                                                                                  |
 | `-V`   | _None_        | _None_                 | **Version.** Prints version information and exits.                                                                                                                                                             |
-| `-R`   | _None_        | _None_                 | **Pull/Rebase.** If used with `-r`, performs a `git pull --rebase` before the push. Note: To use `-R` when in a detached HEAD state, you must also provide `-b <branch>` to specify which branch to pull from. |
 
 ### Security Considerations
 

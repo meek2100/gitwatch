@@ -57,7 +57,7 @@ create_dummy_bin() {
   # shellcheck disable=SC2155 # Declared on previous line
   dummy_flock=$(create_dummy_bin "flock" "$real_flock_path" "FLOCK_OK")
 
-  # --- NEW: Create dummy timeout ---
+  # --- Create dummy timeout ---
   local real_timeout_path
   real_timeout_path=$(command -v timeout)
   local dummy_timeout
@@ -65,7 +65,7 @@ create_dummy_bin() {
   dummy_timeout=$(create_dummy_bin "timeout" "$real_timeout_path" "TIMEOUT_OK")
   # --- End new dummy timeout ---
 
-  # --- NEW: Create dummy pkill ---
+  # --- Create dummy pkill ---
   local real_pkill_path
   real_pkill_path=$(command -v pkill)
   local dummy_pkill
@@ -77,8 +77,8 @@ create_dummy_bin() {
   export GW_GIT_BIN="$dummy_git"
   export GW_INW_BIN="$dummy_inw"
   export GW_FLOCK_BIN="$dummy_flock"
-  export GW_TIMEOUT_BIN="$dummy_timeout" # --- NEW: Export dummy timeout bin ---
-  export GW_PKILL_BIN="$dummy_pkill"     # --- NEW: Export dummy pkill bin ---
+  export GW_TIMEOUT_BIN="$dummy_timeout" # --- Export dummy timeout bin ---
+  export GW_PKILL_BIN="$dummy_pkill"     # --- Export dummy pkill bin ---
 
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -102,12 +102,12 @@ create_dummy_bin() {
   assert_output --partial "*** DUMMY BIN: GIT_OK ***" "Dummy Git command was not executed or its message not captured"
   assert_output --partial "*** DUMMY BIN: INW_OK ***" "Dummy Inotifywait command was not executed or its message not captured"
   assert_output --partial "*** DUMMY BIN: FLOCK_OK ***" "Dummy Flock command was not executed or its message not captured"
-  # --- NEW: Assert dummy timeout was used ---
+  # --- Assert dummy timeout was used ---
   # Note: The dependency check for GNU timeout will fail if the dummy bin doesn't forward --version.
   # The create_dummy_bin helper *does* forward all args, so this test is valid.
   assert_output --partial "*** DUMMY BIN: TIMEOUT_OK ***" "Dummy Timeout command was not executed or its message not captured"
 
-  # --- NEW: Trigger debounce logic to check for pkill ---
+  # --- Trigger debounce logic to check for pkill ---
   echo "change_for_pkill_1" >> file_dummy.txt
   sleep 0.1 # Must be less than script sleep time (1s)
   echo "change_for_pkill_2" >> file_dummy.txt
@@ -122,7 +122,7 @@ create_dummy_bin() {
   unset GW_GIT_BIN
   unset GW_INW_BIN
   unset GW_FLOCK_BIN
-  unset GW_TIMEOUT_BIN # --- NEW: Unset dummy timeout bin ---
-  unset GW_PKILL_BIN   # --- NEW: Unset dummy pkill bin ---
+  unset GW_TIMEOUT_BIN # --- Unset dummy timeout bin ---
+  unset GW_PKILL_BIN   # --- Unset dummy pkill bin ---
   cd /tmp
 }

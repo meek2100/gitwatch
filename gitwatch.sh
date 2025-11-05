@@ -92,7 +92,7 @@ GITWATCH_VERSION="%%GITWATCH_VERSION%%"
 
 # --- Global Configuration Constants ---
 TIMEOUT=${GW_TIMEOUT:-60} # Timeout for critical Git operations (commit, pull, push). Default is 60s.
-# NEW: Configurable line length for diff-lines output
+# Configurable line length for diff-lines output
 LOG_LINE_LENGTH=${GW_LOG_LINE_LENGTH:-150}
 # --------------------------------------
 
@@ -122,8 +122,8 @@ EVENTS="" # User-defined events
 EXCLUDE_PATTERN="" # Raw regex from -x
 GLOB_EXCLUDE_PATTERN="" # Glob list from -X
 USE_SYSLOG=0
-QUIET=0 # NEW: Quiet mode flag
-NO_LOCK=0 # NEW: No-lock flag
+QUIET=0 # Quiet mode flag
+NO_LOCK=0 # No-lock flag
 
 # Print a message about how to use this script
 shelp() {
@@ -213,7 +213,7 @@ shelp() {
 
 # print all arguments to stderr
 stderr() {
-  if [ "$QUIET" -eq 1 ]; then return 0; fi # NEW: Suppress output
+  if [ "$QUIET" -eq 1 ]; then return 0; fi # Suppress output
   if [ "$USE_SYSLOG" -eq 1 ]; then
     logger -t "${0##*/}" -p daemon.error "$@" # Use script name as tag
   else
@@ -223,7 +223,7 @@ stderr() {
 
 # print all arguments to stdout if in verbose mode
 verbose_echo() {
-  if [ "$QUIET" -eq 1 ]; then return 0; fi # NEW: Suppress output
+  if [ "$QUIET" -eq 1 ]; then return 0; fi # Suppress output
   if [ "$VERBOSE" -eq 1 ]; then
     if [ "$USE_SYSLOG" -eq 1 ]; then
       logger -t "${0##*/}" -p daemon.info "$@" # Use script name as tag
@@ -283,7 +283,7 @@ is_command() {
   command -v "$1" &> /dev/null
 }
 
-# --- NEW: Helper to generate a unique hash for a path ---
+# --- Helper to generate a unique hash for a path ---
 # Used for lockfiles and PID files to ensure uniqueness
 _get_path_hash() {
   local path_to_hash="$1"
@@ -443,7 +443,7 @@ while getopts b:d:h:g:L:l:m:c:C:p:r:s:t:e:x:X:MRvSfVqn option; do # Process comm
     p | r) REMOTE=${OPTARG} ;;
     R) PULL_BEFORE_PUSH=1 ;;
     s) SLEEP_TIME=${OPTARG} ;;
-    t) TIMEOUT=${OPTARG} ;; # New: Set timeout
+    t) TIMEOUT=${OPTARG} ;; # Set timeout
     S) USE_SYSLOG=1 ;;
     v)
       VERBOSE=1
@@ -456,8 +456,8 @@ while getopts b:d:h:g:L:l:m:c:C:p:r:s:t:e:x:X:MRvSfVqn option; do # Process comm
     x) EXCLUDE_PATTERN=${OPTARG} ;; # Raw Regex
     X) GLOB_EXCLUDE_PATTERN=${OPTARG} ;; # Glob/List to be converted
     e) EVENTS=${OPTARG} ;;
-    q) QUIET=1 ;; # NEW: Set quiet mode
-    n) NO_LOCK=1 ;; # NEW: Set no-lock mode
+    q) QUIET=1 ;; # Set quiet mode
+    n) NO_LOCK=1 ;; # Set no-lock mode
     *)
       stderr "Error: Option '${option}' does not exist."
       shelp
@@ -663,7 +663,7 @@ verbose_echo "Dependency checks complete."
 
 
 # Determine the appropriate read timeout based on bash version
-# New: Allow override via environment variable
+# Allow override via environment variable
 READ_TIMEOUT="${GW_READ_TIMEOUT:-}"
 
 if [ -z "$READ_TIMEOUT" ]; then
@@ -708,7 +708,7 @@ if [ -n "${GLOB_EXCLUDE_PATTERN:-}" ]; then
   # 5. Convert glob stars `*` into the regex equivalent `.*`
   PROCESSED_GLOB_PATTERN=${PROCESSED_GLOB_PATTERN//\*/.*}
 
-  # 6. NEW: Convert glob question mark `?` into regex single-char wildcard `.`
+  # 6. Convert glob question mark `?` into regex single-char wildcard `.`
   PROCESSED_GLOB_PATTERN=${PROCESSED_GLOB_PATTERN//\?/.}
 fi
 # --- End Conversion ---
@@ -729,7 +729,7 @@ if [ -d "$USER_PATH" ]; then
   if [ -n "${EXCLUDE_PATTERN:-}" ]; then final_exclude_pattern_parts+=("$EXCLUDE_PATTERN"); fi
   if [ -n "$PROCESSED_GLOB_PATTERN" ]; then final_exclude_pattern_parts+=("$PROCESSED_GLOB_PATTERN"); fi
 
-  # --- NEW: Use printf to join array, more robust than IFS/echo ---
+  # --- Use printf to join array, more robust than IFS/echo ---
   # Join all parts with a |
   EXCLUDE_REGEX=$(printf "|%s" "${final_exclude_pattern_parts[@]}")
   # The result is "|part1|part2", so we slice off the leading |
@@ -759,7 +759,7 @@ else
   stderr "Error: The target is neither a regular file nor a directory."; exit 3;
 fi
 
-# --- NEW: CRITICAL PRE-PERMISSION CHECK ON TARGET DIRECTORY ---
+# --- CRITICAL PRE-PERMISSION CHECK ON TARGET DIRECTORY ---
 # Check if the current user has the necessary permissions (R/W/X)
 # on the target directory itself ($TARGETDIR_ABS). This must run *before*
 # any attempt to run 'git rev-parse' which fails with the generic message.
@@ -799,7 +799,7 @@ if ! [ -r "$TARGETDIR_ABS" ] || ! [ -w "$TARGETDIR_ABS" ] || ! [ -x "$TARGETDIR_
   stderr "========================================================================================="
   exit 7
 fi
-# --- END NEW: CRITICAL PRE-PERMISSION CHECK ON TARGET DIRECTORY ---
+# --- END CRITICAL PRE-PERMISSION CHECK ON TARGET DIRECTORY ---
 
 # --- Determine Git Directory Path (Final) ---
 # This now uses the potentially modified $GIT command string from getopts -g handling
@@ -877,7 +877,7 @@ fi
 
 # --- Lockfile Setup ---
 LOCKFILE_DIR="$GIT_DIR_PATH"
-# --- NEW: Create a unique basename based on a hash of the target path ---
+# --- Create a unique basename based on a hash of the target path ---
 # This allows multiple gitwatch instances on the same repo, watching different targets
 # Use TARGETFILE_ABS if it's set (watching a file), otherwise use TARGETDIR_ABS
 WATCH_PATH_TO_HASH="${TARGETFILE_ABS:-$TARGETDIR_ABS}"
@@ -1027,7 +1027,7 @@ diff-lines() {
 
     # --- Match Headers and Update State ---
 
-    # NEW: Match `diff --git a/PATH b/PATH` for mode changes or renames
+    # Match `diff --git a/PATH b/PATH` for mode changes or renames
     if [[ "$stripped_reply" =~ ^diff\ --git\ a/(.*)\ b/(.*) ]]; then
       previous_path=$(_trim_spaces "$(_strip_color "${BASH_REMATCH[1]}")")
       path=$(_trim_spaces "$(_strip_color "${BASH_REMATCH[2]}")")
@@ -1062,14 +1062,14 @@ diff-lines() {
       line=${BASH_REMATCH[2]:-1} # Set starting line number for additions, default to 1
       continue
 
-      # NEW: Match file mode changes
+      # Match file mode changes
     elif [[ "$stripped_reply" =~ ^new\ mode\ ([0-9]+) ]]; then
       echo "$current_file_path:?: Mode changed to ${BASH_REMATCH[1]}"
       continue
     elif [[ "$stripped_reply" =~ ^old\ mode\ ([0-9]+) ]]; then
       continue # Ignore old mode line, wait for new mode line
 
-      # --- NEW: Match binary file changes ---
+      # --- Match binary file changes ---
     elif [[ "$stripped_reply" =~ ^Binary\ files\ (.*)\ and\ (.*)\ differ ]]; then
       # Use BASH_REMATCH[1] which contains the 'a/path'
       local binary_path_a
@@ -1381,7 +1381,7 @@ _perform_commit() {
 
 # Wrapper for perform_commit that uses a lock to prevent concurrent runs
 perform_commit() {
-  # --- NEW: Backoff logic integration ---
+  # --- Backoff logic integration ---
   # This logic is now handled in the main loop *before* perform_commit is called
   # --- End new logic ---
 
@@ -1406,7 +1406,7 @@ perform_commit() {
     commit_status=$?
   fi
 
-  # --- NEW: Backoff counter logic ---
+  # --- Backoff counter logic ---
   if [ $commit_status -ne 0 ]; then
     stderr "Commit logic failed with status $commit_status."
     # Use 'date' which is POSIX compliant
@@ -1443,7 +1443,7 @@ fi
 TIMER_PID_FILE="${TMPDIR:-/tmp}/${LOCKFILE_BASENAME}.timer.pid"
 # --- End modification ---
 
-# --- NEW: Health Status File ---
+# --- Health Status File ---
 # Fixed path for Docker HEALTHCHECK to find
 HEALTH_STATUS_FILE="${TMPDIR:-/tmp}/gitwatch.status"
 # --- End Health Status File ---
@@ -1456,13 +1456,13 @@ trap 'rm -f "$TIMER_PID_FILE" "$HEALTH_STATUS_FILE"; cleanup "$?"' EXIT INT TERM
 
 # main program loop: wait for changes and commit them
 verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
-touch "$HEALTH_STATUS_FILE" # NEW: Signal healthy on startup
+touch "$HEALTH_STATUS_FILE" # Signal healthy on startup
 # Execute the watcher and pipe its output to the read loop
 "${INW}" "${INW_ARGS[@]}" | while IFS= read -r line; do # Use IFS= to preserve leading spaces
 
-  touch "$HEALTH_STATUS_FILE" # NEW: Heartbeat! Proves the loop is alive.
+  touch "$HEALTH_STATUS_FILE" # Heartbeat! Proves the loop is alive.
 
-  # --- NEW: Exponential Backoff Check ---
+  # --- Exponential Backoff Check ---
   if [ "$GIT_FAIL_COUNT" -ge "$MAX_FAIL_COUNT" ]; then
     current_time=$(date +%s)
     time_since_fail=$((current_time - LAST_FAIL_TIME))
@@ -1471,11 +1471,11 @@ touch "$HEALTH_STATUS_FILE" # NEW: Signal healthy on startup
       # FIX for SC2168: Removed 'local' from remaining_wait
       remaining_wait=$((COOL_DOWN_SECONDS - time_since_fail))
       verbose_echo "In cool-down mode. Skipping trigger. ($remaining_wait seconds remaining)"
-      rm -f "$HEALTH_STATUS_FILE" # NEW: Signal "unhealthy" (in cool-down)
+      rm -f "$HEALTH_STATUS_FILE" # Signal "unhealthy" (in cool-down)
       continue # Skip this file change event
     else
       verbose_echo "Cool-down period finished. Resetting failure count and retrying."
-      touch "$HEALTH_STATUS_FILE" # NEW: Signal "healthy" again
+      touch "$HEALTH_STATUS_FILE" # Signal "healthy" again
       GIT_FAIL_COUNT=0
       LAST_FAIL_TIME=0
     fi

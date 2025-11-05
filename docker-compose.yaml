@@ -40,7 +40,7 @@ services:
       # The path to an external .git directory (used with -g flag in gitwatch.sh)
       # If your .git folder is mounted separately, set this to the container path (e.g., /app/.git)
       GIT_EXTERNAL_DIR: ""
-      # NEW: Timeout in seconds for critical Git operations (commit, pull, push) (-t)
+      # Timeout in seconds for critical Git operations (commit, pull, push) (-t)
       GIT_TIMEOUT: 60
       # Set to "true" to run 'git pull --rebase' before every push (-R)
       PULL_BEFORE_PUSH: "false"
@@ -56,6 +56,15 @@ services:
       COMMIT_CMD: ""
       # OPTIONAL: Set to "true" to pipe the list of changed files to COMMIT_CMD (-C)
       PASS_DIFFS: "false"
+
+      # --- Commit Log Options (Only used if COMMIT_CMD is empty) ---
+      # (Optional) Sets the number of diff lines to include in the commit message (-l or -L).
+      # LOG_DIFF_LINES: 10
+      # (Optional) Set to "true" to use -L (no color) with LOG_DIFF_LINES.
+      # LOG_DIFF_NO_COLOR: "false"
+
+      # --- End New ---
+
       # OPTIONAL: Events passed to inotifywait/fswatch (-e)
       EVENTS: ""
       # A comma-separated list of patterns to exclude from monitoring (e.g., "*.log,*.tmp,tmp/") (-X)
@@ -68,18 +77,26 @@ services:
       COMMIT_ON_START: "false"
       # Set to "true" to enable verbose output for debugging (-v)
       VERBOSE: "false"
-      # NEW: Set to "true" to suppress all stdout/stderr output (-q)
+      # Set to "true" to suppress all stdout/stderr output (-q)
       QUIET: "false"
       # Set to "true" to log all messages to syslog (-S)
       USE_SYSLOG: "false"
-      # NEW: Set to "true" to disable file locking (-n).
+      # Set to "true" to disable file locking (-n).
       DISABLE_LOCKING: "false"
-      # NEW: Overrides the default 150-character truncation for *individual lines*
+      # Overrides the default 150-character truncation for *individual lines*
       # in the -l/-L commit log. Does not affect the number of lines.
       GW_LOG_LINE_LENGTH: 150
 
-      # --- NEW: Advanced Backoff Tuning (Optional) ---
+      # --- Advanced Backoff Tuning (Optional) ---
       # Number of consecutive git failures before entering cool-down
       # GW_MAX_FAIL_COUNT: 5
       # Cool-down time in seconds after hitting max failures
       # GW_COOL_DOWN_SECONDS: 600
+
+      # --- Advanced Binary Path Overrides (Optional) ---
+      # Specify the full path *inside the container* to a custom binary.
+      # GW_GIT_BIN: ""
+      # GW_INW_BIN: ""
+      # GW_FLOCK_BIN: ""
+      # GW_TIMEOUT_BIN: ""
+      # GW_PKILL_BIN: ""

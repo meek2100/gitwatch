@@ -50,7 +50,7 @@ jobs:
         shell: powershell
         run: |
           # 1. Setup Test Repo
-          $testDir = "C:\gitwatch-test-dir"
+          $testDir = "C:\gitwatch test dir with spaces"
           $logFile = "C:\gitwatch.log"
           $errFile = "C:\gitwatch.err"
           if (Test-Path $testDir) { Remove-Item $testDir -Recurse -Force }
@@ -67,7 +67,7 @@ jobs:
           # 2. Start gitwatch.bat
           Write-Host "Starting gitwatch.bat in background..."
           # Start the process and log output
-          Start-Process -FilePath "gitwatch.bat" -ArgumentList "-v, $testDir" -NoNewWindow -RedirectStandardOutput $logFile -RedirectStandardError $errFile
+          Start-Process -FilePath "gitwatch.bat" -ArgumentList "-v, `"$testDir`"" -NoNewWindow -RedirectStandardOutput $logFile -RedirectStandardError $errFile
           Write-Host "Waiting 5 seconds for gitwatch to start..."
           Start-Sleep -Seconds 5
 
@@ -106,6 +106,6 @@ jobs:
         if: always()
         shell: powershell
         run: |
-          Remove-Item "C:\gitwatch-test-dir" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item "C:\gitwatch test dir with spaces" -Recurse -Force -ErrorAction SilentlyContinue
           Remove-Item "C:\gitwatch.log" -ErrorAction SilentlyContinue
           Remove-Item "C:\gitwatch.err" -ErrorAction SilentlyContinue

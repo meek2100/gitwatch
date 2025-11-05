@@ -49,6 +49,7 @@ setup() {
   git init "$TEST_REPO_HOST_DIR"
   (
     cd "$TEST_REPO_HOST_DIR" || return 1 # <-- SHELLCHECK FIX
+
     git config user.email "docker@test.com"
     git config user.name "Docker Test"
     echo "initial" > file.txt
@@ -103,6 +104,7 @@ get_container_logs() {
 
   # 1. Check who owns the files *inside* the container
   run docker exec "$container_name" ls -ld /app/watched-repo
+
   assert_success "docker exec 'ls' command failed"
   assert_output --partial "appuser appgroup" "PUID/PGID switch failed: /app/watched-repo not owned by appuser:appgroup"
 
@@ -162,6 +164,7 @@ get_container_logs() {
   logs=$(get_container_logs "$container_name")
 
   # 2. Assert: Logs should NOT contain the startup message (due to QUIET=true)
+
   # The entrypoint.sh itself still echoes, but gitwatch.sh will be quiet.
   run echo "$logs"
   # Check for the entrypoint message (which still runs)
@@ -188,4 +191,39 @@ get_container_logs() {
   run git -C "$TEST_REPO_HOST_DIR" log -1 --format=%B
   assert_success
   assert_output --partial "quiet_file.txt"
+}
+
+@test "docker_env_vars_log_line_length: GW_LOG_LINE_LENGTH is respected" {
+  local container_name="${DOCKER_CONTAINER_NAME_PREFIX}-5"
+  local long_line="This is a very long line that should be truncated"
+  local truncated_line="This is a " # First 10 chars
+
+  run_container "$container_name" \
+    -e SLEEP_TIME=1 \
+    -e LOG_DIFF_LINES=10 \
+    -e GW_LOG_LINE_LENGTH=10 \
+    -e COMMIT_MSG="Changes:" \
+    -e DATE_FMT=""
+
+  # 1. Check container logs to ensure -l 10 was passed
+  run get_container_logs "$container_name"
+  assert_output --partial " -l 10 "
+  assert_output --partial "Exporting GW_LOG_LINE_LENGTH=10"
+
+  # 2. Trigger a change
+  sleep 2
+  echo "$long_line" >> "$TEST_REPO_HOST_DIR/long_line.txt"
+
+  # Wait for the commit (Sleep 1s + commit time)
+  sleep 3
+
+  # 3. Check the git log on the *host*
+  run git -C "$TEST_REPO_HOST_DIR" log -1 --format=%B
+  assert_success "Git log check failed"
+
+  # 4. Assert that the truncated line is present (with the '+' from diff-lines)
+  assert_output --partial "+${truncated_line}"
+
+  # 5. Assert that the *full* line is *not* present
+  refute_output --partial "+${long_line}"
 }

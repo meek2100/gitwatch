@@ -10,7 +10,7 @@ PUID=${PUID:-}
 PGID=${PGID:-}
 CONTAINER_USER="appuser"
 
-# --- NEW: Define GOSU_COMMAND as an array ---
+# --- Define GOSU_COMMAND as an array ---
 declare -a GOSU_COMMAND
 
 if [ -n "$PUID" ] && [ -n "$PGID" ]; then
@@ -26,7 +26,7 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
     chown -R "$PUID":"$PGID" /home/appuser 2>/dev/null || true
     # --- END ADDED LINE ---
 
-    # NEW: Only chown critical files (like the scripts) and rely on gosu
+    # Only chown critical files (like the scripts) and rely on gosu
     # to operate as the correct user on the mounted volumes. This avoids
     # slow recursive chown on large volumes.
     chown "$PUID":"$PGID" /app/entrypoint.sh /app/gitwatch.sh 2>/dev/null || true
@@ -54,38 +54,43 @@ GIT_WATCH_DIR=${GIT_WATCH_DIR:-/app/watched-repo}
 GIT_REMOTE=${GIT_REMOTE:-origin}
 GIT_BRANCH=${GIT_BRANCH:-main}
 GIT_EXTERNAL_DIR=${GIT_EXTERNAL_DIR:-} # Path to the external .git directory (e.g., /app/.git)
-TIMEOUT=${GIT_TIMEOUT:-60} # New: Git operation timeout
+TIMEOUT=${GIT_TIMEOUT:-60} # Git operation timeout
 
 # Gitwatch behavior
 SLEEP_TIME=${SLEEP_TIME:-2}
 COMMIT_MSG=${COMMIT_MSG:-"Auto-commit: %d"}
 DATE_FMT=${DATE_FMT:-"+%Y-%m-%d %H:%M:%S"}
-# New: Custom command for commit message
+# Custom command for commit message
 COMMIT_CMD=${COMMIT_CMD:-}
 # Read the user-friendly glob pattern (for -X)
 USER_EXCLUDE_PATTERN=${EXCLUDE_PATTERN:-""}
-# New: Read the raw regex pattern (for -x)
+# Read the raw regex pattern (for -x)
 RAW_EXCLUDE_REGEX=${RAW_EXCLUDE_REGEX:-""}
 EVENTS=${EVENTS:-""}
-# NEW: Log line length (read by gitwatch.sh from env)
+# Log line length (read by gitwatch.sh from env)
 GW_LOG_LINE_LENGTH=${GW_LOG_LINE_LENGTH:-}
+# --- Add support for -l / -L flags ---
+LOG_DIFF_LINES=${LOG_DIFF_LINES:-}
+LOG_DIFF_NO_COLOR=${LOG_DIFF_NO_COLOR:-false}
+# --- END NEW ---
 
 # Boolean flags (set to "true" to enable)
 PULL_BEFORE_PUSH=${PULL_BEFORE_PUSH:-false}
 SKIP_IF_MERGING=${SKIP_IF_MERGING:-false}
 VERBOSE=${VERBOSE:-false}
 COMMIT_ON_START=${COMMIT_ON_START:-false}
-PASS_DIFFS=${PASS_DIFFS:-false} # New: Pass diffs to custom command (-C)
-USE_SYSLOG=${USE_SYSLOG:-false} # New: Log to Syslog (-S)
-QUIET=${QUIET:-false} # NEW: Quiet mode (-q)
-DISABLE_LOCKING=${DISABLE_LOCKING:-false} # NEW: Disable locking (-n)
+PASS_DIFFS=${PASS_DIFFS:-false} # Pass diffs to custom command (-C)
+USE_SYSLOG=${USE_SYSLOG:-false} # Log to Syslog (-S)
+QUIET=${QUIET:-false} # Quiet mode (-q)
+DISABLE_LOCKING=${DISABLE_LOCKING:-false} # Disable locking (-n)
 
-# --- NEW: Pass-through for binary overrides ---
+# --- Pass-through for binary overrides ---
 # These are exported so gitwatch.sh can find them
 export GW_GIT_BIN=${GW_GIT_BIN:-}
 export GW_INW_BIN=${GW_INW_BIN:-}
 export GW_FLOCK_BIN=${GW_FLOCK_BIN:-}
 export GW_TIMEOUT_BIN=${GW_TIMEOUT_BIN:-}
+export GW_PKILL_BIN=${GW_PKILL_BIN:-} # --- ADDED PKILL ---
 # --- End new pass-through ---
 
 
@@ -99,7 +104,7 @@ cmd=( )
 cmd+=( -r "${GIT_REMOTE}" )
 cmd+=( -b "${GIT_BRANCH}" )
 cmd+=( -s "${SLEEP_TIME}" )
-cmd+=( -t "${TIMEOUT}" ) # NEW: Timeout flag
+cmd+=( -t "${TIMEOUT}" ) # Timeout flag
 cmd+=( -d "${DATE_FMT}" )
 
 # Add custom commit command (-c) which overrides -m and -d
@@ -112,6 +117,17 @@ if [ -n "${COMMIT_CMD}" ]; then
 else
   # Only include -m if no custom command is provided
   cmd+=( -m "${COMMIT_MSG}" )
+
+  # --- Add diff logging flags (-l / -L) ---
+  # This is only added if a custom command is NOT used
+  if [ -n "${LOG_DIFF_LINES}" ]; then
+    if [ "${LOG_DIFF_NO_COLOR}" = "true" ]; then
+      cmd+=( -L "${LOG_DIFF_LINES}" )
+    else
+      cmd+=( -l "${LOG_DIFF_LINES}" )
+    fi
+  fi
+  # --- END NEW ---
 fi
 
 
@@ -146,7 +162,7 @@ if [ "${SKIP_IF_MERGING}" = "true" ]; then
   cmd+=( -M )
 fi
 
-# --- NEW: Mutually exclusive logging flags ---
+# --- Mutually exclusive logging flags ---
 if [ "${QUIET}" = "true" ]; then
   cmd+=( -q )
 elif [ "${VERBOSE}" = "true" ]; then
@@ -163,7 +179,7 @@ if [ "${USE_SYSLOG}" = "true" ]; then
   cmd+=( -S )
 fi
 
-# NEW: Add no-lock flag
+# Add no-lock flag
 if [ "${DISABLE_LOCKING}" = "true" ]; then
   cmd+=( -n )
 fi
@@ -179,7 +195,7 @@ printf "%q " "/app/gitwatch.sh" "${cmd[@]}"
 echo # Add a newline for cleaner logging
 echo "-------------------------------------------------"
 
-# NEW: Export the log line length variable so gitwatch.sh can read it
+# Export the log line length variable so gitwatch.sh can read it
 if [ -n "${GW_LOG_LINE_LENGTH}" ]; then
   export GW_LOG_LINE_LENGTH
   echo "Exporting GW_LOG_LINE_LENGTH=${GW_LOG_LINE_LENGTH}"

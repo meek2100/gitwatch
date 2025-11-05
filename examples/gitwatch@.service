@@ -6,10 +6,10 @@ Wants=network-online.target
 
 [Service]
 Environment="SCRIPT_ARGS=%I"
-# NEW: Add coreutils and util-linux to the PATH
+# Add coreutils and util-linux to the PATH
 # This ensures git, flock, and timeout are found.
 Environment="PATH=/usr/local/bin:/usr/bin:/bin"
-# NEW: Specify dependency packages for clarity (though PATH is the fix)
+# Specify dependency packages for clarity (though PATH is the fix)
 # This is a good place to document what gitwatch needs.
 # Requires=git, util-linux (flock), coreutils (timeout), inotify-tools
 ExecStart=/usr/bin/bash -c "/usr/local/bin/gitwatch ${SCRIPT_ARGS}"
