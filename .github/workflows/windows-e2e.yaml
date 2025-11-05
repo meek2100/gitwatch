@@ -155,12 +155,12 @@ jobs:
           $mockContent = @'
           @echo off
           if "%1 %2 %3" == "-e cat /etc/os-release" (
-          echo "${{ matrix.os-id }}"
+            echo "${{ matrix.os-id }}"
           ) else (
-           echo MOCK_WSL_ERROR: Unexpected call: %* >&2
-           exit 1
-           )
-           '@
+            echo MOCK_WSL_ERROR: Unexpected call: %* >&2
+            exit 1
+          )
+          '@
           New-Item -Path (Join-Path $mockDir "wsl.bat") -Value $mockContent
 
           Write-Host "Mock wsl.bat created."
