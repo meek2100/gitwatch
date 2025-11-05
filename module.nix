@@ -115,6 +115,7 @@ let
             openssh
             coreutils
             flock
+            procps
           ]
           ++ lib.optionals pkgs.stdenv.isLinux [ inotify-tools ]
           ++ lib.optionals pkgs.stdenv.isDarwin [ fswatch ];

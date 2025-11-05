@@ -11,7 +11,7 @@ for testing.
 1. **Clone the repository:**
 
    ```sh
-   git clone [https://github.com/meek2100/gitwatch.git](https://github.com/meek2100/gitwatch.git)
+   git clone https://github.com/meek2100/gitwatch.git
    cd gitwatch
    ```
 
@@ -22,7 +22,7 @@ for testing.
 
      ```sh
      # Runtime deps
-     brew install fswatch flock coreutils
+     brew install fswatch flock coreutils proctools
      # Testing deps
      brew install bats-core bats-support bats-assert bats-file
      # Linting deps
@@ -33,7 +33,7 @@ for testing.
 
      ```sh
      # Runtime deps
-     sudo apt-get install inotify-tools util-linux coreutils
+     sudo apt-get install inotify-tools util-linux coreutils procps
      # Testing deps
      sudo apt-get install bats
      # (Note: bats helpers may need manual install if not packaged)
