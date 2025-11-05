@@ -97,7 +97,7 @@ for Linux (WSL). A `.exe` installer is provided to make setup seamless.
 
 1. **Download** the latest `gitwatch-setup.exe` from the
    [GitHub Releases page](https://github.com/gitwatch/gitwatch/releases/latest).
-2. **Run** the installer. It will automatically:
+1. **Run** the installer. It will automatically:
    - Request Administrator privileges.
    - Check for and install WSL if it's not already present (this may take a
      few minutes).
@@ -226,7 +226,7 @@ configured using environment variables.
 - **SSH Key**: For pushing to a remote repository, the container needs
   access to an SSH key that is authorized with your Git provider.
 
-**1. Configuration:**
+**2. Configuration:**
 
 You must configure the `docker-compose.yaml` file before running it,
 primarily the `volumes` and `environment` sections.
@@ -239,45 +239,45 @@ You can find these on your host machine by running `id -u` (for PUID) and
 [`docker-compose.yaml`](./docker-compose.yaml) file for detailed
 instructions on setting volumes and environment variables.
 
-**1. Environment Variables**
+**3. Environment Variables**
 
 The following environment variables are available for configuring the
 `gitwatch` container:
 
-| Variable               | Default Value          | Description                                                                                                                             |
+| Variable | Default Value | Description |
 | :--------------------- | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------------------- |
-| `PUID`                 | `1000`                 | **Required.** Sets the User ID (UID) for the container's non-root user to match the host user, preventing file permission issues.       |
-| `PGID`                 | `1000`                 | **Required.** Sets the Group ID (GID) for the container's user. Run `id -g` on your host to find this value.                            |
-| `GIT_WATCH_DIR`        | `/app/watched-repo`    | The directory inside the container to watch for changes. This must match the container path you set in the `volumes` section.           |
-| `GIT_REMOTE`           | `origin`               | The name of the remote repository to push to.                                                                                           |
-| `GIT_BRANCH`           | `main`                 | The branch to push to.                                                                                                                  |
-| `GIT_EXTERNAL_DIR`     | `""`                   | Use with the `-g` flag (e.g., `/app/.git`) to specify an external Git directory.                                                        |
-| `GIT_TIMEOUT`          | `60`                   | Timeout in seconds for critical Git operations (commit, pull, push) (`-t`).                                                             |
-| `PULL_BEFORE_PUSH`     | `"false"`              | Set to `"true"` to run `git pull --rebase` before every push (`-R`).                                                                    |
-| `SLEEP_TIME`           | `2`                    | Time in seconds to wait after a file change before committing (`-s`).                                                                   |
-| `COMMIT_MSG`           | `"Auto-commit: %d"`    | The commit message format (`-m`). Ignored if `COMMIT_CMD` is set.                                                                       |
-| `DATE_FMT`             | `"+%Y-%m-%d %H:%M:%S"` | The date format used in the commit message (`-d`).                                                                                      |
-| `COMMIT_CMD`           | `""`                   | Custom shell command to generate the entire commit message (`-c`). Overrides `COMMIT_MSG`.                                              |
-| `PASS_DIFFS`           | `"false"`              | Set to `"true"` to pipe the list of changed files to `COMMIT_CMD` (`-C`).                                                               |
-| `LOG_DIFF_LINES`       | `""`                   | (Optional) Sets the number of diff lines to include in the commit message (`-l` or `-L`). Only used if `COMMIT_CMD` is empty.           |
-| `LOG_DIFF_NO_COLOR`    | `"false"`              | (Optional) Set to `"true"` to use `-L` (no color) with `LOG_DIFF_LINES`.                                                                |
-| `EVENTS`               | `""`                   | Events passed to the underlying watcher tool (`-e`). Uses platform defaults if empty.                                                   |
-| `EXCLUDE_PATTERN`      | `""`                   | A comma-separated list of glob patterns to exclude from monitoring (`-X`).                                                              |
-| `RAW_EXCLUDE_REGEX`    | `""`                   | A raw regex pattern to exclude from monitoring (`-x`).                                                                                  |
-| `SKIP_IF_MERGING`      | `"false"`              | Set to `"true"` to prevent commits when a merge is in progress (`-M`).                                                                  |
-| `COMMIT_ON_START`      | `"false"`              | Set to `"true"` to commit any pending changes on startup (`-f`).                                                                        |
-| `VERBOSE`              | `"false"`              | Set to `"true"` to enable verbose output for debugging (`-v`).                                                                          |
-| `QUIET`                | `"false"`              | Set to `"true"` to suppress all stdout/stderr output (`-q`). Overrides `VERBOSE`.                                                       |
-| `USE_SYSLOG`           | `"false"`              | Set to `"true"` to log all messages to syslog (`-S`).                                                                                   |
-| `DISABLE_LOCKING`      | `"false"`              | Set to `"true"` to disable file locking (`-n`). Bypasses `flock` dependency check.                                                      |
-| `GW_LOG_LINE_LENGTH`   | `150`                  | Overrides the default 150-character truncation for _individual lines_ in the `-l`/`-L` commit log. Does not affect the number of lines. |
-| `GW_MAX_FAIL_COUNT`    | `5`                    | (Optional) Number of consecutive git failures before entering cool-down.                                                                |
-| `GW_COOL_DOWN_SECONDS` | `600`                  | (Optional) Cool-down time in seconds after hitting max failures.                                                                        |
-| `GW_GIT_BIN`           | `""`                   | (Optional) Specify the full path _inside the container_ to a custom `git` binary.                                                       |
-| `GW_INW_BIN`           | `""`                   | (Optional) Specify the full path _inside the container_ to a custom `inotifywait` or `fswatch` binary.                                  |
-| `GW_FLOCK_BIN`         | `""`                   | (Optional) Specify the full path _inside the container_ to a custom `flock` binary.                                                     |
-| `GW_TIMEOUT_BIN`       | `""`                   | (Optional) Specify the full path _inside the container_ to a custom `timeout` binary.                                                   |
-| `GW_PKILL_BIN`         | `""`                   | (Optional) Specify the full path _inside the container_ to a custom `pkill` binary.                                                     |
+| `PUID` | `1000` | **Required.** Sets the User ID (UID) for the container's non-root user to match the host user, preventing file permission issues. |
+| `PGID` | `1000` | **Required.** Sets the Group ID (GID) for the container's user. Run `id -g` on your host to find this value. |
+| `GIT_WATCH_DIR` | `/app/watched-repo` | The directory inside the container to watch for changes. This must match the container path you set in the `volumes` section. |
+| `GIT_REMOTE` | `origin` | The name of the remote repository to push to. |
+| `GIT_BRANCH` | `main` | The branch to push to. |
+| `GIT_EXTERNAL_DIR` | `""` | Use with the `-g` flag (e.g., `/app/.git`) to specify an external Git directory. |
+| `GIT_TIMEOUT` | `60` | Timeout in seconds for critical Git operations (commit, pull, push) (`-t`). |
+| `PULL_BEFORE_PUSH` | `"false"` | Set to `"true"` to run `git pull --rebase` before every push (`-R`). |
+| `SLEEP_TIME` | `2` | Time in seconds to wait after a file change before committing (`-s`). |
+| `COMMIT_MSG` | `"Auto-commit: %d"` | The commit message format (`-m`). Ignored if `COMMIT_CMD` is set. |
+| `DATE_FMT` | `"+%Y-%m-%d %H:%M:%S"` | The date format used in the commit message (`-d`). |
+| `COMMIT_CMD` | `""` | Custom shell command to generate the entire commit message (`-c`). Overrides `COMMIT_MSG`. |
+| `PASS_DIFFS` | `"false"` | Set to `"true"` to pipe the list of changed files to `COMMIT_CMD` (`-C`). |
+| `LOG_DIFF_LINES` | `""` | (Optional) Sets the number of diff lines to include in the commit message (`-l` or `-L`). Only used if `COMMIT_CMD` is empty. |
+| `LOG_DIFF_NO_COLOR` | `"false"` | (Optional) Set to `"true"` to use `-L` (no color) with `LOG_DIFF_LINES`. |
+| `EVENTS` | `""` | Events passed to the underlying watcher tool (`-e`). Uses platform defaults if empty. |
+| `EXCLUDE_PATTERN` | `""` | A comma-separated list of glob patterns to exclude from monitoring (`-X`). |
+| `RAW_EXCLUDE_REGEX` | `""` | A raw regex pattern to exclude from monitoring (`-x`). |
+| `SKIP_IF_MERGING` | `"false"` | Set to `"true"` to prevent commits when a merge is in progress (`-M`). |
+| `COMMIT_ON_START` | `"false"` | Set to `"true"` to commit any pending changes on startup (`-f`). |
+| `VERBOSE` | `"false"` | Set to `"true"` to enable verbose output for debugging (`-v`). |
+| `QUIET` | `"false"` | Set to `"true"` to suppress all stdout/stderr output (`-q`). Overrides `VERBOSE`. |
+| `USE_SYSLOG` | `"false"` | Set to `"true"` to log all messages to syslog (`-S`). |
+| `DISABLE_LOCKING` | `"false"` | Set to `"true"` to disable file locking (`-n`). Bypasses `flock` dependency check. |
+| `GW_LOG_LINE_LENGTH` | `150` | Overrides the default 150-character truncation for _individual lines_ in the `-l`/`-L` commit log. Does not affect the number of lines. |
+| `GW_MAX_FAIL_COUNT` | `5` | (Optional) Number of consecutive git failures before entering cool-down. |
+| `GW_COOL_DOWN_SECONDS` | `600` | (Optional) Cool-down time in seconds after hitting max failures. |
+| `GW_GIT_BIN` | `""` | (Optional) Specify the full path _inside the container_ to a custom `git` binary. |
+| `GW_INW_BIN` | `""` | (Optional) Specify the full path _inside the container_ to a custom `inotifywait` or `fswatch` binary. |
+| `GW_FLOCK_BIN` | `""` | (Optional) Specify the full path _inside the container_ to a custom `flock` binary. |
+| `GW_TIMEOUT_BIN` | `""` | (Optional) Specify the full path _inside the container_ to a custom `timeout` binary. |
+| `GW_PKILL_BIN` | `""` | (Optional) Specify the full path _inside the container_ to a custom `pkill` binary. |
 
 **4. Running gitwatch:**
 
@@ -363,14 +363,14 @@ provided `Makefile`.
    to install the runtime and testing dependencies (like `bats-core`,
    `shellcheck`, etc.).
 
-2. **Install Hooks**: Install the `pre-commit` hooks, which will ensure all
+1. **Install Hooks**: Install the `pre-commit` hooks, which will ensure all
    linting passes before you commit.
 
    ```sh
    pre-commit install
    ```
 
-3. **Run Tests**:
+1. **Run Tests**:
 
    ```sh
    make test
@@ -382,10 +382,10 @@ When you start the script, it first performs critical checks:
 
 1. **Permission Check:** Verifies the user has read/write/execute
    permissions on the target directory and the `.git` directory.
-2. **Locking Check:** Attempts to acquire a non-blocking process lock using
+1. **Locking Check:** Attempts to acquire a non-blocking process lock using
    `flock` to prevent multiple instances from running concurrently on the
    same repository.
-3. **Optional Startup Commit:** If the `-f` flag is provided, it commits
+1. **Optional Startup Commit:** If the `-f` flag is provided, it commits
    any pending staged changes before starting the watch loop.
 
 Then it enters the main loop, which runs forever (until forcefully
@@ -431,30 +431,30 @@ gitwatch.sh [-s <secs>] [-t <secs>] [-d <fmt>] [-r <remote> [-b <branch> | -R]] 
 
 Where `<target>` is the file or folder to be watched.
 
-| Option | Argument      | Default                | Description                                                                                                                                                                                                    |
+| Option | Argument | Default | Description |
 | :----- | :------------ | :--------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `-s`   | `<secs>`      | `2`                    | **Debounce Delay.** Time to wait after a change before initiating the commit process.                                                                                                                          |
-| `-t`   | `<secs>`      | `60`                   | **Git Timeout.** Timeout in seconds for critical Git operations (commit, pull, push).                                                                                                                          |
-| `-d`   | `<fmt>`       | `"+%Y-%m-%d %H:%M:%S"` | **Date Format.** Format string for the timestamp (`%d`) in the commit message (see `man date`).                                                                                                                |
-| `-r`   | `<remote>`    | _None_                 | **Push Remote.** Specifies a remote to push to after every successful commit.                                                                                                                                  |
-| `-R`   | _None_        | _None_                 | **Pull/Rebase.** If used with `-r`, performs a `git pull --rebase` before the push. Note: To use `-R` when in a detached HEAD state, you must also provide `-b <branch>` to specify which branch to pull from. |
-| `-b`   | `<branch>`    | _Current_              | **Target Branch.** Specifies the branch to push to.                                                                                                                                                            |
-| `-g`   | `<path>`      | _None_                 | **Git Dir.** Specifies the path to an external `.git` directory (`--git-dir`).                                                                                                                                 |
-| `-l`   | `<lines>`     | `-1`                   | **Log Changes (Color).** Includes diff lines in the commit message, up to `<lines>` count (use `0` for unlimited).                                                                                             |
-| `-L`   | `<lines>`     | `-1`                   | **Log Changes (Plain).** Same as `-l` but without colored formatting.                                                                                                                                          |
-| `-m`   | `<msg>`       | `"Auto-commit: %d"`    | **Commit Message.** Template for the commit message. Ignored if `-c` is used.                                                                                                                                  |
-| `-c`   | `<command>`   | _None_                 | **Custom Message Command.** Command to run to generate the full commit message. Overrides `-m`, `-d`, `-l`, and `-L`.                                                                                          |
-| `-C`   | _None_        | _None_                 | **Pipe Diff.** If used with `-c`, pipes the list of changed files (`git diff --staged --name-only`) to the custom command's stdin.                                                                             |
-| `-e`   | `<events>`    | _OS Default_           | **Watcher Events.** Custom event list for `inotifywait` or `fswatch`.                                                                                                                                          |
-| `-x`   | `<pattern>`   | _None_                 | **Exclude Regex.** Raw regex pattern to exclude files/directories from being monitored. The `.git` folder is always excluded.                                                                                  |
-| `-X`   | `<glob/list>` | _None_                 | **Exclude Globs.** Comma-separated list of glob patterns to exclude (e.g., `*.log,tmp/`). Converted to regex.                                                                                                  |
-| `-M`   | _None_        | _None_                 | **Skip Merging.** Prevents commits if a Git merge/rebase is currently in progress.                                                                                                                             |
-| `-f`   | _None_        | _None_                 | **Commit on Start.** Commits any pending staged changes before starting the watch loop.                                                                                                                        |
-| `-S`   | _None_        | _None_                 | **Syslog.** Logs all messages to syslog (daemon mode) instead of stdout/stderr.                                                                                                                                |
-| `-v`   | _None_        | _None_                 | **Verbose.** Enables verbose logging for debugging                                                                                                                                                             |
-| `-q`   | _None_        | _None_                 | **Quiet.** Suppress all stdout and stderr output (overridden by `-S`).                                                                                                                                         |
-| `-n`   | _None_        | _None_                 | **No Lock.** Disables file locking and bypasses the `flock` dependency check.                                                                                                                                  |
-| `-V`   | _None_        | _None_                 | **Version.** Prints version information and exits.                                                                                                                                                             |
+| `-s` | `<secs>` | `2` | **Debounce Delay.** Time to wait after a change before initiating the commit process. |
+| `-t` | `<secs>` | `60` | **Git Timeout.** Timeout in seconds for critical Git operations (commit, pull, push). |
+| `-d` | `<fmt>` | `"+%Y-%m-%d %H:%M:%S"` | **Date Format.** Format string for the timestamp (`%d`) in the commit message (see `man date`). |
+| `-r` | `<remote>` | _None_ | **Push Remote.** Specifies a remote to push to after every successful commit. |
+| `-R` | _None_ | _None_ | **Pull/Rebase.** If used with `-r`, performs a `git pull --rebase` before the push. Note: To use `-R` when in a detached HEAD state, you must also provide `-b <branch>` to specify which branch to pull from. |
+| `-b` | `<branch>` | _Current_ | **Target Branch.** Specifies the branch to push to. |
+| `-g` | `<path>` | _None_ | **Git Dir.** Specifies the path to an external `.git` directory (`--git-dir`). |
+| `-l` | `<lines>` | `-1` | **Log Changes (Color).** Includes diff lines in the commit message, up to `<lines>` count (use `0` for unlimited). |
+| `-L` | `<lines>` | `-1` | **Log Changes (Plain).** Same as `-l` but without colored formatting. |
+| `-m` | `<msg>` | `"Auto-commit: %d"` | **Commit Message.** Template for the commit message. Ignored if `-c` is used. |
+| `-c` | `<command>` | _None_ | **Custom Message Command.** Command to run to generate the full commit message. Overrides `-m`, `-d`, `-l`, and `-L`. |
+| `-C` | _None_ | _None_ | **Pipe Diff.** If used with `-c`, pipes the list of changed files (`git diff --staged --name-only`) to the custom command's stdin. |
+| `-e` | `<events>` | _OS Default_ | **Watcher Events.** Custom event list for `inotifywait` or `fswatch`. |
+| `-x` | `<pattern>` | _None_ | **Exclude Regex.** Raw regex pattern to exclude files/directories from being monitored. The `.git` folder is always excluded. |
+| `-X` | `<glob/list>` | _None_ | **Exclude Globs.** Comma-separated list of glob patterns to exclude (e.g., `*.log,tmp/`). Converted to regex. |
+| `-M` | _None_ | _None_ | **Skip Merging.** Prevents commits if a Git merge/rebase is currently in progress. |
+| `-f` | _None_ | _None_ | **Commit on Start.** Commits any pending staged changes before starting the watch loop. |
+| `-S` | _None_ | _None_ | **Syslog.** Logs all messages to syslog (daemon mode) instead of stdout/stderr. |
+| `-v` | _None_ | _None_ | **Verbose.** Enables verbose logging for debugging |
+| `-q` | _None_ | _None_ | **Quiet.** Suppress all stdout and stderr output (overridden by `-S`). |
+| `-n` | _None_ | _None_ | **No Lock.** Disables file locking and bypasses the `flock` dependency check. |
+| `-V` | _None_ | _None_ | **Version.** Prints version information and exits. |
 
 ### Security Considerations
 
@@ -567,10 +567,10 @@ your local repository does not have. `gitwatch` will not overwrite these
 changes. To fix this:
 
 1. Stop `gitwatch`.
-2. In your watched repository, run `git pull --rebase` to fetch and apply
+1. In your watched repository, run `git pull --rebase` to fetch and apply
    the remote changes.
-3. Resolve any merge conflicts that may occur.
-4. Restart `gitwatch`.
+1. Resolve any merge conflicts that may occur.
+1. Restart `gitwatch`.
 
 To have `gitwatch` attempt this for you automatically, run it with the
 **`-R`** flag.
@@ -602,7 +602,7 @@ different files or sub-directories (e.g., one for `/repo/docs` and one for
 container is "unhealthy," it can mean one of two things:
 
 1. The script has crashed (check logs with `docker-compose logs -f`).
-2. The script has entered its automatic "cool-down" period after repeated
+1. The script has entered its automatic "cool-down" period after repeated
    failures (e.g., it couldn't reach your Git remote). This is normal
    behavior to prevent spamming. The script will be marked "healthy" again
    and resume operations after the cool-down period (default: 10 minutes)
