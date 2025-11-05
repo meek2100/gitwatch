@@ -25,19 +25,16 @@
             gitwatch = pkgs.callPackage ./gitwatch.nix { };
             default = gitwatch;
           };
-          # --- ADDED BLOCK ---
           apps = rec {
             gitwatch = flake-utils.lib.mkApp { drv = packages.gitwatch; };
             default = gitwatch;
           };
-          # --- END ADDED BLOCK ---
         }
       );
     in
     packages
     // {
       modules = [ ./module.nix ];
-      # --- ADDED LINE ---
       license = nixpkgs.lib.licenses.gpl3Plus;
     };
 }
