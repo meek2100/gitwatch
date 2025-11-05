@@ -458,53 +458,53 @@ load 'bats-custom/startup-shutdown'
 
 # --- NEW TEST: -b non-detached ---
 @test "push_different_branch: -b <branch> pushes current branch to target branch (non-detached)" {
-local output_file
-# shellcheck disable=SC2154 # testdir is sourced via setup function
-output_file=$(mktemp "$testdir/output.XXXXX")
-local initial_remote_hash
-local target_branch="backup-branch"
+  local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  output_file=$(mktemp "$testdir/output.XXXXX")
+  local initial_remote_hash
+  local target_branch="backup-branch"
 
-cd "$testdir/local/$TEST_SUBDIR_NAME"
-# 1. Ensure the repo is clean and get remote hash
-git push -q origin master # Ensure everything is pushed
-initial_remote_hash=$(git rev-parse origin/master)
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+  # 1. Ensure the repo is clean and get remote hash
+  git push -q origin master # Ensure everything is pushed
+  initial_remote_hash=$(git rev-parse origin/master)
 
-# Ensure we are on 'master' (not detached)
-git checkout master
+  # Ensure we are on 'master' (not detached)
+  git checkout master
 
-# 2. Start gitwatch, targeting the new 'backup-branch'
-verbose_echo "# DEBUG: Starting gitwatch on master, pushing to $target_branch"
-# shellcheck disable=SC2154 # testdir is sourced via setup function
-"${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -r origin -b "$target_branch" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
-# shellcheck disable=SC2034 # used by teardown
-GITWATCH_PID=$!
-sleep 1 # Allow watcher to initialize
+  # 2. Start gitwatch, targeting the new 'backup-branch'
+  verbose_echo "# DEBUG: Starting gitwatch on master, pushing to $target_branch"
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -r origin -b "$target_branch" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
+  GITWATCH_PID=$!
+  sleep 1 # Allow watcher to initialize
 
-# 3. Trigger a new change
-echo "new local commit" >> new_file_for_backup.txt
+  # 3. Trigger a new change
+  echo "new local commit" >> new_file_for_backup.txt
 
-# 4. Wait for the change to be pushed to the *target branch*
-run wait_for_git_change 30 1 git rev-parse "origin/$target_branch"
-assert_success "Push to '$target_branch' timed out"
+  # 4. Wait for the change to be pushed to the *target branch*
+  run wait_for_git_change 30 1 git rev-parse "origin/$target_branch"
+  assert_success "Push to '$target_branch' timed out"
 
-# 5. Assert: Remote hash of target branch is the new local commit hash
-local final_local_hash
-# shellcheck disable=SC2155 # Declared on previous line
-final_local_hash=$(git rev-parse HEAD) # This is HEAD on master
-local final_remote_hash
-# shellcheck disable=SC2155 # Declared on previous line
-final_remote_hash=$(git rev-parse "origin/$target_branch")
-assert_equal "$final_local_hash" "$final_remote_hash" "Local and remote hashes must match after push"
+  # 5. Assert: Remote hash of target branch is the new local commit hash
+  local final_local_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  final_local_hash=$(git rev-parse HEAD) # This is HEAD on master
+  local final_remote_hash
+  # shellcheck disable=SC2155 # Declared on previous line
+  final_remote_hash=$(git rev-parse "origin/$target_branch")
+  assert_equal "$final_local_hash" "$final_remote_hash" "Local and remote hashes must match after push"
 
-# 6. Assert: Remote hash of 'master' branch has NOT changed
-local master_remote_hash
-master_remote_hash=$(git rev-parse origin/master)
-assert_equal "$initial_remote_hash" "$master_remote_hash" "origin/master hash should not have changed"
+  # 6. Assert: Remote hash of 'master' branch has NOT changed
+  local master_remote_hash
+  master_remote_hash=$(git rev-parse origin/master)
+  assert_equal "$initial_remote_hash" "$master_remote_hash" "origin/master hash should not have changed"
 
-# 7. Assert: Log output confirms the push logic was used
-run cat "$output_file"
-assert_output --partial "Push branch selected: $target_branch, current branch: master"
-assert_output --partial "Executing push command: git push 'origin' master:'$target_branch'"
+  # 7. Assert: Log output confirms the push logic was used
+  run cat "$output_file"
+  assert_output --partial "Push branch selected: $target_branch, current branch: master"
+  assert_output --partial "Executing push command: git push 'origin' master:'$target_branch'"
 
-cd /tmp
+  cd /tmp
 }
