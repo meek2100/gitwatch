@@ -279,14 +279,14 @@ The following environment variables are available for configuring the
 | `QUIET`                | `"false"`              | Set to `"true"` to suppress all stdout/stderr output (`-q`). Overrides `VERBOSE`.                                                       |
 | `USE_SYSLOG`           | `"false"`              | Set to `"true"` to log all messages to syslog (`-S`).                                                                                   |
 | `DISABLE_LOCKING`      | `"false"`              | Set to `"true"` to disable file locking (`-n`). Bypasses `flock` dependency check.                                                      |
-| `GW_LOG_LINE_LENGTH`   | `150`                  | Overrides the default 150-character truncation for *individual lines* in the `-l`/`-L` commit log. Does not affect the number of lines. |
+| `GW_LOG_LINE_LENGTH`   | `150`                  | Overrides the default 150-character truncation for _individual lines_ in the `-l`/`-L` commit log. Does not affect the number of lines. |
 | `GW_MAX_FAIL_COUNT`    | `5`                    | (Optional) Number of consecutive git failures before entering cool-down.                                                                |
 | `GW_COOL_DOWN_SECONDS` | `600`                  | (Optional) Cool-down time in seconds after hitting max failures.                                                                        |
-| `GW_GIT_BIN`           | `""`                   | (Optional) Specify the full path *inside the container* to a custom `git` binary.                                                       |
-| `GW_INW_BIN`           | `""`                   | (Optional) Specify the full path *inside the container* to a custom `inotifywait` or `fswatch` binary.                                  |
-| `GW_FLOCK_BIN`         | `""`                   | (Optional) Specify the full path *inside the container* to a custom `flock` binary.                                                     |
-| `GW_TIMEOUT_BIN`       | `""`                   | (Optional) Specify the full path *inside the container* to a custom `timeout` binary.                                                   |
-| `GW_PKILL_BIN`         | `""`                   | (Optional) Specify the full path *inside the container* to a custom `pkill` binary.                                                     |
+| `GW_GIT_BIN`           | `""`                   | (Optional) Specify the full path _inside the container_ to a custom `git` binary.                                                       |
+| `GW_INW_BIN`           | `""`                   | (Optional) Specify the full path _inside the container_ to a custom `inotifywait` or `fswatch` binary.                                  |
+| `GW_FLOCK_BIN`         | `""`                   | (Optional) Specify the full path _inside the container_ to a custom `flock` binary.                                                     |
+| `GW_TIMEOUT_BIN`       | `""`                   | (Optional) Specify the full path _inside the container_ to a custom `timeout` binary.                                                   |
+| `GW_PKILL_BIN`         | `""`                   | (Optional) Specify the full path _inside the container_ to a custom `pkill` binary.                                                     |
 
 <!-- prettier-ignore-end -->
 
