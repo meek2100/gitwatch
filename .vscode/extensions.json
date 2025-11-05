@@ -9,7 +9,7 @@
     "DavidAnson.vscode-markdownlint",
     "bittorala.mdformat",
     "exiasr.hadolint",
-    "jnoortheen.nix-ide",
+    "brettm12345.nixfmt-vscode",
     "streetsidesoftware.code-spell-checker"
   ]
 }
