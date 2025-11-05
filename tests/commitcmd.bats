@@ -183,3 +183,38 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
   assert_output --partial "ERROR: Custom commit command '$hanging_cmd' timed out after ${TEST_TIMEOUT} seconds."
   cd /tmp
 }
+
+# --- NEW TEST: -C without -c ---
+@test "commit_command_pipe_C_ignored: -C flag is ignored if -c is not provided" {
+  local output_file
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  output_file=$(mktemp "$testdir/output.XXXXX")
+
+  # 1. Start gitwatch with -C, -l 10, but NO -c
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -l 10 -C "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  # shellcheck disable=SC2034 # used by teardown
+  GITWATCH_PID=$!
+  cd "$testdir/local/$TEST_SUBDIR_NAME"
+  sleep 1
+
+  # 2. Trigger a change
+  echo "change for -C alone" > file_c_alone.txt
+
+  # 3. Wait for the commit hash to change
+  run wait_for_git_change 20 0.5 git log -1 --format=%H
+  assert_success
+
+  # 4. Verify commit message used the default -l 10 logic, proving -C was ignored
+  run git log -1 --pretty=%B
+  assert_success
+  assert_output --partial "file_c_alone.txt:1: +change for -C alone"
+  refute_output --partial "Changed: file_c_alone.txt" # This is from the -c test
+
+  # 5. Verify log output
+  run cat "$output_file"
+  assert_success
+  refute_output --partial "ERROR" # Should not cause an error
+
+  cd /tmp
+}
