@@ -13,7 +13,7 @@ jobs:
   docker-e2e:
     strategy:
       matrix:
-        base_image: [alpine:3.20, alpine:edge]
+        base_image: ["alpine:3.20", "alpine:edge"]
     name: "Docker E2E Tests (${{ matrix.base_image }})"
     runs-on: ubuntu-latest
     permissions:
