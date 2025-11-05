@@ -47,6 +47,7 @@ load 'bats-custom/startup-shutdown'
   local DUMMY_BIN="$testdir/dummy-bin"
   mkdir -p "$DUMMY_BIN"
   local path_backup="$PATH"
+  # shellcheck disable=SC2030,SC2031 # Modifying PATH is intentional for this test
   export PATH="$DUMMY_BIN:$PATH"
 
   # Double check that we can't find the commands now
@@ -57,12 +58,10 @@ load 'bats-custom/startup-shutdown'
     fail "Test setup failed: Cannot reliably hide 'sha256sum'/'md5sum' to test fallback logic."
   fi
   verbose_echo "# DEBUG: Successfully hid hash commands via PATH manipulation."
-
   # 4. Start gitwatch, which should fall back because of unwritable .git AND missing hash tools
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$target_path" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
-
   # 5. Wait for initialization and check log
   sleep 2
 
@@ -71,7 +70,6 @@ load 'bats-custom/startup-shutdown'
   assert_output --partial "Warning: Cannot write lockfile to $GIT_DIR_PATH. Falling back to temporary directory." \
     "Did not log the expected fallback warning"
   assert_output --partial "Warning: Neither 'sha256sum' nor 'md5sum' found."
-
   # 6a. Calculate the expected path-based "hash" name
   local target_abs_path
   target_abs_path=$(cd "$target_path" && pwd -P)
@@ -124,7 +122,9 @@ load 'bats-custom/startup-shutdown'
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   local DUMMY_BIN="$testdir/dummy-bin"
   mkdir -p "$DUMMY_BIN"
+  # shellcheck disable=SC2031 # PATH modification is intentional for this test
   local path_backup="$PATH"
+  # shellcheck disable=SC2030,SC2031 # Modifying PATH is intentional for this test
   export PATH="$DUMMY_BIN:$PATH"
 
   # 3. Assert hash commands are hidden
@@ -145,7 +145,6 @@ load 'bats-custom/startup-shutdown'
   refute_output --partial "Falling back to temporary directory."
   # SHOULD warn about missing hash tools
   assert_output --partial "Warning: Neither 'sha256sum' nor 'md5sum' found."
-
   # 6. Calculate the expected path-based "hash" name
   local target_abs_path
   target_abs_path=$(cd "$target_path" && pwd -P)
