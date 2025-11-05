@@ -57,9 +57,9 @@ for testing.
 2. **Run the Tests:** Run the full BATS test suite to ensure your change
    didn't break anything. We've created a simple command for this:
 
-```sh
-make test
-```
+   ```sh
+   make test
+   ```
 
 3. **Add a Changelog Fragment:** If your change is user-facing (a new
    feature, bugfix, or performance improvement), add a small changelog
