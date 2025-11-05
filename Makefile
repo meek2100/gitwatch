@@ -1,7 +1,7 @@
 # Makefile for gitwatch development
 
 # Use .PHONY to declare targets that are not files
-.PHONY: all test lint install uninstall install-hooks clean build-windows-installer
+.PHONY: all test lint install uninstall install-hooks clean build-windows-installer coverage man man-uninstall
 
 # Default target
 all: test
@@ -18,6 +18,17 @@ test:
 	@BATS_LIB_PATH="./tests" find tests -name "*.bats" -print0 | \
 	xargs -0 -n1 -P "$(NPROC)" bats --tap
 
+# Run code coverage with kcov (Linux only)
+coverage:
+	@echo "Running BATS test suite with kcov..."
+	@if ! command -v kcov &> /dev/null; then \
+		echo "Error: 'kcov' not found. Please install it (e.g., sudo apt install kcov)."; \
+		exit 1; \
+	fi
+	@mkdir -p coverage
+	@kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats tests/*.bats
+	@echo "Coverage report generated in ./coverage/index.html"
+
 # Run all pre-commit hooks against all files
 lint:
 	@echo "Running linters and formatters..."
@@ -26,12 +37,23 @@ lint:
 # --- Installation Targets ---
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
+MANDIR ?= $(PREFIX)/share/man/man1
 
-install:
+# Install man page
+man:
+	@echo "Installing man page to $(MANDIR)/gitwatch.1..."
+	@install -D -m 644 gitwatch.1 $(MANDIR)/gitwatch.1
+
+# Uninstall man page
+man-uninstall:
+	@echo "Removing man page from $(MANDIR)/gitwatch.1..."
+	@rm -f $(MANDIR)/gitwatch.1
+
+install: man
 	@echo "Installing gitwatch.sh to $(BINDIR)/gitwatch..."
 	@install -D -m 755 gitwatch.sh $(BINDIR)/gitwatch
 
-uninstall:
+uninstall: man-uninstall
 	@echo "Removing gitwatch from $(BINDIR)/gitwatch..."
 	@rm -f $(BINDIR)/gitwatch
 # --- End Installation Targets ---
@@ -67,6 +89,6 @@ build-windows-installer:
 # Clean up build/test artifacts
 clean:
 	@echo "Cleaning up..."
-	rm -rf result result-*
+	rm -rf result result-* coverage
 	find . -name "*.tmp" -delete
 	find . -name "*.XXXXX" -delete

@@ -1,0 +1,134 @@
+." Man page for gitwatch
+." Contact gitwatch maintainers to correct errors or typos.
+.TH "GITWATCH" "1" "November 2025" "gitwatch 0.6" "User Commands"
+.SH "NAME"
+gitwatch \- watch file or directory and git commit all changes as they happen
+.SH "SYNOPSIS"
+.B gitwatch
+[\-s \fI<secs>\fP] [\-t \fI<secs>\fP] [\-d \fI<fmt>\fP] [\-r \fI<remote>\fP [\-b \fI<branch>\fP]] [\-m \fI<msg>\fP] [\-l|\-L \fI<lines>\fP] [\-x \fI<regex>\fP] [\-X \fI<glob/list>\fP] [\-M] [\-S] [\-v] [\-q] [\-n] [\-f] [\-V] \fI<target>\fP
+.SH "DESCRIPTION"
+.B gitwatch
+is a Bash script that monitors a \fI<target>\fP file or directory within a Git repository. When changes are detected, it automatically stages and commits them. It is designed to run as a persistent background process.
+
+The \fI<target>\fP must be a file or folder that is already part of a Git repository, or the top\-level folder of the repository itself.
+.SH "OPTIONS"
+.TP
+.B \-s \fI<secs>\fP
+After detecting a change, wait \fI<secs>\fP seconds until committing to allow for more write actions to finish. Default is 2.
+.TP
+.B \-t \fI<secs>\fP
+Timeout in seconds for critical Git operations (commit, pull, push). Can also be set via \fBGW_TIMEOUT\fP. Default is 60.
+.TP
+.B \-d \fI<fmt>\fP
+The format string for the \fB%d\fP timestamp in the commit message (see \fBdate(1)\fP). Default is "+%Y\-%m\-%d %H:%M:%S".
+.TP
+.B \-r \fI<remote>\fP
+Specifies a remote to \fBgit push\fP to after every successful commit. If empty, no push is done.
+.TP
+.B \-R
+If given with \fB\-r\fP, performs a \fBgit pull \-\-rebase\fP before every push.
+.TP
+.B \-b \fI<branch>\fP
+The branch to push to. If not given, \fBgit push <remote>\fP is used. If the repo is in a detached HEAD state, it pushes as \fBHEAD:<branch>\fP. Otherwise, it pushes as \fB<current branch>:<branch>\fP.
+.TP
+.B \-g \fI<path>\fP
+Specifies the path to an external \fB.git\fP directory (\fB\-\-git\-dir\fP).
+.TP
+.B \-l \fI<lines>\fP
+Log the actual changes in the commit message, up to \fI<lines>\fP count (use 0 for unlimited). Output is colored.
+.TP
+.B \-L \fI<lines>\fP
+Same as \fB\-l\fP but without colored formatting.
+.TP
+.B \-m \fI<msg>\fP
+Template for the commit message. \fB%d\fP is replaced by the formatted date/time. Default is "Auto\-commit: %d". Ignored if \fB\-c\fP is used.
+.TP
+.B \-c \fI<command>\fP
+Command to run to generate the full commit message. Overrides \fB\-m\fP, \fB\-d\fP, and \fB\-l\fP/\fB\-L\fP.
+.TP
+.B \-C
+If used with \fB\-c\fP, pipes the list of changed files (\fBgit diff \-\-staged \-\-name\-only\fP) to the custom command's stdin.
+.TP
+.B \-e \fI<events>\fP
+Custom event list for \fBinotifywait(1)\fP or \fBfswatch(1)\fP.
+.TP
+.B \-x \fI<regex>\fP
+Raw regex pattern to exclude files/directories from being monitored. The \fB.git\fP folder is always excluded.
+.TP
+.B \-X \fI<glob/list>\fP
+Comma\-separated list of glob patterns to exclude (e.g., "*.log,tmp/").
+.TP
+.B \-M
+Prevents commits if a Git merge/rebase is currently in progress.
+.TP
+.B \-f
+Commits any pending staged changes on startup before starting the watch loop.
+.TP
+.B \-S
+Logs all messages to \fBsyslog(3)\fP (daemon mode) instead of stdout/stderr.
+.TP
+.B \-v
+Enables verbose logging for debugging.
+.TP
+.B \-q
+Suppresses all stdout and stderr output (overridden by \fB\-S\fP).
+.TP
+.B \-n
+Disables file locking and bypasses the \fBflock(1)\fP dependency check.
+.TP
+.B \-V
+Prints version information and exits.
+.SH "SECURITY"
+The \fB\-c\fP flag executes arbitrary shell commands. This carries inherent security risks. Only use the \fB\-c\fP flag with trusted commands, especially when running \fBgitwatch\fP as a service or on repositories with untrusted content.
+.SH "ENVIRONMENT"
+.TP
+.B GW_GIT_BIN
+Specify the full path to the \fBgit\fP binary.
+.TP
+.B GW_INW_BIN
+Specify the full path to the watcher binary (\fBinotifywait\fP or \fBfswatch\fP).
+.TP
+.B GW_FLOCK_BIN
+Specify the full path to the \fBflock\fP binary.
+.TP
+.B GW_TIMEOUT_BIN
+Specify the full path to the \fBtimeout\fP binary (e.g., \fBgtimeout\fP on macOS).
+.TP
+.B GW_PKILL_BIN
+Specify the full path to the \fBpkill\fP binary.
+.TP
+.B GW_TIMEOUT
+Overrides the default 60\-second timeout for Git operations.
+.TP
+.B GW_READ_TIMEOUT
+Overrides the auto\-detected event drain timeout (e.g., \fB0.1\fP or \fB1\fP).
+.TP
+.B GW_LOG_LINE_LENGTH
+Overrides the default 150\-character truncation for individual lines in the \fB\-l\fP/\fB\-L\fP commit log.
+.TP
+.B GW_MAX_FAIL_COUNT
+Number of consecutive git failures before entering cool\-down. Default is 5.
+.TP
+.B GW_COOL_DOWN_SECONDS
+Cool\-down time in seconds after hitting max failures. Default is 600.
+.SH "FILES"
+.TP
+.B $GIT_DIR/gitwatch-target_<hash>.lock
+The primary lockfile used to prevent concurrent instances on the same target.
+.TP
+.B /tmp/gitwatch-repo_<hash>-target_<hash>.lock
+Fallback lockfile used if the \fB.git\fP directory is not writable.
+.TP
+.B /tmp/gitwatch-target_<hash>.timer.pid
+PID file used internally for managing debounce logic.
+.TP
+.B /tmp/gitwatch.status
+Healthcheck status file, updated on every watcher event. Used by the Docker \fBHEALTHCHECK\fP.
+.SH "SEE ALSO"
+.BR git (1),
+.BR inotifywait (1),
+.BR fswatch (1),
+.BR flock (1),
+.BR timeout (1),
+.BR pkill (1),
+.BR date (1)

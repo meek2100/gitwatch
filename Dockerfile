@@ -1,4 +1,5 @@
-FROM alpine:3.20
+ARG BASE_IMAGE=alpine:3.20
+FROM ${BASE_IMAGE}
 
 # Create a non-root user and group first
 # --- FIX: Added '-s /bin/bash' to set a valid login shell ---

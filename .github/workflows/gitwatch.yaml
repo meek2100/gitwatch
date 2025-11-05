@@ -18,6 +18,8 @@ jobs:
     if: "!contains(github.event.head_commit.message, '#noaction')"
     permissions:
       contents: read
+      # Allow writing artifacts
+      actions: write
     strategy:
       matrix:
         os: [ubuntu-latest, macOS-latest]
@@ -48,6 +50,13 @@ jobs:
       # - name: Setup upterm session # Preserved commented-out step
       #   uses: lhotari/action-upterm@v1
 
+      - name: Install kcov (for coverage on Linux)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install kcov
+
       - name: Display gitwatch.sh content before testing
         shell: bash
         run: |
@@ -66,7 +75,7 @@ jobs:
           grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
           echo "--- End of verification ---"
 
-      - name: Run tests in parallel
+      - name: Run tests (and coverage on Linux)
         shell: bash
         # Set BATS_LIB_PATH to include action-installed libraries and our custom module
         env:
@@ -87,11 +96,31 @@ jobs:
 
           echo "Running BATS tests in parallel using $NPROC cores..."
 
-          # Use find and xargs to pipe test files to bats
-          # -n1: one file at a time per bats process
-          # -P $NPROC: run up to $NPROC processes in parallel
-          # We add --tap to get a standard output format, which is good for parallel runs
-          # Add the new helpers.bats test to the parallel run
-          find . -name "*.bats" -print0 | xargs -0 -n1 -P "$NPROC" bats --tap
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            # Run with kcov on Linux
+            echo "Running with kcov for code coverage..."
+            mkdir -p ../coverage
+            # We must run kcov from the root of the repo to get correct paths
+            cd ..
+            # kcov manages its own parallel execution, but we point it to the bats files
+            # Note: kcov + BATS can be complex. This command runs all tests under one kcov instance.
+            # We use `find` to pass all test files to `bats` at once.
+            kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats $(find tests -name "*.bats")
+          else
+            # Run normally on macOS
+            # Use find and xargs to pipe test files to bats
+            # -n1: one file at a time per bats process
+            # -P $NPROC: run up to $NPROC processes in parallel
+            # We add --tap to get a standard output format, which is good for parallel runs
+            find . -name "*.bats" -print0 | xargs -0 -n1 -P "$NPROC" bats --tap
+          fi
 
           echo "Finished running tests"
+
+      - name: Upload coverage report (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-linux
+          path: coverage/
+          retention-days: 7

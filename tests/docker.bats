@@ -21,7 +21,11 @@ setup_file() {
   # shellcheck disable=SC2154 # BATS_TEST_DIRNAME is set by BATS
   local repo_root="${BATS_TEST_DIRNAME}/.."
 
-  run docker build -t "$DOCKER_IMAGE_NAME" "$repo_root"
+  # --- MODIFIED: Read base image from env var ---
+  local base_image="${TEST_BASE_IMAGE:-alpine:3.20}"
+  verbose_echo "# DEBUG: Building image with base: $base_image"
+  run docker build --build-arg "BASE_IMAGE=$base_image" -t "$DOCKER_IMAGE_NAME" "$repo_root"
+  # --- END MODIFICATION ---
 
   if [ "$status" -ne 0 ]; then
     echo "# DEBUG: Docker image build failed"
@@ -41,8 +45,7 @@ HEALTHCHECK --interval=3s --timeout=2s --start-period=5s --retries=2 \
 EOF
 
   run docker build -t "$DOCKER_HEALTHCHECK_IMAGE_NAME" -f "${BATS_TEST_TMPDIR}/Dockerfile.healthcheck" .
-  if [ "$status" -ne 0 ];
-  then
+  if [ "$status" -ne 0 ]; then
     echo "# DEBUG: Docker healthcheck image build failed"
     echo "$output"
   fi

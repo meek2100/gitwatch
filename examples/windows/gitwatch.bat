@@ -2,41 +2,36 @@
 rem
 rem gitwatch.bat - Windows wrapper for the gitwatch.sh WSL script
 rem
-rem This script finds the target path (the first argument not starting
-rem with '-') and translates it to a WSL path, passing all other
-rem arguments (flags) as-is, regardless of their position.
+rem This script finds the target path by identifying the last argument
+rem that does not begin with a '-'. This allows flags to be placed
+rem before or after the target path.
 rem
 
 setlocal
 
-set "all_args=%*"
 set "options="
 set "target_path="
+set "last_non_flag_arg="
 
-rem Loop through all arguments
+rem Loop through all arguments to find the last non-flag
 :argloop
-if "%~1"=="" goto :eof
-
+if "%~1"=="" goto :process
 rem Check if the argument is a flag (starts with -)
 echo "%~1" | findstr /R /B /C:"-" >nul
 if %errorlevel% equ 0 (
-    rem It's an option/flag
+    rem It's an option/flag, add it to the options string
     set "options=%options% %1"
 ) else (
-    rem It's not a flag. Assume it's the target path.
-    rem Only set the *first* non-flag argument as the path.
-    if "%target_path%"=="" (
-        set "target_path=%~1"
-    ) else (
-        rem This is a second non-flag argument, which is invalid.
-        rem Pass it along; gitwatch.sh will show an error.
-        set "options=%options% %1"
-    )
+    rem It's not a flag. Store it as the *potential* target path.
+    set "last_non_flag_arg=%~1"
 )
 shift
 goto :argloop
 
-:eof
+:process
+rem The last non-flag argument we found is the target path
+set "target_path=%last_non_flag_arg%"
+
 rem Check if a path was provided
 if "%target_path%"=="" (
     rem No path provided, just run gitwatch (which will show the help message)
