@@ -57,15 +57,26 @@ for testing.
 2. **Run the Tests:** Run the full BATS test suite to ensure your change
    didn't break anything. We've created a simple command for this:
 
-   ```sh
-   make test
-   ```
+```sh
+make test
+```
 
-3. **Commit your changes:** When you run `git commit`, the `pre-commit`
+3. **Add a Changelog Fragment:** If your change is user-facing (a new
+   feature, bugfix, or performance improvement), add a small changelog
+   "fragment" file.
+   - Go to the `.changelog/` directory.
+   - Create a file named `<issue-number>.<type>.md` (e.g., `123.added.md`
+     or `456.fixed.md`).
+   - Write a brief, past-tense description of your change, e.g., "Fixed an
+     issue where the -R flag would fail with detached HEADs."
+   - This will be automatically compiled into `CHANGELOG.md` on the next
+     release.
+
+4. **Commit your changes:** When you run `git commit`, the `pre-commit`
    hooks will automatically run, format your code, and check for linting
    errors. If it fails, fix the errors and run `git commit` again.
 
-4. **Open a Pull Request:** Push your branch to GitHub and open a Pull
+5. **Open a Pull Request:** Push your branch to GitHub and open a Pull
    Request against the `master` branch. The `CHANGELOG.md` will be updated
    automatically when your PR is merged.
 

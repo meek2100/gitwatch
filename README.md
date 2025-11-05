@@ -599,6 +599,18 @@ multiple instances on the same repository, as long as they are watching
 different files or sub-directories (e.g., one for `/repo/docs` and one for
 `/repo/src`).
 
+**Q: My Docker container is "unhealthy". Is it broken?**
+
+**A:** Not necessarily. `gitwatch` has an advanced health check. If the
+container is "unhealthy," it can mean one of two things:
+
+1. The script has crashed (check logs with `docker-compose logs -f`).
+2. The script has entered its automatic "cool-down" period after repeated
+   failures (e.g., it couldn't reach your Git remote). This is normal
+   behavior to prevent spamming. The script will be marked "healthy" again
+   and resume operations after the cool-down period (default: 10 minutes)
+   expires.
+
 ## Other Articles
 
 ### On the Gitwatch Wiki
