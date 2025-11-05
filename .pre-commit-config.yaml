@@ -8,21 +8,21 @@ repos:
       - id: prettier
         name: Format Code (Prettier)
         args: ["--config", ".config/.prettierrc.yaml", "--write"]
-  # - repo: https://github.com/executablebooks/mdformat
-  #   rev: 1.0.0
-  #   hooks:
-  #     - id: mdformat
-  #       name: Format Markdown (mdformat)
-  #       entry: mdformat
-  #       language: python
-  #       types: [markdown]
-  #       args: [--wrap, "75", --number]
-  #       additional_dependencies:
-  #         - mdformat-toc
-  #         - mdformat-config
-  #         - mdformat-gfm
-  #         - mdformat-beautysh
-  #         - setuptools
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 1.0.0
+    hooks:
+      - id: mdformat
+        name: Format Markdown (mdformat)
+        entry: mdformat
+        language: python
+        types: [markdown]
+        args: [--wrap, "75", --number]
+        additional_dependencies:
+          - mdformat-toc
+          - mdformat-config
+          - mdformat-gfm
+          - mdformat-beautysh
+          - setuptools
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.45.0
     hooks:
