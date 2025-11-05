@@ -30,6 +30,7 @@ client and a formatter plugin is the recommended path for seamless
 integration.
 
 1. **Linter (`shellcheck`):**
+
    - Install a Language Server client (e.g., `coc.nvim`, `vim-lsp`, native
      LSP) configured to use a tool that calls `shellcheck` (such as
      `bash-language-server`).
@@ -37,6 +38,7 @@ integration.
      file.
 
 2. **Formatter (`beautysh`):**
+
    - Install a formatter plugin (e.g., `Neoformat`, `ALE`,
      `vim-autoformat`).
    - Configure the plugin to use the command **`beautysh`** as the external

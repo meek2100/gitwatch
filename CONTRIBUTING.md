@@ -18,6 +18,7 @@ for testing.
 2. **Install Core Dependencies:** You will need the runtime dependencies
    for `gitwatch` itself, plus the development dependencies for testing and
    linting.
+
    - **macOS (using Homebrew):**
 
      ```sh
@@ -64,6 +65,7 @@ for testing.
 3. **Add a Changelog Fragment:** If your change is user-facing (a new
    feature, bugfix, or performance improvement), add a small changelog
    "fragment" file.
+
    - Go to the `.changelog/` directory.
    - Create a file named `<issue-number>.<type>.md` (e.g., `123.added.md`
      or `456.fixed.md`).

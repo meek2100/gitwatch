@@ -238,13 +238,7 @@ You can find these on your host machine by running `id -u` (for PUID) and
 [`docker-compose.yaml`](./docker-compose.yaml) file for detailed
 instructions on setting volumes and environment variables.
 
-<!-- prettier-ignore-start -->
-
-<!-- markdownlint-disable -->
-
 **3. Environment Variables**
-
-<!-- markdownlint-restore -->
 
 The following environment variables are available for configuring the
 `gitwatch` container:
@@ -283,8 +277,6 @@ The following environment variables are available for configuring the
 | `GW_FLOCK_BIN`         | `""`                   | (Optional) Specify the full path _inside the container_ to a custom `flock` binary.                                                     |
 | `GW_TIMEOUT_BIN`       | `""`                   | (Optional) Specify the full path _inside the container_ to a custom `timeout` binary.                                                   |
 | `GW_PKILL_BIN`         | `""`                   | (Optional) Specify the full path _inside the container_ to a custom `pkill` binary.                                                     |
-
-<!-- prettier-ignore-end -->
 
 **4. Running gitwatch:**
 
@@ -526,11 +518,9 @@ A central place to put startup scripts on Linux is generally
 startup, **by the root user account**. If you want to start `gitwatch` from
 `rc.local`, the recommended way to call it is:
 
-<!-- markdownlint-disable -->
-
-`su -c "/absolute/path/to/script/gitwatch.sh /absolute/path/to/watched/file/or/folder" -l <username> &`
-
-<!-- markdownlint-restore -->
+```sh
+su -c "/absolute/path/to/script/gitwatch.sh /absolute/path/to/watched/file/or/folder" -l <username> &
+```
 
 The `<username>` bit should be replaced with your username or that of any
 other (non-root) user account; it only needs write-access to the Git

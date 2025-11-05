@@ -20,7 +20,7 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[markdown]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.defaultFormatter": "bittorala.mdformat",
     "editor.wordWrap": "on",
     "editor.rulers": [90]
   },
@@ -48,7 +48,7 @@
       "exclude": [
         "tests/bats-support/**/*",
         "tests/bats-assert/**/*",
-        "tests/bats-file/**/*"
+        "testsF/bats-file/**/*"
       ]
     }
   ]
