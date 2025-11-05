@@ -38,7 +38,7 @@ USER appuser
 #    indicating the main watch loop is hung on a read or git command.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD test -f /tmp/gitwatch.status && \
-      find /tmp -maxdepth 1 -name gitwatch.status -mmin -3 | grep -q . || \
+      find /tmp -maxdepth 1 -name gitwatch.status -mmin -1 | grep -q . || \
       exit 1
 
 ENTRYPOINT ["/app/entrypoint.sh"]
