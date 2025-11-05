@@ -48,7 +48,7 @@ run_conversion() {
   run run_conversion ""
   assert_output "" "Empty string conversion failed"
 
-  # Case 6: Test '?' glob
+  # Case 6: Test '?'
   run run_conversion "file?.log,data*"
   assert_output "file.\.log|data.*" "Glob '?' conversion failed: file?.log,data* -> file.\.log|data.*"
 }

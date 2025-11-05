@@ -151,6 +151,7 @@ in
         disableLocking = false;
         logLineLength = 100;
         logDiffLines = 10;
+        logDiffNoColor = false;
         gitDir = "/mnt/data/.git";
         globExcludePattern = "*.log,temp/";
       };
@@ -278,7 +279,7 @@ in
             default = null;
           };
           logDiffLines = lib.mkOption {
-            description = "Log actual changes up to a given number of lines, 0 for unlimited (-l).";
+            description = "Log actual changes up to a given number of lines, 0 for unlimited (-l or -L).";
             type = nullOr (oneOf [
               str
               int
