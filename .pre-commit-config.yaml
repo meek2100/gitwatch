@@ -6,12 +6,13 @@ repos:
     rev: "v3.6.2"
     hooks:
       - id: prettier
+        name: Format Code (Prettier)
         args: ["--config", ".config/.prettierrc.yaml", "--write"]
   # - repo: https://github.com/executablebooks/mdformat
   #   rev: 1.0.0
   #   hooks:
   #     - id: mdformat
-  #       name: Format Markdown
+  #       name: Format Markdown (mdformat)
   #       entry: mdformat
   #       language: python
   #       types: [markdown]
@@ -32,42 +33,59 @@ repos:
     rev: v6.0.0
     hooks:
       - id: no-commit-to-branch
+        name: Block Commit to Main
         args: [--branch, master]
       - id: check-yaml
+        name: Check YAML Syntax
         exclude: ^(docker-compose\.yml|.*/release-drafter\.yml)$
       - id: debug-statements
+        name: No Debug Statements
       - id: end-of-file-fixer
+        name: Fix End of File
       - id: trailing-whitespace
+        name: Trim Trailing Whitespace
       - id: check-json
+        name: Check JSON Syntax
       - id: mixed-line-ending
+        name: Fix Mixed Line Endings (LF)
         args: [--fix=lf]
         types: [text]
         exclude: \.md$
       - id: check-merge-conflict
+        name: Check Merge Conflicts
       - id: check-executables-have-shebangs
+        name: Check Shebangs on Executables
       - id: check-shebang-scripts-are-executable
+        name: Shebang Scripts are Executable
       - id: fix-byte-order-marker
+        name: Fix BOM
       - id: check-case-conflict
+        name: Check Filename Case Conflicts
       - id: check-added-large-files
+        name: Prevent Large File Commits
         args: ["--maxkb=500"]
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.37.1
     hooks:
       - id: yamllint
+        name: Lint YAML
         args: ["--config-file", ".config/.yamllint.yaml"]
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:
       - id: codespell
+        name: Check Spelling (Codespell)
         args: ["--config", ".config/.codespellrc"]
   - repo: https://github.com/IamTheFij/docker-pre-commit
     rev: v3.0.1
     hooks:
       - id: docker-compose-check
+        name: Validate Docker Compose
   - repo: https://github.com/lovesegfault/beautysh
     rev: v6.2.1
     hooks:
       - id: beautysh
+        name: Format Shell Scripts (Beautysh)
         args: ["-i", "2"]
         additional_dependencies:
           - setuptools
@@ -76,12 +94,14 @@ repos:
   #  rev: v6.4.2
   #  hooks:
   #    - id: beautysh
+  #      name: Format Shell Scripts (Beautysh)
   #      args: ["--config", ".beautyshrc"]
   #      exclude: ^gitwatch.sh$
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
+        name: Lint Shell Scripts (ShellCheck)
         files: \.(sh|bats|bash)$
         args: ["--rcfile", ".config/.shellcheckrc"]
   - repo: https://github.com/AleksaC/hadolint-py
@@ -95,10 +115,3 @@ repos:
     hooks:
       - id: nixfmt
         name: Format Nix files
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
-    hooks:
-      - id: end-of-file-fixer
-        files: \.(ps1|bat)$
-      - id: trailing-whitespace
-        files: \.(ps1|bat)$
