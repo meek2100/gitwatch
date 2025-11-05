@@ -13,6 +13,7 @@ RUN apk add --no-cache \
         su-exec \
         util-linux \
         coreutils \
+        procps \
     && mkdir -p /app \
     && chown appuser:appgroup /app
 
