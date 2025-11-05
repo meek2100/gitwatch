@@ -123,10 +123,6 @@ gitwatch -r origin -b main "C:\Users\YourUser\Documents\MyNotes"
 The wrapper automatically handles path translation, and `gitwatch` will use
 your existing Windows `.gitconfig` and SSH keys.
 
-**Note:** The `gitwatch.bat` wrapper requires the target path to be the
-**final argument** in the command. All flags (like `-r` or `-b`) must come
-_before_ the path.
-
 ### From Source
 
 `gitwatch` can be installed from source using the provided `Makefile`. This

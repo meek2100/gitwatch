@@ -40,6 +40,9 @@ result-*
 # BATS test artifacts (e.g., mktemp output.XXXXX)
 *.XXXXX
 
+# Code coverage reports
+coverage/
+
 # Docker-compose test volume
 watched-repo/
 

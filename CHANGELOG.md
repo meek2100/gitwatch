@@ -17,10 +17,11 @@ incorporating all changes **after** commit `5cdaeb49dc`._
 - Added CI step for `kcov` code coverage reporting.
 - Added CI matrix build to test against `alpine:edge` in Docker.
 - Added `man` page (`gitwatch.1`) and Makefile rule for installation.
-- Added BATS test for filenames with special characters (quotes, non-ASCII).
+- Added BATS test for filenames with special characters (quotes,
+  non-ASCII).
 - Added BATS test for graceful failure on `git config` errors.
-- Added BATS test to simulate generic `git commit` failures
-  (e.g., disk full) and verify backoff logic.
+- Added BATS test to simulate generic `git commit` failures (e.g., disk
+  full) and verify backoff logic.
 - **New Options:**
   - `-f`: Commit any pending changes on startup before starting the watch
     loop.
