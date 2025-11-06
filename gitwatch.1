@@ -67,11 +67,16 @@ Commits any pending staged changes on startup before starting the watch loop.
 .B \-S
 Logs all messages to \fBsyslog(3)\fP (daemon mode) instead of stdout/stderr.
 .TP
+.B \-o \fI<level>\fP
+Set the logging verbosity. Accepts numbers (0\-6) or names:
+\fBQUIET\fP (0), \fBFATAL\fP (1), \fBERROR\fP (2), \fBWARN\fP (3), \fBINFO\fP (4 - default),
+\fBDEBUG\fP (5), \fBTRACE\fP (6).
+.TP
 .B \-v
-Enables verbose logging for debugging.
+Enables verbose logging for debugging. Shortcut for \fB-o DEBUG\fP.
 .TP
 .B \-q
-Suppresses all stdout and stderr output (overridden by \fB\-S\fP).
+Suppresses all stdout and stderr output. Shortcut for \fB-o QUIET\fP (overridden by \fB\-S\fP).
 .TP
 .B \-n
 Disables file locking and bypasses the \fBflock(1)\fP dependency check.
