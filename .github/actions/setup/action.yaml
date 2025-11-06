@@ -13,7 +13,7 @@ inputs:
 outputs:
   bats-lib-path:
     description: "Path to BATS libraries if setup-bats was true"
-    value: ${{ steps.setup-bats.outputs.lib-path }}
+    value: ${{ steps.set-bats-paths.outputs.lib-path }}
 
 runs:
   using: "composite"
@@ -24,17 +24,47 @@ runs:
         fetch-depth: 0
         persist-credentials: false
 
-    - name: Setup BATS and Libraries
-      # Note: Composite action inputs are always strings, so we check for 'true'
-      if: ${{ inputs.setup-bats == 'true' }}
-      id: setup-bats
-      uses: bats-core/bats-action@v2 # <-- Changed to the major version tag
-      with:
-        support-path: "${{ github.workspace }}/tests/bats-support"
-        assert-path: "${{ github.workspace }}/tests/bats-assert"
-        file-path: "${{ github.workspace }}/tests/bats-file"
-        detik-install: "false"
+    # --- BATS INSTALLATION ---
+    - name: Install BATS Core (Linux)
+      if: ${{ inputs.setup-bats == 'true' && startsWith(inputs.os, 'ubuntu') }}
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bats
 
+    - name: Install BATS Core (macOS)
+      if: ${{ inputs.setup-bats == 'true' && startsWith(inputs.os, 'macOS') }}
+      shell: bash
+      run: |
+        brew install bats-core
+
+    - name: Install BATS Helper Libraries
+      if: ${{ inputs.setup-bats == 'true' }}
+      shell: bash
+      run: |
+        echo "Cloning BATS helper libraries..."
+        # Clone into the paths defined in your original action file
+        git clone --depth 1 https://github.com/bats-core/bats-support.git "${{ github.workspace }}/tests/bats-support"
+        git clone --depth 1 https://github.com/bats-core/bats-assert.git "${{ github.workspace }}/tests/bats-assert"
+        git clone --depth 1 https://github.com/bats-core/bats-file.git   "${{ github.workspace }}/tests/bats-file"
+        echo "Helper libraries installed."
+
+    - name: Set BATS Library Path Output
+      # This step manually constructs the output path that bats-action *would have*
+      if: ${{ inputs.setup-bats == 'true' }}
+      id: set-bats-paths
+      shell: bash
+      run: |
+        BATS_SUPPORT_PATH="${{ github.workspace }}/tests/bats-support"
+        BATS_ASSERT_PATH="${{ github.workspace }}/tests/bats-assert"
+        BATS_FILE_PATH="${{ github.workspace }}/tests/bats-file"
+
+        # This is the colon-separated path the action was supposed to output
+        LIB_PATH="${BATS_SUPPORT_PATH}:${BATS_ASSERT_PATH}:${BATS_FILE_PATH}"
+
+        echo "BATS lib-path manually set to: $LIB_PATH"
+        echo "lib-path=$LIB_PATH" >> $GITHUB_OUTPUT
+    # --- END BATS SETUP ---
     - name: Substitute Version Number into gitwatch.sh
       shell: bash
       run: |
