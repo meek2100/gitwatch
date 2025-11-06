@@ -96,6 +96,18 @@ TIMEOUT=${GW_TIMEOUT:-60} # Timeout for critical Git operations (commit, pull, p
 LOG_LINE_LENGTH=${GW_LOG_LINE_LENGTH:-150}
 # --------------------------------------
 
+# --- Logging Configuration ---
+LEVEL_QUIET=0
+LEVEL_FATAL=1
+LEVEL_ERROR=2
+LEVEL_WARN=3
+LEVEL_INFO=4
+LEVEL_DEBUG=5
+LEVEL_TRACE=6
+GW_LOG_LEVEL=$LEVEL_INFO # Default log level
+USE_SYSLOG=0
+# --- End Logging Configuration ---
+
 # --- Exponential Backoff Configuration ---
 GIT_FAIL_COUNT=0                                  # Current number of consecutive Git failures
 # MODIFIED: Allow override for testing
@@ -116,14 +128,87 @@ LISTCHANGES=-1
 LISTCHANGES_COLOR="--color=always"
 GIT_DIR=""
 SKIP_IF_MERGING=0
-VERBOSE=0
 COMMIT_ON_START=0
 EVENTS="" # User-defined events
 EXCLUDE_PATTERN="" # Raw regex from -x
 GLOB_EXCLUDE_PATTERN="" # Glob list from -X
-USE_SYSLOG=0
-QUIET=0 # Quiet mode flag
 NO_LOCK=0 # No-lock flag
+
+# --- Logging Functions ---
+
+# Set the global log level, accepting either names or numbers
+_set_log_level() {
+  local level_input
+  level_input=$(echo "$1" | tr '[:upper:]' '[:lower:]') # Convert to lowercase
+  case "$level_input" in
+    0|quiet)  GW_LOG_LEVEL=$LEVEL_QUIET  ;;
+    1|fatal)  GW_LOG_LEVEL=$LEVEL_FATAL  ;;
+    2|error)  GW_LOG_LEVEL=$LEVEL_ERROR  ;;
+    3|warn)   GW_LOG_LEVEL=$LEVEL_WARN   ;;
+    4|info)   GW_LOG_LEVEL=$LEVEL_INFO   ;;
+    5|debug)  GW_LOG_LEVEL=$LEVEL_DEBUG  ;;
+    6|trace)  GW_LOG_LEVEL=$LEVEL_TRACE  ;;
+    *)
+      # Use log_warn here, but it might not be visible if level is QUIET
+      echo "[WARN] Invalid log level '$1'. Using default (INFO)." >&2
+      GW_LOG_LEVEL=$LEVEL_INFO
+      ;;
+  esac
+}
+
+# _log: Internal log function
+# $1: The log level (e.g., LEVEL_INFO)
+# $2: The log prefix (e.g., "[INFO]")
+# $3: The syslog severity (e.g., "daemon.info")
+# $4: The output stream (1 for stdout, 2 for stderr)
+# $5+: The message to log
+_log() {
+  local log_level=$1
+  local prefix=$2
+  local syslog_severity=$3
+  local stream=$4
+  shift 4
+
+  # Check if the current log level is high enough to show this message
+  if [ "$GW_LOG_LEVEL" -ge "$log_level" ]; then
+    local message
+    message=$(printf "%s" "$*") # Format the message
+
+    if [ "$USE_SYSLOG" -eq 1 ]; then
+      logger -t "${0##*/}" -p "$syslog_severity" "$message"
+    else
+      # Write to the specified stream (1 for stdout, 2 for stderr)
+      if [ "$stream" -eq 1 ]; then
+        echo "$prefix $message"
+      else
+        echo "$prefix $message" >&2
+      fi
+    fi
+  fi
+}
+
+# --- Public-facing log functions ---
+log_fatal() {
+  # This function ONLY logs. It does NOT exit.
+  _log $LEVEL_FATAL "[FATAL]" "daemon.emerg" 2 "$@"
+}
+log_error() {
+  _log $LEVEL_ERROR "[ERROR]" "daemon.error" 2 "$@"
+}
+log_warn() {
+  _log $LEVEL_WARN "[WARN]" "daemon.warning" 2 "$@"
+}
+log_info() {
+  _log $LEVEL_INFO "[INFO]" "daemon.info" 1 "$@"
+}
+log_debug() {
+  _log $LEVEL_DEBUG "[DEBUG]" "daemon.debug" 1 "$@"
+}
+log_trace() {
+  _log $LEVEL_TRACE "[TRACE]" "daemon.debug" 1 "$@"
+}
+# --- End Logging Functions ---
+
 
 # Print a message about how to use this script
 shelp() {
@@ -132,7 +217,8 @@ gitwatch - watch file or directory and git commit all changes as they happen
 
 Usage:
   ${0##*/} [-s <secs>] [-t <secs>] [-d <fmt>] [-r <remote> [-b <branch>]]
-            [-m <msg>] [-l|-L <lines>] [-x <regex>] [-X <glob/list>] [-M] [-S] [-v] [-q] [-n] [-f] [-V] <target>
+            [-m <msg>] [-l|-L <lines>] [-x <regex>] [-X <glob/list>]
+            [-o <level>] [-v] [-q] [-M] [-S] [-n] [-f] [-V] <target>
 
 Where <target> is the file or folder which should be watched. The target needs
 to be in a Git repository, or in the case of a folder, it may also be the top
@@ -186,9 +272,13 @@ folder of the repo.
 
  -f               Commit any pending changes on startup before watching.
  -M               Prevent commits when there is an ongoing merge in the repo
- -S               Log all messages to syslog (daemon mode).
- -v               Run in verbose mode for debugging. Enables informational messages.
- -q               Quiet mode. Suppress all stdout and stderr output (overridden by -S).
+ -S               Log all messages to syslog (daemon mode). Overrides -q.
+ -o <level>       Set the logging verbosity. Accepts numbers (0-6) or names:
+                  QUIET (0), FATAL (1), ERROR (2), WARN (3), INFO (4 - default),
+                  DEBUG (5), TRACE (6).
+ -v               Verbose mode. Shortcut for '-o DEBUG'.
+ -q               Quiet mode. Shortcut for '-o QUIET'. Suppresses all stdout/stderr
+                  output (but is overridden by -S).
  -n               Disable file locking. Bypasses the 'flock' dependency check.
  -V               Print version information and exit.
  -x <regex>       Raw regex pattern to exclude files/directories from being monitored (backward compatible).
@@ -211,28 +301,6 @@ GW_TIMEOUT_BIN, and GW_PKILL_BIN.
 The read timeout for the drain loop can be set using the GW_READ_TIMEOUT environment variable.
 The line length for diffs in commit logs can be set with GW_LOG_LINE_LENGTH (default 150).
 EOF
-}
-
-# print all arguments to stderr
-stderr() {
-  if [ "$QUIET" -eq 1 ]; then return 0; fi # Suppress output
-  if [ "$USE_SYSLOG" -eq 1 ]; then
-    logger -t "${0##*/}" -p daemon.error "$@" # Use script name as tag
-  else
-    echo "$@" >&2
-  fi
-}
-
-# print all arguments to stdout if in verbose mode
-verbose_echo() {
-  if [ "$QUIET" -eq 1 ]; then return 0; fi # Suppress output
-  if [ "$VERBOSE" -eq 1 ]; then
-    if [ "$USE_SYSLOG" -eq 1 ]; then
-      logger -t "${0##*/}" -p daemon.info "$@" # Use script name as tag
-    else
-      echo "$@"
-    fi
-  fi
 }
 
 # _strip_color: Removes ANSI color codes from the input string.
@@ -264,7 +332,7 @@ _trim_spaces() {
 # clean up at end of program
 cleanup() {
   # shellcheck disable=SC2317 # Code is reachable via trap
-  verbose_echo "Cleanup function called. Exiting."
+  log_debug "Cleanup function called. Exiting."
   # The lockfile descriptors (8 and 9) will be auto-released on exit
   # shellcheck disable=SC2317 # Code is reachable via trap
   exit "$1" # Pass the exit code from the caller (or 0 if unset)
@@ -274,7 +342,7 @@ cleanup() {
 # New signal handler function
 signal_handler() {
   # shellcheck disable=SC2317 # Code is reachable via trap
-  stderr "Signal $1 received, shutting down."
+  log_info "Signal $1 received, shutting down."
   # shellcheck disable=SC2317 # Code is reachable via trap
   exit 0 # This will trigger the EXIT trap with status 0
 }
@@ -288,6 +356,7 @@ is_command() {
 # --- Helper to generate a unique hash for a path ---
 # Used for lockfiles and PID files to ensure uniqueness
 _get_path_hash() {
+  log_trace "Entering function _get_path_hash"
   local path_to_hash="$1"
   local path_hash=""
   if is_command "sha256sum"; then
@@ -298,6 +367,7 @@ _get_path_hash() {
     # Simple "hash" for POSIX compliance, replaces / with _
     path_hash="${path_to_hash//\//_}"
   fi
+  log_trace "Exiting function _get_path_hash"
   echo "$path_hash"
 }
 # --- End new helper ---
@@ -305,6 +375,7 @@ _get_path_hash() {
 # Test whether or not current git directory has ongoing merge
 # Uses the globally defined $GIT command string which might include --git-dir/--work-tree
 is_merging () {
+  log_trace "Entering function is_merging"
   # Execute in subshell to handle potential errors from rev-parse if not a repo yet
   # Use bash -c to correctly interpret the $GIT string with its arguments
   (
@@ -323,6 +394,7 @@ is_merging () {
 # Check for git user.name and user.email
 # This runs *after* $GIT is finalized, but *before* the main loop
 check_git_config() {
+  log_trace "Entering function check_git_config"
   # Check global config
   local user_name
   user_name=$(bash -c "$GIT config --global user.name" 2>/dev/null || echo "")
@@ -339,12 +411,13 @@ check_git_config() {
 
   # If either is *still* not set, warn the user.
   if [ -z "$user_name" ] || [ -z "$user_email" ]; then
-    stderr "Warning: 'user.name' or 'user.email' is not set in your Git config."
-    stderr "  Commits made by gitwatch may fail. To set them globally, run:"
-    stderr "  git config --global user.name \"Your Name\""
-    stderr "  git config --global user.email \"you@example.com\""
+    log_warn "Warning: 'user.name' or 'user.email' is not set in your Git config."
+    log_warn "  Commits made by gitwatch may fail. To set them globally, run:"
+    log_warn "  git config --global user.name \"Your Name\""
+    log_warn "  git config --global user.email \"you@example.com\""
     # Don't exit, just warn.
   fi
+  log_trace "Exiting function check_git_config"
 }
 
 #############################################################################
@@ -352,7 +425,6 @@ check_git_config() {
 # --- Signal Trapping ---
 # Note: The trap for EXIT/INT/TERM is redefined later to include PID file cleanup
 trap "cleanup 0" EXIT # Ensure cleanup runs on script exit, for any reason
-verbose_echo "Signal traps set."
 trap "signal_handler INT" INT # Handle Ctrl+C
 trap "signal_handler TERM" TERM # Handle kill/systemd stop
 # ---------------------
@@ -399,7 +471,7 @@ fi
 # --- End Preliminary Path ---
 
 
-while getopts b:d:h:g:L:l:m:c:C:p:r:s:t:e:x:X:MRvSfVqn option; do # Process command line options
+while getopts b:d:h:g:L:l:m:c:C:p:r:s:t:e:x:X:o:MRvSfVqn option; do # Process command line options
   case "${option}" in
     b) BRANCH=${OPTARG} ;;
     d) DATE_FMT=${OPTARG} ;;
@@ -413,21 +485,21 @@ while getopts b:d:h:g:L:l:m:c:C:p:r:s:t:e:x:X:MRvSfVqn option; do # Process comm
       if [ -n "$PRELIM_TARGETDIR_ABS" ]; then
         # Basic check if GIT_DIR looks like a directory path
         if [[ "$GIT_DIR" != */* ]] && [[ "$GIT_DIR" != "." ]] && [[ "$GIT_DIR" != ".." ]] && [[ "$GIT_DIR" != /* ]]; then
-          stderr "Warning: GIT_DIR '$GIT_DIR' specified with -g looks like a relative name, not a full path. Proceeding..."
+          log_warn "Warning: GIT_DIR '$GIT_DIR' specified with -g looks like a relative name, not a full path. Proceeding..."
         elif [ ! -d "$GIT_DIR" ]; then
-          stderr "Warning: GIT_DIR '$GIT_DIR' specified with -g does not seem to be a directory. Proceeding..."
+          log_warn "Warning: GIT_DIR '$GIT_DIR' specified with -g does not seem to be a directory. Proceeding..."
         fi
         # Resolve the user-provided path for GIT_DIR robustly
-        RESOLVED_GIT_DIR=$(cd "$GIT_DIR" && pwd -P) || { stderr "Error resolving path for GIT_DIR '$GIT_DIR'"; exit 4; }
+        RESOLVED_GIT_DIR=$(cd "$GIT_DIR" && pwd -P) || { log_fatal "Error resolving path for GIT_DIR '$GIT_DIR'"; exit 4; }
         # Modify the *global* GIT variable string, quoting paths
         read -r GIT_CMD_BASE _ <<< "$GIT" # Get base git command
         # Reconstruct the GIT command string safely using printf %q
         GIT=$(printf "%s --no-pager --work-tree %q --git-dir %q" "$GIT_CMD_BASE" "$PRELIM_TARGETDIR_ABS" "$RESOLVED_GIT_DIR")
 
-        verbose_echo "Using specified git directory: $RESOLVED_GIT_DIR (applied early to GIT command string)"
+        log_debug "Using specified git directory: $RESOLVED_GIT_DIR (applied early to GIT command string)"
       else
         # If PRELIM_TARGETDIR_ABS is empty, we couldn't resolve the work tree path early
-        stderr "Error: Cannot determine target directory path ('$PRELIM_USER_PATH') needed to apply -g option."
+        log_fatal "Error: Cannot determine target directory path ('$PRELIM_USER_PATH') needed to apply -g option."
         exit 5
       fi
       # --- End Early -g Handling ---
@@ -447,10 +519,8 @@ while getopts b:d:h:g:L:l:m:c:C:p:r:s:t:e:x:X:MRvSfVqn option; do # Process comm
     s) SLEEP_TIME=${OPTARG} ;;
     t) TIMEOUT=${OPTARG} ;; # Set timeout
     S) USE_SYSLOG=1 ;;
-    v)
-      VERBOSE=1
-      # set -x is enabled below, after option parsing
-      ;;
+    o) _set_log_level "${OPTARG}" ;;
+    v) GW_LOG_LEVEL=$LEVEL_DEBUG ;;
     V)
       echo "gitwatch.sh version ${GITWATCH_VERSION:-unknown}"
       exit 0
@@ -458,10 +528,11 @@ while getopts b:d:h:g:L:l:m:c:C:p:r:s:t:e:x:X:MRvSfVqn option; do # Process comm
     x) EXCLUDE_PATTERN=${OPTARG} ;; # Raw Regex
     X) GLOB_EXCLUDE_PATTERN=${OPTARG} ;; # Glob/List to be converted
     e) EVENTS=${OPTARG} ;;
-    q) QUIET=1 ;; # Set quiet mode
+    q) GW_LOG_LEVEL=$LEVEL_QUIET ;; # Set quiet mode
     n) NO_LOCK=1 ;; # Set no-lock mode
     *)
-      stderr "Error: Option '${option}' does not exist."
+      # Don't use log_fatal, as we want to print help *before* exiting
+      log_error "Error: Option '${option}' does not exist."
       shelp
       exit 1
       ;;
@@ -475,12 +546,7 @@ if [ $# -ne 1 ]; then # If no command line arguments are left (that's bad: no ta
   exit                # and exit
 fi
 USER_PATH="$1" # Final user path after shifting options
-verbose_echo "Verbose logging enabled."
-
-# Enable command tracing only if verbose and not using syslog (to avoid flooding syslog)
-if [ "$VERBOSE" -eq 1 ] && [ "$USE_SYSLOG" -eq 0 ]; then
-  verbose_echo "Command tracing disabled in favor of verbose_echo."
-fi
+log_debug "Log level set to $GW_LOG_LEVEL."
 
 
 # Determine Watcher Command (INW) and default events (moved after getopts)
@@ -526,7 +592,7 @@ if [ -z "${GW_PKILL_BIN:-}" ]; then PKILL="pkill"; else PKILL="$GW_PKILL_BIN"; f
 read -r BASE_GIT_CMD _ <<< "$GIT" # Get base git command
 for cmd in "$BASE_GIT_CMD" "$INW" "$PKILL"; do
   is_command "$cmd" || {
-    stderr "Error: Required command '$cmd' not found."
+    hint="" # Initialize hint
     # ... (Platform-specific hints remain the same) ...
     if [ "$OS_TYPE" = "Darwin" ] || [ "$OS_TYPE" = "FreeBSD" ] || [ "$OS_TYPE" = "OpenBSD" ]; then
       # macOS/BSD hints
@@ -540,21 +606,18 @@ for cmd in "$BASE_GIT_CMD" "$INW" "$PKILL"; do
               hint="  Hint: Run \`$INSTALL_CMD git\`"
             fi
           fi
-          stderr "$hint"
           ;;
         "$INW")
           hint="  Hint: '$INW' is part of the 'fswatch' package."
           if [ "$PKG_MANAGER" = "brew" ]; then
             hint="  Hint: Run \`$INSTALL_CMD fswatch\`"
           fi
-          stderr "$hint"
           ;;
         "$PKILL")
           hint="  Hint: '$PKILL' is part of the 'proctools' package."
           if [ "$PKG_MANAGER" = "brew" ]; then
             hint="  Hint: Run \`$INSTALL_CMD proctools\`"
           fi
-          stderr "$hint"
           ;;
       esac
     else
@@ -569,24 +632,22 @@ for cmd in "$BASE_GIT_CMD" "$INW" "$PKILL"; do
               hint="  Hint: Run \`$INSTALL_CMD git\`"
             fi
           fi
-          stderr "$hint"
           ;;
         "$INW")
           hint="  Hint: '$INW' is part of the 'inotify-tools' package."
           if [ -n "$INSTALL_CMD" ]; then
             hint="  Hint: Run \`$INSTALL_CMD inotify-tools\`"
           fi
-          stderr "$hint"
           ;;
         "$PKILL")
           hint="  Hint: '$PKILL' is part of the 'procps' or 'procps-ng' package."
           if [ -n "$INSTALL_CMD" ]; then
             hint="  Hint: Run \`$INSTALL_CMD procps\`"
           fi
-          stderr "$hint"
           ;;
       esac
     fi
+    log_fatal "Error: Required command '$cmd' not found.\n$hint"
     exit 2
   }
 done
@@ -597,9 +658,7 @@ if ! is_command "$TIMEOUT_CMD"; then
   if [ -n "$INSTALL_CMD" ]; then
     hint="  Hint: Run \`$INSTALL_CMD coreutils\`"
   fi
-  stderr "Error: Required command '$TIMEOUT_CMD' not found."
-  stderr "$hint"
-  stderr "  Hint: You can specify a custom path (e.g., 'gtimeout') via the GW_TIMEOUT_BIN environment variable."
+  log_fatal "Error: Required command '$TIMEOUT_CMD' not found.\n$hint\n  Hint: You can specify a custom path (e.g., 'gtimeout') via the GW_TIMEOUT_BIN environment variable."
   exit 2
 fi
 # Check for GNU coreutils version
@@ -609,16 +668,12 @@ if ! ("$TIMEOUT_CMD" --version 2>&1 | grep -q "GNU coreutils"); then
   if [ -n "$INSTALL_CMD" ] && [ "$PKG_MANAGER" != "brew" ]; then
     hint="  Hint: Run \`$INSTALL_CMD coreutils\`"
   fi
-  stderr "Error: GNU 'timeout' (from coreutils) not found (found at '$TIMEOUT_CMD')."
-  stderr "  gitwatch.sh requires the GNU version for consistent behavior."
-  stderr "$hint"
-  stderr "  Hint: If your GNU timeout is named 'gtimeout', run: export GW_TIMEOUT_BIN=gtimeout"
+  log_fatal "Error: GNU 'timeout' (from coreutils) not found (found at '$TIMEOUT_CMD').\n  gitwatch.sh requires the GNU version for consistent behavior.\n$hint\n  Hint: If your GNU timeout is named 'gtimeout', run: export GW_TIMEOUT_BIN=gtimeout"
   exit 2
 fi
 
 # 'logger' is a special case, we only check if syslog is requested
 if [ "$USE_SYSLOG" -eq 1 ] && ! is_command "logger"; then
-  stderr "Error: Required command 'logger' not found (for -S syslog option)."
   hint="  Hint: 'logger' is usually part of 'util-linux' or 'bsd-utils'."
   if [ -n "$INSTALL_CMD" ]; then
     if [ "$PKG_MANAGER" = "apt" ]; then
@@ -628,7 +683,7 @@ if [ "$USE_SYSLOG" -eq 1 ] && ! is_command "logger"; then
       hint="  Hint: Run \`$INSTALL_CMD util-linux\`"
     fi
   fi
-  stderr "$hint"
+  log_fatal "Error: Required command 'logger' not found (for -S syslog option).\n$hint"
   exit 2
 fi
 
@@ -643,13 +698,11 @@ if [ "$NO_LOCK" -eq 0 ]; then
         flock_hint="  Hint: Run \`$INSTALL_CMD util-linux\`"
       fi
     fi
-    stderr "Error: Required command 'flock' not found for process locking."
-    stderr "$flock_hint"
-    stderr "    Install 'flock' or re-run with the -n flag to disable locking and proceed."
+    log_fatal "Error: Required command 'flock' not found for process locking.\n$flock_hint\n    Install 'flock' or re-run with the -n flag to disable locking and proceed."
     exit 2
   fi
 else
-  verbose_echo "File locking explicitly disabled via -n flag."
+  log_debug "File locking explicitly disabled via -n flag."
 fi
 # --- End flock check ---
 
@@ -657,11 +710,11 @@ fi
 if [ "$NO_LOCK" -eq 0 ] && ! is_command "sha256sum" && ! is_command "md5sum"; then
   # Only warn if flock *is* available, as the hash is only needed for the fallback logic
   if is_command "$FLOCK"; then
-    stderr "Warning: Neither 'sha256sum' nor 'md5sum' found. Lockfile fallback to /tmp might use less unique names."
+    log_warn "Warning: Neither 'sha256sum' nor 'md5sum' found. Lockfile fallback to /tmp might use less unique names."
   fi
 fi
 unset cmd BASE_GIT_CMD # Clean up
-verbose_echo "Dependency checks complete."
+log_debug "Dependency checks complete."
 
 
 # Determine the appropriate read timeout based on bash version
@@ -688,7 +741,7 @@ if [ -z "$READ_TIMEOUT" ]; then
     READ_TIMEOUT="0.1" # Use faster timeout for modern bash
   fi
 fi
-verbose_echo "Using read timeout: $READ_TIMEOUT seconds (Bash version: ${bash_major_version:-unknown})"
+log_debug "Using read timeout: $READ_TIMEOUT seconds (Bash version: ${bash_major_version:-unknown})"
 
 
 #############################################################################
@@ -696,7 +749,7 @@ verbose_echo "Using read timeout: $READ_TIMEOUT seconds (Bash version: ${bash_ma
 # --- Convert User-Friendly Exclude Pattern (glob/comma-sep) to Regex (for -X) ---
 PROCESSED_GLOB_PATTERN="" # Initialize for safety
 if [ -n "${GLOB_EXCLUDE_PATTERN:-}" ]; then
-  verbose_echo "Converting glob exclude pattern '$GLOB_EXCLUDE_PATTERN' from glob/comma-separated list to regex."
+  log_debug "Converting glob exclude pattern '$GLOB_EXCLUDE_PATTERN' from glob/comma-separated list to regex."
   # 1. Replace commas with spaces to treat as separate words.
   PATTERNS_AS_WORDS=${GLOB_EXCLUDE_PATTERN//,/ }
   # 2. Use an array to store and automatically trim whitespace from each pattern.
@@ -722,9 +775,9 @@ TARGETFILE_ABS=""
 GIT_DIR_PATH="" # Initialize
 
 if [ -d "$USER_PATH" ]; then
-  verbose_echo "Target is a directory."
+  log_debug "Target is a directory."
   TARGETDIR="$USER_PATH"
-  TARGETDIR_ABS=$(cd "$TARGETDIR" && pwd -P) || { stderr "Error resolving path for '$TARGETDIR'"; exit 5; }
+  TARGETDIR_ABS=$(cd "$TARGETDIR" && pwd -P) || { log_fatal "Error resolving path for '$TARGETDIR'"; exit 5; }
 
   # GIT_DIR_PATH logic moved AFTER getopts, handled below
   final_exclude_pattern_parts=("(\.git/|\.git$)")
@@ -743,14 +796,14 @@ if [ -d "$USER_PATH" ]; then
   GIT_COMMIT_ARGS=""
 
 elif [ -f "$USER_PATH" ]; then
-  verbose_echo "Target is a file."
+  log_debug "Target is a file."
   TARGETDIR="${USER_PATH%/*}"
   TARGETFILE="${USER_PATH##*/}"
   # Handle case where file is in current directory (dirname is '.')
   if [ "$USER_PATH" = "$TARGETDIR" ] || [ -z "$TARGETDIR" ] && [[ "$USER_PATH" != /* ]]; then TARGETDIR="."; fi
   # Handle case where file is in root directory (dirname is '/')
   if [ -z "$TARGETDIR" ] && [[ "$USER_PATH" == /* ]]; then TARGETDIR="/"; fi
-  TARGETDIR_ABS=$(cd "$TARGETDIR" && pwd -P) || { stderr "Error resolving path for '$TARGETDIR'"; exit 5; }
+  TARGETDIR_ABS=$(cd "$TARGETDIR" && pwd -P) || { log_fatal "Error resolving path for '$TARGETDIR'"; exit 5; }
   TARGETFILE_ABS="$TARGETDIR_ABS/$TARGETFILE"
 
   # GIT_DIR_PATH logic moved AFTER getopts, handled below
@@ -758,7 +811,7 @@ elif [ -f "$USER_PATH" ]; then
   # GIT_ADD_ARGS logic moved to _perform_commit
   GIT_COMMIT_ARGS=""
 else
-  stderr "Error: The target is neither a regular file nor a directory."; exit 3;
+  log_fatal "Error: The target is neither a regular file nor a directory."; exit 3;
 fi
 
 # --- CRITICAL PRE-PERMISSION CHECK ON TARGET DIRECTORY ---
@@ -771,34 +824,32 @@ if ! [ -r "$TARGETDIR_ABS" ] || ! [ -w "$TARGETDIR_ABS" ] || ! [ -x "$TARGETDIR_
   CURRENT_UID=$(id -u 2>/dev/null || echo "Unknown UID")
   CURRENT_USER=$(id -n -u 2>/dev/null || echo "Unknown User")
 
-  resolution_message=""
+  resolution_message_1=""
+  resolution_message_2=""
+  resolution_message_3=""
   if [ -n "${GITWATCH_DOCKER_ENV:-}" ]; then
-    resolution_message=$(printf "
-    Resolution required:
-    1. **Container User Mismatch**: The current user (UID %s) lacks the required permissions.
-    2. **Recommended Fix**: Ensure the host volume mounted to the repository (e.g., %s) is owned by the container's non-root user ('appuser').
-    - You may need to run \`chown\` on the host path or use Docker's \`user\` option.
-    " "$CURRENT_UID" "$TARGETDIR_ABS")
+    resolution_message_1="    Resolution required:"
+    resolution_message_2="    1. **Container User Mismatch**: The current user (UID $CURRENT_UID) lacks the required permissions."
+    resolution_message_3="    2. **Recommended Fix**: Ensure the host volume mounted to the repository (e.g., $TARGETDIR_ABS) is owned by the container's non-root user ('appuser')."
   else
-    resolution_message=$(printf "
-    Resolution required:
-    1. **Check Ownership**: The current user (UID %s) does not own or have R/W/X access to the directory.
-    2. **Recommended Fix**: Ensure the watched directory is owned by the user running gitwatch.sh.
-    - Run: \`sudo chown -R \$USER:\$USER \"\$TARGETDIR_ABS\"\`
-    " "$CURRENT_UID")
+    resolution_message_1="    Resolution required:"
+    resolution_message_2="    1. **Check Ownership**: The current user (UID $CURRENT_UID) does not own or have R/W/X access to the directory."
+    resolution_message_3="    2. **Recommended Fix**: Ensure the watched directory is owned by the user running gitwatch.sh.\n    - Run: \`sudo chown -R \$USER:\$USER \"\$TARGETDIR_ABS\"\`"
   fi
 
-  stderr "========================================================================================="
-  stderr "CRITICAL PERMISSION ERROR: Cannot Access Target Directory"
-  stderr "========================================================================================="
-  stderr "The application is running as user: $CURRENT_USER (UID $CURRENT_UID)"
-  stderr "Attempted to access target directory: $TARGETDIR_ABS"
-  stderr ""
-  stderr "This error indicates that the current user lacks the necessary Read/Write/Execute"
-  stderr "permissions on the target directory itself, preventing Git initialization/checks."
-  stderr ""
-  stderr "$resolution_message"
-  stderr "========================================================================================="
+  log_fatal "=========================================================================================\n" \
+    "CRITICAL PERMISSION ERROR: Cannot Access Target Directory\n" \
+    "=========================================================================================\n" \
+    "The application is running as user: $CURRENT_USER (UID $CURRENT_UID)\n" \
+    "Attempted to access target directory: $TARGETDIR_ABS\n" \
+    "\n" \
+    "This error indicates that the current user lacks the necessary Read/Write/Execute\n" \
+    "permissions on the target directory itself, preventing Git initialization/checks.\n" \
+    "\n" \
+    "$resolution_message_1\n" \
+    "$resolution_message_2\n" \
+    "$resolution_message_3\n" \
+    "========================================================================================="
   exit 7
 fi
 # --- END CRITICAL PRE-PERMISSION CHECK ON TARGET DIRECTORY ---
@@ -812,14 +863,14 @@ GIT_DIR_PATH=$(cd "$TARGETDIR_ABS" && bash -c "$GIT rev-parse --absolute-git-dir
   # And if -g was used, trust the resolved path from earlier getopts
   if [ -n "${GIT_DIR:-}" ]; then
     # Re-resolve GIT_DIR just to be absolutely sure GIT_DIR_PATH is set correctly
-    GIT_DIR_PATH=$(cd "$GIT_DIR" && pwd -P) || { stderr "Error: Could not resolve specified GIT_DIR '$GIT_DIR' and could not find repository from '$TARGETDIR_ABS'."; exit 6; }
-    verbose_echo "Using specified git directory (final resolution): $GIT_DIR_PATH"
+    GIT_DIR_PATH=$(cd "$GIT_DIR" && pwd -P) || { log_fatal "Error: Could not resolve specified GIT_DIR '$GIT_DIR' and could not find repository from '$TARGETDIR_ABS'."; exit 6; }
+    log_debug "Using specified git directory (final resolution): $GIT_DIR_PATH"
   else
     # If -g wasn't used and rev-parse failed, it's not a git repo
-    stderr "Error: Not a git repository (or cannot find .git): ${TARGETDIR_ABS}"; exit 6;
+    log_fatal "Error: Not a git repository (or cannot find .git): ${TARGETDIR_ABS}"; exit 6;
   fi
 }
-verbose_echo "Determined git directory for lockfiles: $GIT_DIR_PATH"
+log_debug "Determined git directory for lockfiles: $GIT_DIR_PATH"
 
 # --- CRITICAL PERMISSION CHECK FOR NON-ROOT USER ON VOLUME MOUNT ---
 # FIX: Only check for Read/Execute. Lack of Write will trigger lockfile fallback below.
@@ -833,38 +884,36 @@ if ! [ -r "$GIT_DIR_PATH" ] || ! [ -x "$GIT_DIR_PATH" ]; then
   CURRENT_USER=$(id -n -u 2>/dev/null || echo "Unknown User")
 
   # --- Custom Resolution Message based on Environment ---
-  resolution_message=""
+  resolution_message_1=""
+  resolution_message_2=""
+  resolution_message_3=""
   if [ -n "${GITWATCH_DOCKER_ENV:-}" ]; then
     # Docker/Container-specific resolution
-    resolution_message=$(printf "
-    Resolution required:
-    1. **Container User Mismatch**: The current user (UID %s) lacks the required permissions.
-    2. **Recommended Fix**: Ensure the host volume mounted to the repository (e.g., /app/gitwatch-test/vault) is owned by the container's non-root user ('appuser').
-    - You may need to run \`chown\` on the host path or use Docker's \`user\` option.
-    " "$CURRENT_UID")
+    resolution_message_1="    Resolution required:"
+    resolution_message_2="    1. **Container User Mismatch**: The current user (UID $CURRENT_UID) lacks the required permissions."
+    resolution_message_3="    2. **Recommended Fix**: Ensure the host volume mounted to the repository (e.g., /app/gitwatch-test/vault) is owned by the container's non-root user ('appuser')."
   else
     # Generic/Daemon/Standalone resolution
-    resolution_message=$(printf "
-    Resolution required:
-    1. **Check Ownership**: The current user (UID %s) does not own or have R/X access to the '.git' folder.
-    2. **Recommended Fix**: Ensure the watched directory is owned by the user running gitwatch.sh.
-    - Run: \`sudo chown -R \$USER:\$USER \"\$GIT_DIR_PATH\"\`
-    " "$CURRENT_UID")
+    resolution_message_1="    Resolution required:"
+    resolution_message_2="    1. **Check Ownership**: The current user (UID $CURRENT_UID) does not own or have R/X access to the '.git' folder."
+    resolution_message_3="    2. **Recommended Fix**: Ensure the watched directory is owned by the user running gitwatch.sh.\n    - Run: \`sudo chown -R \$USER:\$USER \"\$GIT_DIR_PATH\"\`"
   fi
   # ---------------------------------------------------
 
-  stderr "========================================================================================="
-  stderr "CRITICAL PERMISSION ERROR: Cannot Access Git Repository Metadata"
-  stderr "========================================================================================="
-  stderr "The application is running as user: $CURRENT_USER (UID $CURRENT_UID)"
-  stderr "Attempted to access Git directory: $GIT_DIR_PATH"
-  stderr ""
-  stderr "This error indicates that the current user lacks the necessary Read/Execute"
-  stderr "permissions on the Git repository's metadata folder (the '.git' directory), which"
-  stderr "is required to perform Git operations."
-  stderr ""
-  stderr "$resolution_message"
-  stderr "========================================================================================="
+  log_fatal "=========================================================================================\n" \
+    "CRITICAL PERMISSION ERROR: Cannot Access Git Repository Metadata\n" \
+    "=========================================================================================\n" \
+    "The application is running as user: $CURRENT_USER (UID $CURRENT_UID)\n" \
+    "Attempted to access Git directory: $GIT_DIR_PATH\n" \
+    "\n" \
+    "This error indicates that the current user lacks the necessary Read/Execute\n" \
+    "permissions on the Git repository's metadata folder (the '.git' directory), which\n" \
+    "is required to perform Git operations.\n" \
+    "\n" \
+    "$resolution_message_1\n" \
+    "$resolution_message_2\n" \
+    "$resolution_message_3\n" \
+    "========================================================================================="
   exit 7
 fi
 # --- END PERMISSION CHECK ---
@@ -872,7 +921,7 @@ fi
 # Ensure GIT_DIR_PATH is absolute (belt-and-suspenders)
 if [[ "$GIT_DIR_PATH" != /* ]]; then
   # This might happen if rev-parse somehow failed to give absolute path or -g was relative
-  GIT_DIR_PATH=$(bash -c "$GIT rev-parse --git-path '$GIT_DIR_PATH'") || { stderr "Error finalizing git directory path."; exit 6; }
+  GIT_DIR_PATH=$(bash -c "$GIT rev-parse --git-path '$GIT_DIR_PATH'") || { log_fatal "Error finalizing git directory path."; exit 6; }
 fi
 # --- End Git Directory Path ---
 
@@ -891,7 +940,7 @@ LOCKFILE_BASENAME="gitwatch-target_${TARGET_HASH}"
 # This handles the case where Write permission was missing on $GIT_DIR_PATH (the check above passed)
 if [ "$NO_LOCK" -eq 0 ]; then
   if ! touch "$LOCKFILE_DIR/gitwatch.lock.tmp" 2>/dev/null; then
-    verbose_echo "Warning: Cannot write lockfile to $LOCKFILE_DIR. Falling back to temporary directory."
+    log_warn "Warning: Cannot write lockfile to $LOCKFILE_DIR. Falling back to temporary directory."
     # Use $TMPDIR if set, otherwise /tmp
     LOCKFILE_DIR="${TMPDIR:-/tmp}"
 
@@ -901,7 +950,7 @@ if [ "$NO_LOCK" -eq 0 ]; then
     LOCKFILE_BASENAME="gitwatch-repo_${REPO_HASH}-target_${TARGET_HASH}"
     # --- End modification ---
 
-    verbose_echo "Using temporary lockfile base: $LOCKFILE_DIR/$LOCKFILE_BASENAME"
+    log_debug "Using temporary lockfile base: $LOCKFILE_DIR/$LOCKFILE_BASENAME"
   else
     # We have write permission, clean up our test file
     rm "$LOCKFILE_DIR/gitwatch.lock.tmp"
@@ -918,9 +967,10 @@ if [ "$NO_LOCK" -eq 0 ]; then
   exec 9>"$LOCKFILE"
   "$FLOCK" -n 9 || {
     # Exit with 69 (EX_UNAVAILABLE) to indicate the resource (lock) was busy
-    stderr "Error: gitwatch is already running on this repository/target (lockfile: $LOCKFILE)."; exit 69;
+    log_fatal "Error: gitwatch is already running on this repository/target (lockfile: $LOCKFILE)."
+    exit 69
   }
-  verbose_echo "Acquired main instance lock (FD 9) on $LOCKFILE"
+  log_debug "Acquired main instance lock (FD 9) on $LOCKFILE"
 fi
 # --- End Lockfile Setup ---
 
@@ -928,9 +978,10 @@ fi
 # Now change to the target directory for file watching and relative git operations
 cd "$TARGETDIR_ABS" || {
   # This should not happen due to earlier check, but belts and suspenders
-  stderr "Error: Can't change directory to '${TARGETDIR_ABS}' after lock setup."; exit 5;
+  log_fatal "Error: Can't change directory to '${TARGETDIR_ABS}' after lock setup."
+  exit 5
 }
-verbose_echo "Changed working directory to $TARGETDIR_ABS"
+log_debug "Changed working directory to $TARGETDIR_ABS"
 # --- End Change Directory ---
 
 # Run Git Config Check
@@ -957,25 +1008,25 @@ PULL_CMD="" # Ensure PULL_CMD is initialized for set -u
 PUSH_CMD="" # Ensure PUSH_CMD is initialized for set -u
 
 if [ -n "${REMOTE:-}" ]; then        # are we pushing to a remote?
-  verbose_echo "Push remote selected: $REMOTE"
+  log_debug "Push remote selected: $REMOTE"
   if [ -z "${BRANCH:-}" ]; then      # Do we have a branch set to push to ?
-    verbose_echo "No push branch selected, using default."
+    log_debug "No push branch selected, using default."
     PUSH_CMD="$GIT push '$REMOTE'" # Build command string, quoting remote
   else
     # check if we are on a detached HEAD
     # Use bash -c "$GIT ..." to run commands with correct context
     if HEADREF=$(bash -c "$GIT symbolic-ref HEAD" 2> /dev/null); then # HEAD is not detached
-      verbose_echo "Push branch selected: $BRANCH, current branch: ${HEADREF#refs/heads/}"
+      log_debug "Push branch selected: $BRANCH, current branch: ${HEADREF#refs/heads/}"
       PUSH_CMD=$(printf "%s push %q %s:%q" "$GIT" "$REMOTE" "${HEADREF#refs/heads/}" "$BRANCH")
     else # HEAD is detached
-      verbose_echo "Push branch selected: $BRANCH, HEAD is detached."
+      log_debug "Push branch selected: $BRANCH, HEAD is detached."
       # This needs to get the current commit hash and push it to the target branch name
       # Since we only want to push the *current* HEAD, we use HEAD:branch
       PUSH_CMD=$(printf "%s push %q HEAD:%q" "$GIT" "$REMOTE" "$BRANCH")
     fi
   fi
   if [[ $PULL_BEFORE_PUSH -eq 1 ]]; then
-    verbose_echo "Pull before push is enabled."
+    log_debug "Pull before push is enabled."
     # Get current branch name for pull, handle detached HEAD
     CURRENT_BRANCH_FOR_PULL=$(bash -c "$GIT symbolic-ref --short HEAD" 2>/dev/null || echo "")
     if [ -n "$CURRENT_BRANCH_FOR_PULL" ]; then
@@ -988,11 +1039,11 @@ if [ -n "${REMOTE:-}" ]; then        # are we pushing to a remote?
       if [ -z "$PULL_TARGET" ]; then PULL_TARGET="$REMOTE"; fi
 
       PULL_CMD=$(printf "%s pull --rebase %q %q" "$GIT" "$REMOTE" "$PULL_TARGET")
-      stderr "Warning: Cannot determine current branch for pull (detached HEAD?). Using explicit 'git pull --rebase %s %s'." "$REMOTE" "$PULL_TARGET"
+      log_warn "Warning: Cannot determine current branch for pull (detached HEAD?). Using explicit 'git pull --rebase $REMOTE $PULL_TARGET'."
     fi
   fi
 else
-  verbose_echo "No push remote selected."
+  log_debug "No push remote selected."
 fi
 # --- End Pull/Push Command Setup ---
 
@@ -1004,6 +1055,7 @@ fi
 #
 # Arguments: Receives git diff output via stdin.
 diff-lines() {
+  log_trace "Entering function diff-lines"
   local path=""           # Current file path (for additions/modifications)
   local line=""           # Current line number in the new file (for additions)
   local previous_path=""  # Previous file path (used for deletions/renames)
@@ -1013,6 +1065,7 @@ diff-lines() {
 
   # Loop over diff lines, preserving leading/trailing whitespace (IFS= read -r)
   while IFS= read -r REPLY; do
+    log_trace "diff-lines processing: $REPLY"
     # 1. Strip leading color codes from the line for reliable regex matching
     # FIX: Quoting $color_regex to fix SC2295
     local stripped_reply="${REPLY##"$color_regex"}"
@@ -1102,7 +1155,7 @@ diff-lines() {
 
       if [ -z "$current_file_path" ]; then
         # Fail-safe: If path is empty, log warning and skip line
-        stderr "Warning: Could not determine file path for diff line: $REPLY"
+        log_warn "Warning: Could not determine file path for diff line: $REPLY"
         continue
       fi
 
@@ -1132,18 +1185,20 @@ diff-lines() {
       fi
     fi
   done
+  log_trace "Exiting function diff-lines"
 }
 
 
 # Generates the commit message based on user flags
 generate_commit_message() {
+  log_trace "Entering function generate_commit_message"
   local local_commit_msg="" # Initialize
 
   # Check if DATE_FMT is set and COMMITMSG contains %d
   if [ -n "$DATE_FMT" ] && [[ "$COMMITMSG" == *%d* ]]; then
     local formatted_date
     if ! formatted_date=$(date "$DATE_FMT"); then
-      stderr "Warning: Invalid date format '$DATE_FMT'. Using default commit message."
+      log_warn "Warning: Invalid date format '$DATE_FMT'. Using default commit message."
       formatted_date="<date format error>"
     fi
     # Use simple parameter expansion, more robust than sed for this case
@@ -1167,10 +1222,10 @@ generate_commit_message() {
     set -e # Re-enable exit on error
 
     if [ "$timeout_status" -eq 124 ]; then
-      stderr "Warning: 'git diff' for commit message timed out after $TIMEOUT seconds."
+      log_warn "Warning: 'git diff' for commit message timed out after $TIMEOUT seconds."
       DIFF_COMMITMSG=""
     elif [ "$timeout_status" -ne 0 ] || [ "$diff_lines_status" -ne 0 ]; then
-      stderr "Warning: diff-lines pipeline failed (codes: $timeout_status, $diff_lines_status). Commit message may be incomplete."
+      log_warn "Warning: diff-lines pipeline failed (codes: $timeout_status, $diff_lines_status). Commit message may be incomplete."
       DIFF_COMMITMSG=""
     fi
     # --- END MODIFICATION ---
@@ -1231,38 +1286,40 @@ generate_commit_message() {
       local_commit_msg="$commit_output"
     elif [ "$commit_exit_code" -eq 124 ]; then
       # Timeout
-      stderr "ERROR: Custom commit command '$COMMITCMD' timed out after $TIMEOUT seconds."
+      log_error "ERROR: Custom commit command '$COMMITCMD' timed out after $TIMEOUT seconds."
       local_commit_msg="Custom command timed out" # Fallback message
     else
       # Command failed
-      stderr "ERROR: Custom commit command '$COMMITCMD' failed with exit code $commit_exit_code."
-      stderr "Command output: $commit_output"
+      log_error "ERROR: Custom commit command '$COMMITCMD' failed with exit code $commit_exit_code."
+      log_error "Command output: $commit_output"
       local_commit_msg="Custom command failed" # Fallback message
     fi
   fi
 
+  log_trace "Exiting function generate_commit_message"
   echo "$local_commit_msg"
 }
 
 
 # The main commit and push logic
 _perform_commit() {
+  log_trace "Entering function _perform_commit"
   if [ "$SKIP_IF_MERGING" -eq 1 ] && is_merging; then
-    verbose_echo "Skipping commit - repo is merging."
+    log_info "Skipping commit - repo is merging."
     return 0
   fi
 
   # *** NEW PURE BASH STATUS CHECK ***
   local porcelain_output
   # Note: git status --porcelain is fast and does not need timeout
-  verbose_echo "Checking for changes to commit via 'git status --porcelain'..."
+  log_debug "Checking for changes to commit via 'git status --porcelain'..."
   porcelain_output=$(bash -c "$GIT status --porcelain")
 
   if [ -z "$porcelain_output" ]; then
-    verbose_echo "No relevant changes detected by git status (porcelain check)."
+    log_debug "No relevant changes detected by git status (porcelain check)."
     return 0
   fi
-  verbose_echo "Changes detected. Staging files..."
+  log_info "Changes detected. Staging files..."
   # *** END NEW PURE BASH STATUS CHECK ***
 
   # Add changes
@@ -1273,17 +1330,17 @@ _perform_commit() {
     add_cmd=$(printf "%s add --all ." "$GIT")
   fi
   # git add is typically fast and doesn't need a timeout unless a huge repo/slow FS
-  verbose_echo "Running git add command: $add_cmd"
-  bash -c "$add_cmd" || { stderr "ERROR: 'git add' failed."; return 1; }
+  log_debug "Running git add command: $add_cmd"
+  bash -c "$add_cmd" || { log_error "ERROR: 'git add' failed."; return 1; }
 
   # *** MODIFIED CHECK: Use git write-tree comparison ***
   # Final check: Only proceed if the staged tree differs from HEAD's tree (meaning content or number of files changed).
-  verbose_echo "Checking for ephemeral changes (comparing staged tree to HEAD)..."
+  log_debug "Checking for ephemeral changes (comparing staged tree to HEAD)..."
   local staged_tree_hash
   # write-tree is typically fast
   staged_tree_hash=$(bash -c "$GIT write-tree") || {
     # If write-tree fails (e.g., due to index corruption), simply abort.
-    verbose_echo "Error in git write-tree. Aborting commit."
+    log_warn "Error in git write-tree. Aborting commit."
     return 0 # Treat as non-fatal, might recover on next change
   }
   local head_tree_hash
@@ -1291,23 +1348,23 @@ _perform_commit() {
   head_tree_hash=$(bash -c "$GIT rev-parse HEAD:." 2>/dev/null) || head_tree_hash=""
 
   if [ "$staged_tree_hash" = "$head_tree_hash" ]; then
-    verbose_echo "Staged tree is identical to HEAD (only ephemeral metadata changed). Aborting commit."
+    log_info "Staged tree is identical to HEAD (only ephemeral metadata changed). Aborting commit."
     # If git add coerced a spurious metadata change into the index, unstage it before exiting.
     bash -c "$GIT reset --mixed" &> /dev/null || true # Use reset --mixed
     return 0
   fi
 
-  verbose_echo "Content or significant file changes detected (staged tree hash differs from HEAD). Generating commit message..."
+  log_debug "Content or significant file changes detected (staged tree hash differs from HEAD). Generating commit message..."
   # *** END MODIFIED CHECK ***
 
 
   # Generate commit message (reflects staged changes)
   local FINAL_COMMIT_MSG
   FINAL_COMMIT_MSG=$(generate_commit_message)
-  verbose_echo "Generated commit message. Proceeding with commit."
+  log_debug "Generated commit message. Proceeding with commit."
 
   if [ -z "$FINAL_COMMIT_MSG" ]; then
-    stderr "Warning: Generated commit message was empty. Using default."
+    log_warn "Warning: Generated commit message was empty. Using default."
     FINAL_COMMIT_MSG="Auto-commit: Changes detected"
   fi
 
@@ -1317,7 +1374,7 @@ _perform_commit() {
   commit_cmd=$(printf "%s -s 9 %s %s commit %s -m %q" "$TIMEOUT_CMD" "$TIMEOUT" "$GIT" "$GIT_COMMIT_ARGS" "$FINAL_COMMIT_MSG")
 
   # Run the commit command and capture its output and exit code
-  verbose_echo "Running git commit command: $commit_cmd"
+  log_info "Running git commit command: $commit_cmd"
   commit_output=$(bash -c "$commit_cmd" 2>&1) # Capture stdout and stderr
   commit_exit_code=$? # Capture the exit code immediately
 
@@ -1325,38 +1382,38 @@ _perform_commit() {
   if [ "$commit_exit_code" -eq 0 ]; then
     # Commit succeeded
     # Optional: Log the commit output if verbose and needed for debugging
-    # verbose_echo "Commit output: $commit_output"
+    # log_debug "Commit output: $commit_output"
     : # Do nothing, success
   elif [ "$commit_exit_code" -eq 124 ]; then
     # Timeout exit code (124 from coreutils timeout)
-    stderr "ERROR: 'git commit' timed out after $TIMEOUT seconds."
+    log_error "ERROR: 'git commit' timed out after $TIMEOUT seconds."
     return 1
   else
     # Commit failed (e.g., hook failure, no changes, etc.)
     # Check stderr/stdout for "nothing to commit" as a secondary check (more robust than just exit code 1)
     if [[ "$commit_output" == *"nothing to commit"* ]]; then
-      verbose_echo "Commit attempted, but no changes to commit (post write-tree check)."
+      log_info "Commit attempted, but no changes to commit (post write-tree check)."
       # This case should ideally not happen if write-tree check works, but handle defensively
       return 0 # Return success
     else
       # It was a different, unexpected error
-      stderr "ERROR: 'git commit' failed with exit code $commit_exit_code."
-      stderr "Commit output: $commit_output"
+      log_error "ERROR: 'git commit' failed with exit code $commit_exit_code."
+      log_error "Commit output: $commit_output"
       return 1 # Return failure
     fi
   fi
 
   # Pull (if enabled)
   if [ -n "$PULL_CMD" ]; then
-    verbose_echo "Executing pull command: $PULL_CMD"
+    log_info "Executing pull command: $PULL_CMD"
     # Add timeout to pull command
     local pull_cmd_with_timeout
     pull_cmd_with_timeout=$(printf "%s -s 9 %s %s" "$TIMEOUT_CMD" "$TIMEOUT" "$PULL_CMD")
     if ! bash -c "$pull_cmd_with_timeout"; then
       if [ $? -eq 124 ]; then
-        stderr "ERROR: 'git pull' timed out after $TIMEOUT seconds. Skipping push."
+        log_error "ERROR: 'git pull' timed out after $TIMEOUT seconds. Skipping push."
       else
-        stderr "ERROR: 'git pull' failed. Skipping push."
+        log_error "ERROR: 'git pull' failed. Skipping push."
       fi
       return 1 # Abort
     fi
@@ -1364,25 +1421,27 @@ _perform_commit() {
 
   # Push (if enabled)
   if [ -n "$PUSH_CMD" ]; then
-    verbose_echo "Executing push command: $PUSH_CMD"
+    log_info "Executing push command: $PUSH_CMD"
     # Add timeout to push command
     local push_cmd_with_timeout
     push_cmd_with_timeout=$(printf "%s -s 9 %s %s" "$TIMEOUT_CMD" "$TIMEOUT" "$PUSH_CMD")
     if ! bash -c "$push_cmd_with_timeout"; then
       if [ $? -eq 124 ]; then
-        stderr "ERROR: 'git push' timed out after $TIMEOUT seconds."
+        log_error "ERROR: 'git push' timed out after $TIMEOUT seconds."
       else
-        stderr "ERROR: 'git push' failed."
+        log_error "ERROR: 'git push' failed."
       fi
       return 1 # Report failure
     fi
   fi
+  log_trace "Exiting function _perform_commit"
   return 0
 }
 
 
 # Wrapper for perform_commit that uses a lock to prevent concurrent runs
 perform_commit() {
+  log_trace "Entering function perform_commit"
   # --- Backoff logic integration ---
   # This logic is now handled in the main loop *before* perform_commit is called
   # --- End new logic ---
@@ -1394,15 +1453,18 @@ perform_commit() {
   else
     # Try to acquire a non-blocking lock on file descriptor 8 using COMMIT_LOCKFILE.
     (
+      log_trace "Entering commit lock subshell"
       # Open FD 8 for the subshell, associating it with the lock file
       exec 8>"$COMMIT_LOCKFILE"
       "$FLOCK" -n 8 || {
-        # This is a common and expected event, so it's a good verbose log
-        verbose_echo "Commit already in progress (commit lock busy), skipping this trigger."
+        # This is a common and expected event, so it's a good debug log
+        log_debug "Commit already in progress (commit lock busy), skipping this trigger."
+        log_trace "Exiting commit lock subshell (lock busy)"
         exit 0 # Exit subshell gracefully
       }
-      verbose_echo "Acquired commit lock (FD 8) on $COMMIT_LOCKFILE, running commit logic."
+      log_debug "Acquired commit lock (FD 8) on $COMMIT_LOCKFILE, running commit logic."
       _perform_commit
+      log_trace "Exiting commit lock subshell (complete)"
       # Lock on FD 8 is released automatically when this subshell exits
     )
     commit_status=$?
@@ -1410,31 +1472,32 @@ perform_commit() {
 
   # --- Backoff counter logic ---
   if [ $commit_status -ne 0 ]; then
-    stderr "Commit logic failed with status $commit_status."
+    log_error "Commit logic failed with status $commit_status."
     # Use 'date' which is POSIX compliant
     LAST_FAIL_TIME=$(date +%s)
     GIT_FAIL_COUNT=$((GIT_FAIL_COUNT + 1))
-    verbose_echo "Git operation failed. Incrementing failure count to $GIT_FAIL_COUNT/$MAX_FAIL_COUNT."
+    log_warn "Git operation failed. Incrementing failure count to $GIT_FAIL_COUNT/$MAX_FAIL_COUNT."
     if [ "$GIT_FAIL_COUNT" -ge "$MAX_FAIL_COUNT" ]; then
-      verbose_echo "Max failures reached. Entering cool-down period for $COOL_DOWN_SECONDS seconds."
+      log_warn "Max failures reached. Entering cool-down period for $COOL_DOWN_SECONDS seconds."
     fi
   else
     # On success, reset the counter
     if [ "$GIT_FAIL_COUNT" -gt 0 ]; then
-      verbose_echo "Git operation succeeded. Resetting failure count."
+      log_debug "Git operation succeeded. Resetting failure count."
       GIT_FAIL_COUNT=0
       LAST_FAIL_TIME=0
     fi
   fi
   # --- End backoff logic ---
 
+  log_trace "Exiting function perform_commit"
   return $commit_status
 }
 
 
 # If -f is specified, perform an initial commit before starting to watch
 if [ "$COMMIT_ON_START" -eq 1 ]; then
-  verbose_echo "Performing initial commit check..."
+  log_info "Performing initial commit check on startup..."
   perform_commit
 fi
 
@@ -1447,21 +1510,23 @@ TIMER_PID_FILE="${TMPDIR:-/tmp}/${LOCKFILE_BASENAME}.timer.pid"
 
 # --- Health Status File ---
 # Fixed path for Docker HEALTHCHECK to find
-HEALTH_STATUS_FILE="${TMPDIR:-/tmp}/gitwatch.status"
+HEALTH_STATUS_FILE="${TMPDIFR:-/tmp}/gitwatch.status"
 # --- End Health Status File ---
 
 
 # Cleanup PID file on exit
 # Redefine trap to include PID file removal AND health file removal
 trap 'rm -f "$TIMER_PID_FILE" "$HEALTH_STATUS_FILE"; cleanup "$?"' EXIT INT TERM
+log_debug "Signal traps set."
 
 
 # main program loop: wait for changes and commit them
-verbose_echo "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
+log_info "Starting file watch. Command: ${INW} ${INW_ARGS[*]}"
 touch "$HEALTH_STATUS_FILE" # Signal healthy on startup
 # Execute the watcher and pipe its output to the read loop
 "${INW}" "${INW_ARGS[@]}" | while IFS= read -r line; do # Use IFS= to preserve leading spaces
 
+  log_trace "Watcher loop triggered."
   touch "$HEALTH_STATUS_FILE" # Heartbeat! Proves the loop is alive.
 
   # --- Exponential Backoff Check ---
@@ -1472,11 +1537,11 @@ touch "$HEALTH_STATUS_FILE" # Signal healthy on startup
     if [ "$time_since_fail" -lt "$COOL_DOWN_SECONDS" ]; then
       # FIX for SC2168: Removed 'local' from remaining_wait
       remaining_wait=$((COOL_DOWN_SECONDS - time_since_fail))
-      verbose_echo "In cool-down mode. Skipping trigger. ($remaining_wait seconds remaining)"
+      log_info "In cool-down mode. Skipping trigger. ($remaining_wait seconds remaining)"
       rm -f "$HEALTH_STATUS_FILE" # Signal "unhealthy" (in cool-down)
       continue # Skip this file change event
     else
-      verbose_echo "Cool-down period finished. Resetting failure count and retrying."
+      log_info "Cool-down period finished. Resetting failure count and retrying."
       touch "$HEALTH_STATUS_FILE" # Signal "healthy" again
       GIT_FAIL_COUNT=0
       LAST_FAIL_TIME=0
@@ -1485,17 +1550,17 @@ touch "$HEALTH_STATUS_FILE" # Signal healthy on startup
   # --- End Backoff Check ---
 
   if [ -z "$line" ]; then
-    verbose_echo "Received empty line from watcher, possibly pipe closed?"
+    log_debug "Received empty line from watcher, possibly pipe closed?"
     continue
   fi
-  verbose_echo "Change detected: $line"
+  log_info "Change detected: $line"
 
   # Drain any other events that are already in the pipe buffer.
   while IFS= read -t "$READ_TIMEOUT" -r drain_line; do
     [ -z "$drain_line" ] && break # Timeout means buffer is clear
-    verbose_echo "Draining event: $drain_line"
+    log_trace "Draining event: $drain_line"
   done
-  verbose_echo "Event drain complete. Starting debounce logic..."
+  log_debug "Event drain complete. Starting debounce logic..."
 
   # --- DEBOUNCE LOGIC REVISION 3 ---
   # Read the PID from the file if it exists
@@ -1505,12 +1570,12 @@ touch "$HEALTH_STATUS_FILE" # Signal healthy on startup
     # **Crucially, clear the PID file *before* killing**
     # This acts as an immediate signal to any waking timer that it's stale.
     rm -f "$TIMER_PID_FILE"
-    verbose_echo "Debounce: Cleared PID file (was for PID $OLD_TIMER_PID)."
+    log_debug "Debounce: Cleared PID file (was for PID $OLD_TIMER_PID)."
   fi
 
   # Check if that old process is still running and kill it forcefully
   if [[ -n "$OLD_TIMER_PID" ]] && kill -0 "$OLD_TIMER_PID" &>/dev/null; then
-    verbose_echo "Debounce: Timer (PID $OLD_TIMER_PID) is active. Killing it forcefully (SIGKILL)."
+    log_debug "Debounce: Timer (PID $OLD_TIMER_PID) is active. Killing it forcefully (SIGKILL)."
     # Kill children first, then parent, using SIGKILL
     "$PKILL" -9 -P "$OLD_TIMER_PID" &>/dev/null || true
     kill -9 "$OLD_TIMER_PID" &>/dev/null || true
@@ -1520,10 +1585,11 @@ touch "$HEALTH_STATUS_FILE" # Signal healthy on startup
 
   # Start the new timer in the background
   (
+    log_trace "Entering debounce timer subshell"
     # Subshell: Store own PID immediately
     MY_PID=$$
     echo "$MY_PID" > "$TIMER_PID_FILE"
-    verbose_echo "Debounce Timer (PID $MY_PID): Started. PID stored."
+    log_debug "Debounce Timer (PID $MY_PID): Started. PID stored."
 
     # Sleep
     sleep "$SLEEP_TIME"
@@ -1531,28 +1597,30 @@ touch "$HEALTH_STATUS_FILE" # Signal healthy on startup
     # **IMPROVED SAFEGUARD:** Check PID file *immediately* after sleep.
     # If the file is gone or contains a different PID, exit silently *before* printing/committing.
     if ! [ -f "$TIMER_PID_FILE" ] || [ "$(cat "$TIMER_PID_FILE")" != "$MY_PID" ]; then
-      verbose_echo "Debounce Timer (PID $MY_PID): Stale timer detected immediately after sleep. Exiting silently."
+      log_debug "Debounce Timer (PID $MY_PID): Stale timer detected immediately after sleep. Exiting silently."
+      log_trace "Exiting debounce timer subshell (stale)"
       exit 0 # Exit subshell gracefully and silently
     fi
 
     # If we got here, we are the active timer. Proceed.
-    verbose_echo "Debounce Timer (PID $MY_PID): Sleep finished. PID still valid. Attempting commit."
+    log_debug "Debounce Timer (PID $MY_PID): Sleep finished. PID still valid. Attempting commit."
     perform_commit
     # Remove the PID file *after* finishing commit attempt
     # (Conditional rm -f is safe even if already removed)
     if [ -f "$TIMER_PID_FILE" ] && [ "$(cat "$TIMER_PID_FILE")" = "$MY_PID" ]; then
       rm -f "$TIMER_PID_FILE"
-      verbose_echo "Debounce Timer (PID $MY_PID): Commit attempt finished. PID file removed."
+      log_debug "Debounce Timer (PID $MY_PID): Commit attempt finished. PID file removed."
     else
-      verbose_echo "Debounce Timer (PID $MY_PID): Commit attempt finished. PID file was already removed or changed."
+      log_debug "Debounce Timer (PID $MY_PID): Commit attempt finished. PID file was already removed or changed."
     fi
+    log_trace "Exiting debounce timer subshell (committed)"
   ) &
   # --- END DEBOUNCE LOGIC REVISION 3 ---
 
 done
 
 WATCHER_EXIT_CODE=$?
-verbose_echo "File watcher process ended (or failed) with exit code $WATCHER_EXIT_CODE. Exiting via loop termination."
+log_info "File watcher process ended (or failed) with exit code $WATCHER_EXIT_CODE. Exiting via loop termination."
 # Ensure PID file is removed if loop terminates unexpectedly
 rm -f "$TIMER_PID_FILE"
 # Ensure health file is removed if loop terminates unexpectedly (trap will also get this)
