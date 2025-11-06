@@ -28,7 +28,7 @@ runs:
       # Note: Composite action inputs are always strings, so we check for 'true'
       if: ${{ inputs.setup-bats == 'true' }}
       id: setup-bats
-      uses: bats-core/bats-action@42fcc8700f773c075a16a90eb11874c0318ad507
+      uses: bats-core/bats-action@v3.0.1
       with:
         support-path: "${{ github.workspace }}/tests/bats-support"
         assert-path: "${{ github.workspace }}/tests/bats-assert"
