@@ -48,6 +48,7 @@ export GITWATCH_TEST_ARGS="${GITWATCH_TEST_ARGS:-${default_args[@]}}"
 # --- FIX: Create a BASH array for safe, quoted expansion in tests ---
 # This new array is used by tests as "${GITWATCH_TEST_ARGS_ARRAY[@]}"
 # to satisfy shellcheck SC2086 and fix word-splitting issues.
+# shellcheck disable=SC2034,SC2206
 declare -a GITWATCH_TEST_ARGS_ARRAY=(${GITWATCH_TEST_ARGS})
 # --- END FIX ---
 
