@@ -65,6 +65,45 @@ runs:
         echo "BATS lib-path manually set to: $LIB_PATH"
         echo "lib-path=$LIB_PATH" >> $GITHUB_OUTPUT
     # --- END BATS SETUP ---
+    # --- KCOV INSTALL (with caching) ---
+    - name: Cache kcov
+      if: ${{ inputs.setup-bats == 'true' && startsWith(inputs.os, 'ubuntu') }}
+      id: cache-kcov
+      uses: actions/cache@v4
+      with:
+        # Cache the installation directory
+        path: ~/kcov-installed
+        # A simple key, will rebuild if runner image changes
+        key: kcov-build-v1-${{ runner.os }}
+
+    - name: Install kcov (build from source for Linux)
+      if: ${{ inputs.setup-bats == 'true' && startsWith(inputs.os, 'ubuntu') && steps.cache-kcov.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: |
+        echo "Installing kcov dependencies..."
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake pkg-config \
+                                  libcurl4-openssl-dev libelf-dev libdw-dev \
+                                  binutils-dev libiberty-dev
+
+        echo "Cloning and building kcov..."
+        git clone --depth 1 https://github.com/SimonKagstrom/kcov.git
+        cd kcov
+        mkdir build
+        cd build
+        # Install to a local, cacheable directory
+        cmake .. -DCMAKE_INSTALL_PREFIX=~/kcov-installed
+        make
+        make install
+        echo "kcov installed to ~/kcov-installed"
+
+    - name: Add kcov to PATH
+      if: ${{ inputs.setup-bats == 'true' && startsWith(inputs.os, 'ubuntu') }}
+      shell: bash
+      run: |
+        echo "$HOME/kcov-installed/bin" >> $GITHUB_PATH
+        echo "kcov path added. Location: $(command -v kcov)"
+    # --- END KCOV INSTALL ---
     - name: Substitute Version Number into gitwatch.sh
       shell: bash
       run: |

@@ -73,12 +73,8 @@ jobs:
       # - name: Setup upterm session # Preserved commented-out step
       #   uses: lhotari/action-upterm@v1
 
-      - name: Install kcov (for coverage on Linux)
-        if: matrix.os == 'ubuntu-latest'
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get -y install kcov
+      # Note: The 'Install kcov' step has been removed from here.
+      # It is now inside .github/actions/setup/action.yaml
 
       - name: Display gitwatch.sh content before testing
         shell: bash
