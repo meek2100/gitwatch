@@ -700,7 +700,7 @@ if [ -n "${GLOB_EXCLUDE_PATTERN:-}" ]; then
   # 1. Replace commas with spaces to treat as separate words.
   PATTERNS_AS_WORDS=${GLOB_EXCLUDE_PATTERN//,/ }
   # 2. Use an array to store and automatically trim whitespace from each pattern.
-  read -r -a PATTERN_ARRAY <<< "$PATTERNS_AS_WORDS"
+  IFS=' ' read -r -a PATTERN_ARRAY <<< "$PATTERNS_AS_WORDS"
   # 3. Join the array elements with the regex OR pipe `|`.
   PROCESSED_GLOB_PATTERN=$(IFS=\|; echo "${PATTERN_ARRAY[*]}")
 
@@ -738,7 +738,7 @@ if [ -d "$USER_PATH" ]; then
   EXCLUDE_REGEX="(${EXCLUDE_REGEX:1})"
   # --- End NEW ---
 
-  if [ "$INW" = "inotifywait" ]; then INW_ARGS=("-qmr" "-e" "$EVENTS" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS"); else INW_ARGS=("--recursive" "--event" "$EVENTS" "-E" "-X" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS"); fi
+  if [ "$INW" = "inotifywait" ]; then INW_ARGS=("-qmr" "-e" "$EVENTS" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS"); else INW_ARGS=("--recursive" "--event" "$EVENTS" "-E" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS"); fi
   # GIT_ADD_ARGS logic moved to _perform_commit
   GIT_COMMIT_ARGS=""
 
