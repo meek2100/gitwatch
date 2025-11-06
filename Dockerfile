@@ -34,9 +34,11 @@ USER appuser
 
 # Healthcheck: Checks for a status file managed by the script.
 # 1. `test -f`: Fails if the file is missing (e.g., script crashed or is in cool-down).
-# 2. `find ... -mmin -3`: Fails if the file exists but is "stale" (older than 3 minutes),
-#    indicating the main watch loop is hung on a read or git command.
+# 2. `find ... -mmin -1`: Fails if the file exists but is "stale" (older than 1 minute),
+#    indicating the main watch loop is hung. (Alpine `find` uses -mmin)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD test -f /tmp/gitwatch.status
+  CMD test -f /tmp/gitwatch.status && \
+      find /tmp -maxdepth 1 -name gitwatch.status -mmin -1 | grep -q . || \
+      exit 1
 
 ENTRYPOINT ["/app/entrypoint.sh"]

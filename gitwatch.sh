@@ -706,17 +706,14 @@ else
 fi
 # --- End flock check ---
 
-# --- MODIFICATION: Hardened hash command check ---
 # Add check for hash command needed for tmpdir fallback
 if [ "$NO_LOCK" -eq 0 ] && ! is_command "sha256sum" && ! is_command "md5sum"; then
-  # This is now a fatal error if locking is enabled, as we cannot guarantee
-  # a unique lockfile name if we must fall back to /tmp.
-  log_fatal "Error: Neither 'sha256sum' nor 'md5sum' found."
-  log_fatal "  These are required for generating unique lockfile names."
-  log_fatal "  Please install 'coreutils' or re-run with -n to disable locking."
-  exit 2
+  # This is not a fatal error, but we log a warning as the fallback "hash"
+  # is just a path substitution, which is less ideal.
+  log_warn "Warning: Neither 'sha256sum' nor 'md5sum' found."
+  log_warn "  Will use a simple path-based name for lockfiles if /tmp fallback is needed."
+  log_warn "  It is recommended to install 'coreutils' for robust lockfile naming."
 fi
-# --- END MODIFICATION ---
 
 unset cmd BASE_GIT_CMD # Clean up
 log_debug "Dependency checks complete."
@@ -950,6 +947,10 @@ if [ "$NO_LOCK" -eq 0 ]; then
     LOCKFILE_DIR="${TMPDIR:-/tmp}"
 
     # --- MODIFIED: Use both repo and target hash for unique /tmp name ---
+    # We must check for hash commands *before* attempting to use them here
+    if ! is_command "sha256sum" && ! is_command "md5sum"; then
+      log_warn "Warning: Neither 'sha256sum' nor 'md5sum' found. Using insecure path-based lockfile name in /tmp."
+    fi
     REPO_HASH=$(_get_path_hash "$GIT_DIR_PATH")
     # TARGET_HASH is already defined above
     LOCKFILE_BASENAME="gitwatch-repo_${REPO_HASH}-target_${TARGET_HASH}"
@@ -1560,8 +1561,9 @@ TIMER_PID_FILE="${TMPDIR:-/tmp}/${LOCKFILE_BASENAME}.timer.pid"
 
 # --- Health Status File ---
 # Fixed path for Docker HEALTHCHECK to find
-HEALTH_STATUS_FILE="${TMPDIFR:-/tmp}/gitwatch.status"
-# --- End Health Status File ---
+# --- TYPO FIX: TMPDIFR -> TMPDIR ---
+HEALTH_STATUS_FILE="${TMPDIR:-/tmp}/gitwatch.status"
+# --- END TYPO FIX ---
 
 
 # Cleanup PID file on exit
