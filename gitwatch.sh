@@ -94,7 +94,7 @@ GITWATCH_VERSION="%%GITWATCH_VERSION%%"
 TIMEOUT=${GW_TIMEOUT:-60} # Timeout for critical Git operations (commit, pull, push). Default is 60s.
 # Configurable line length for diff-lines output
 LOG_LINE_LENGTH=${GW_LOG_LINE_LENGTH:-150}
-# --------------------------------------
+# --- End Global Configuration Constants ---
 
 # --- Logging Configuration ---
 LEVEL_QUIET=0
@@ -541,7 +541,7 @@ done
 
 shift $((OPTIND - 1)) # Shift the input arguments, so that the input file (last arg) is $1 in the code below
 
-if [ $# -ne 1 ]; then # If no command line arguments are left (that's bad: no target was passed)
+if [ $# -ne 1 ]; then # If no command line options are left (that's bad: no target was passed)
   shelp               # print usage help
   exit                # and exit
 fi
@@ -706,13 +706,18 @@ else
 fi
 # --- End flock check ---
 
+# --- MODIFICATION: Hardened hash command check ---
 # Add check for hash command needed for tmpdir fallback
 if [ "$NO_LOCK" -eq 0 ] && ! is_command "sha256sum" && ! is_command "md5sum"; then
-  # Only warn if flock *is* available, as the hash is only needed for the fallback logic
-  if is_command "$FLOCK"; then
-    log_warn "Warning: Neither 'sha256sum' nor 'md5sum' found. Lockfile fallback to /tmp might use less unique names."
-  fi
+  # This is now a fatal error if locking is enabled, as we cannot guarantee
+  # a unique lockfile name if we must fall back to /tmp.
+  log_fatal "Error: Neither 'sha256sum' nor 'md5sum' found."
+  log_fatal "  These are required for generating unique lockfile names."
+  log_fatal "  Please install 'coreutils' or re-run with -n to disable locking."
+  exit 2
 fi
+# --- END MODIFICATION ---
+
 unset cmd BASE_GIT_CMD # Clean up
 log_debug "Dependency checks complete."
 
@@ -1047,6 +1052,19 @@ else
 fi
 # --- End Pull/Push Command Setup ---
 
+# --- MODIFICATION: Added developer maintenance comment ---
+#
+# --- diff-lines ---
+#
+# DEVELOPER WARNING: This function is a complex, state-based parser
+# for `git diff` output. It is inherently fragile and sensitive to
+# changes in Git's diff format (including color codes).
+#
+# Any modifications to this function MUST be validated against the
+# extensive unit tests in `tests/diff-lines.bats`.
+#
+# ---
+#
 # diff-lines: Parses git diff output, extracts relevant lines, and prepends
 #             the path and line number to each relevant content line.
 #
@@ -1321,6 +1339,38 @@ _perform_commit() {
   fi
   log_info "Changes detected. Staging files..."
   # *** END NEW PURE BASH STATUS CHECK ***
+
+  # --- MODIFICATION: Large File Safety Gate ---
+  # Before adding, check for large untracked files (only when watching a directory)
+  if [ -z "${TARGETFILE_ABS:-}" ]; then
+    log_trace "Checking for large untracked files..."
+    local untracked_files
+    # Get null-terminated list of untracked files
+    untracked_files=$(bash -c "$GIT ls-files --others --exclude-standard -z" 2>/dev/null || echo "")
+    if [ -n "$untracked_files" ]; then
+      while IFS= read -r -d '' file; do
+        # Use 'stat' to get size. Works on Linux and macOS.
+        local file_size_kb=0
+        if [ "$OS_TYPE" = "Linux" ]; then
+            # stat -c%s gives size in bytes
+            file_size_kb=$(stat -c%s "$file" 2>/dev/null || echo 0)
+            file_size_kb=$((file_size_kb / 1024))
+        else # macOS
+            # stat -f%z gives size in bytes
+            file_size_kb=$(stat -f%z "$file" 2>/dev/null || echo 0)
+            file_size_kb=$((file_size_kb / 1024))
+        fi
+
+        # Check if > 50MB (51200 KB)
+        if [ "$file_size_kb" -gt 51200 ]; then
+            log_warn "Warning: Skipping commit due to large untracked file (>=50MB). Please ignore or add manually: $file"
+            return 0 # Skip this entire commit attempt
+        fi
+      done <<< "$untracked_files"
+    fi
+    log_trace "No large untracked files found."
+  fi
+  # --- END MODIFICATION ---
 
   # Add changes
   local add_cmd
