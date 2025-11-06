@@ -74,15 +74,9 @@ build-windows-installer:
 	fi
 	@pwsh -Command "if (-not (Get-Module -ListAvailable -Name PS2EXE)) { echo 'Error: PS2EXE module not found. Please run: pwsh -Command \"Install-Module -Name PS2EXE -Scope CurrentUser\"'; exit 1; }"
 
-	@echo "Copying gitwatch.sh to examples/windows..."
-	@cp gitwatch.sh examples/windows/gitwatch.sh
-
 	@echo "Running PS2EXE..."
 	@pwsh -Command "Import-Module PS2EXE; \
 		ps2exe -inputFile 'examples/windows/install.ps1' -outputFile 'examples/windows/gitwatch-setup.exe' -title 'Gitwatch Installer' -noconsole -noOutput"
-
-	@echo "Cleaning up..."
-	@rm examples/windows/gitwatch.sh
 
 	@echo "Build complete: examples/windows/gitwatch-setup.exe"
 

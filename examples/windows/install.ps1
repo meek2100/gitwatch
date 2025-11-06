@@ -13,7 +13,24 @@ Write-Host "Administrator privileges confirmed." -ForegroundColor Green
 
 # Define paths
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$GitwatchScriptSource = Join-Path $ScriptDir "gitwatch.sh"
+
+# --- MODIFICATION: Look for gitwatch.sh in parent (dev) or local (standalone) dir ---
+$GitwatchScriptSourceRoot = Join-Path $ScriptDir "../gitwatch.sh"
+$GitwatchScriptSourceLocal = Join-Path $ScriptDir "gitwatch.sh"
+
+$GitwatchScriptSource = "" # Will be set below
+
+if (Test-Path $GitwatchScriptSourceRoot) {
+    $GitwatchScriptSource = $GitwatchScriptSourceRoot
+    Write-Host "Found 'gitwatch.sh' in project root."
+} elseif (Test-Path $GitwatchScriptSourceLocal) {
+    $GitwatchScriptSource = $GitwatchScriptSourceLocal
+    Write-Host "Found 'gitwatch.sh' in local directory."
+} else {
+    $GitwatchScriptSource = $GitwatchScriptSourceLocal # Default to local for error message
+}
+# --- END MODIFICATION ---
+
 $GitwatchWrapperSource = Join-Path $ScriptDir "gitwatch.bat"
 $WslScriptPath = "/usr/local/bin/gitwatch"
 
@@ -95,8 +112,8 @@ catch {
 # --- 4. Install gitwatch.sh into WSL ---
 Write-Host "Installing gitwatch.sh into WSL at $WslScriptPath..."
 if (-NOT (Test-Path $GitwatchScriptSource)) {
-  Write-Error "Could not find 'gitwatch.sh' in the installer directory."
-  Write-Error "Please ensure 'gitwatch.sh' is in the same folder as 'install.ps1'."
+  Write-Error "Could not find 'gitwatch.sh' in the installer directory or project root."
+  Write-Error "Please ensure 'gitwatch.sh' is in the same folder as 'install.ps1' or in the parent directory."
   Read-Host "Press Enter to exit..."
   exit 1
 }

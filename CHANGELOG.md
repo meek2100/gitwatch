@@ -24,6 +24,13 @@ and this project adheres to
     DEBUG, TRACE)
   - `-V`: Print version information (read from `VERSION` file) and exit.
 - **Robustness & Reliability:**
+  - Added a "large file safety gate" to `_perform_commit` that detects untracked
+    files >=50MB (via `stat`) and skips the commit to prevent accidentally
+    adding large binaries.
+  - Added BATS tests for filenames containing newlines (`\n`) to
+    `tests/special-chars.bats`.
+  - Added BATS tests for composite `git diff` parsing (rename+mode and
+    rename+binary) to `tests/diff-lines.bats`.
   - Added `flock` support for process locking to prevent concurrent runs on the
     same repository. Includes fallback to `/tmp` if `.git` is not writable.
   - Implemented `git write-tree` vs `HEAD` tree hash comparison to prevent empty
@@ -78,6 +85,14 @@ and this project adheres to
 
 ### Changed
 
+- Made the Windows installer (`examples/windows/install.ps1`) more robust by
+  allowing it to find `gitwatch.sh` in the project root (parent directory),
+  simplifying the `Makefile` and CI build process.
+- Updated `README.md` to clarify that `flock` is the hard requirement for
+  locking and hashing utilities (`sha256sum`/`md5sum`) are only recommended for
+  cleaner lockfile names.
+- Added a developer maintenance warning comment above the `diff-lines` function
+  in `gitwatch.sh`.
 - Made `gitwatch.bat` wrapper more robust by correctly finding the target path,
   regardless of argument order.
 - Refactored script structure significantly for clarity, maintainability, and

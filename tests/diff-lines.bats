@@ -177,3 +177,32 @@ Binary files a/logo.png and b/logo.png differ
   assert_success
   assert_output "logo.png:?: Binary file changed."
 }
+
+@test "diff_lines_11_rename_and_mode_change: Handles rename and mode change" {
+  local DIFF_INPUT="
+diff --git a/old_script.sh b/new_script.sh
+similarity index 100%
+rename from old_script.sh
+rename to new_script.sh
+old mode 100644
+new mode 100755
+"
+  run diff-lines <<< "$DIFF_INPUT"
+  assert_success
+  # The parser should output the mode change, associated with the new path
+  assert_output "new_script.sh:?: Mode changed to 100755"
+}
+
+@test "diff_lines_12_rename_and_binary: Handles rename of a binary file" {
+  local DIFF_INPUT="
+diff --git a/old_logo.png b/new_logo.png
+similarity index 90%
+rename from old_logo.png
+rename to new_logo.png
+Binary files a/old_logo.png and b/new_logo.png differ
+"
+  run diff-lines <<< "$DIFF_INPUT"
+  assert_success
+  # The parser should output the binary change, associated with the new path
+  assert_output "new_logo.png:?: Binary file changed."
+}

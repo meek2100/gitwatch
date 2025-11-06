@@ -345,6 +345,10 @@ To run this script, you must have installed and globally available:
   for robust Git operations.
 - **Debouncing:** `pkill` (part of `procps` on Linux or `proctools` on macOS)
   for robustly managing debounce timers.
+- **Hashing (Recommended):** `sha256sum` or `md5sum` (part of `coreutils`).
+  These are strongly recommended for generating clean, unique lockfile names. If
+  they are not found, `gitwatch` will still run but will fall back to using a
+  less-ideal lockfile name based on the full repository path.
 
 The script automatically detects the appropriate watcher tool based on your
 operating system.
@@ -474,6 +478,9 @@ as root if watching a repository that could be modified by untrusted users.
 - **Empty Commit Prevention:** `gitwatch` prevents commits if only metadata
   (like timestamps) has changed, ensuring only meaningful file content or file
   count changes result in a new commit.
+- **Large File Safety Gate:** `gitwatch` includes a safety check (on directory
+  watches) that prevents commits if an untracked file larger than 50MB is
+  detected. This avoids accidentally committing large binary files or archives.
 - **Symlink Behavior:** `gitwatch` does not follow symlinks. On Linux
   (`inotifywait`) this is the default, and on macOS (`fswatch`) the `-X` flag is
   used to ensure symlinks pointing outside the watched directory are ignored.
