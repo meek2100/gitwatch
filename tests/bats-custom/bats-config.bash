@@ -61,6 +61,8 @@ WAITTIME=4
 # (Least common settings, for advanced debugging)
 # ==============================================================================
 
+BATS_SET_OPTIONS="-x"
+
 # ---
 # 3. Shell Debug Mode (set -x)
 # ---
