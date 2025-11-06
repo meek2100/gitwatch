@@ -30,6 +30,7 @@ let
         globExcludePatternArg = getvar "-X" "globExcludePattern" cfg;
         eventsArg = getvar "-e" "events" cfg;
         gitDirArg = getvar "-g" "gitDir" cfg;
+        logLevelArg = getvar "-o" "logLevel" cfg;
         logDiffLinesArg =
           if cfg.logDiffLines != null then
             getvar (if cfg.logDiffNoColor then "-L" else "-l") "logDiffLines" cfg

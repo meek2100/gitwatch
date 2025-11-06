@@ -66,7 +66,7 @@ EOF
   export GW_GIT_BIN="$dummy_git"
 
   # 2. Start gitwatch with -o ERROR
-  # --- FIX: Replaced > "$output_file" 2&>1 & ---
+  # --- FIX: Replaced > "$output_file" 2&>1 & with &> "$output_file" & ---
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -o ERROR "$testdir/local/$TEST_SUBDIR_NAME" &> "$output_file" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
@@ -102,7 +102,7 @@ EOF
   git config --global --unset user.email || true
 
   # 2. Start gitwatch with -o WARN (or 3)
-  # --- FIX: Replaced > "$output_file" 2&>1 & ---
+  # --- FIX: Replaced > "$output_file" 2&>1 & with &> "$output_file" & ---
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -o 3 "$testdir/local/$TEST_SUBDIR_NAME" &> "$output_file" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
@@ -127,7 +127,7 @@ EOF
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Start gitwatch with -o INFO
-  # --- FIX: Replaced > "$output_file" 2&>1 & ---
+  # --- FIX: Replaced > "$output_file" 2&>1 & with &> "$output_file" & ---
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -o INFO "$testdir/local/$TEST_SUBDIR_NAME" &> "$output_file" &
   # shellcheck disable=SC2034 # used by teardown
@@ -149,7 +149,7 @@ EOF
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Start gitwatch with -v
-  # --- FIX: Replaced > "$output_file" 2&>1 & ---
+  # --- FIX: Replaced > "$output_file" 2&>1 & with &> "$output_file" & ---
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -v "$testdir/local/$TEST_SUBDIR_NAME" &> "$output_file" &
   # shellcheck disable=SC2034 # used by teardown
@@ -174,7 +174,7 @@ EOF
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
   # 1. Start gitwatch with -o TRACE
-  # --- FIX: Replaced > "$output_file" 2&>1 & ---
+  # --- FIX: Replaced > "$output_file" 2&>1 & with &> "$output_file" & ---
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" -o TRACE "$testdir/local/$TEST_SUBDIR_NAME" &> "$output_file" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
