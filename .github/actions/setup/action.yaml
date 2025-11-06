@@ -28,7 +28,7 @@ runs:
       # Note: Composite action inputs are always strings, so we check for 'true'
       if: ${{ inputs.setup-bats == 'true' }}
       id: setup-bats
-      uses: bats-core/bats-action@v2.0.0 # <-- This is the correct tag for that commit
+      uses: bats-core/bats-action@v2 # <-- Changed to the major version tag
       with:
         support-path: "${{ github.workspace }}/tests/bats-support"
         assert-path: "${{ github.workspace }}/tests/bats-assert"
