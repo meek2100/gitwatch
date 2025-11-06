@@ -8,10 +8,6 @@ and this project adheres to
 
 ## [Unreleased]
 
-_Note: This version represents a major internal refactor focused on robustness,
-portability, containerization, and production readiness, incorporating all
-changes **after** commit `5cdaeb49dc`._
-
 ### Added
 
 - Added CI step for `kcov` code coverage reporting.
@@ -24,9 +20,8 @@ changes **after** commit `5cdaeb49dc`._
 - **New Options:**
   - `-f`: Commit any pending changes on startup before starting the watch loop.
   - `-S`: Log messages to syslog instead of stderr/stdout.
-  - `-v`: Enable verbose output for debugging.
-  - `-V`/`--version`: Print version information (read from `VERSION` file or
-    embedded placeholder) and exit.
+  - `-o <level>`: New 6-level hierarchical logging (FATAL, ERROR, WARN, INFO, DEBUG, TRACE)
+  - `-V`: Print version information (read from `VERSION` file) and exit.
 - **Robustness & Reliability:**
   - Added `flock` support for process locking to prevent concurrent runs on the
     same repository. Includes fallback to `/tmp` if `.git` is not writable.
@@ -47,14 +42,15 @@ changes **after** commit `5cdaeb49dc`._
   - Improved POSIX compliance (e.g., using `command -v` instead of `hash`,
     POSIX-compliant parameter expansions).
   - Added support for specifying alternative binary paths via environment
-    variables (`GW_GIT_BIN`, `GW_INW_BIN`, `GW_FLOCK_BIN`, `GW_TIMEOUT_BIN`).
+    variables (`GW_GIT_BIN`, `GW_INW_BIN`, `GW_FLOCK_BIN`, `GW_TIMEOUT_BIN`,
+    `GW_PKILL_BIN`).
   - Uses `pwd -P` for path resolution, removing dependency on
     `readlink`/`greadlink`.
   - Added check for `sha256sum`/`md5sum` needed for unique lockfile names in
     `/tmp`.
 - **Containerization:**
   - Created official `Dockerfile` using Alpine, a non-root user (`appuser`),
-    pinned versions, and best practices.
+    and best practices.
   - Added `docker-compose.yaml` for easy configuration and deployment, including
     volume mounts for SSH keys and `.gitconfig`.
   - Created `entrypoint.sh` for flexible container startup configuration via
@@ -68,8 +64,8 @@ changes **after** commit `5cdaeb49dc`._
     multi-platform CI execution (Linux & macOS). Includes test helpers.
   - Integrated extensive linting and formatting via `.pre-commit-config.yaml`
     (`shellcheck`, `mdformat`, `yamllint`, `codespell`, `beautysh`, `prettier`).
-    Added configuration files for linters (`.yamllint.yaml`,
-    `.markdownlint.yaml`, `biome.json`).
+    Added configuration files for linters (`.config/.yamllint.yaml`,
+    `.config/.markdownlint.yaml`).
   - Updated NixOS support (`flake.nix`, `gitwatch.nix`, `module.nix`) for
     packaging and system module integration to work with refactored code.
   - Automated Docker release workflow (`.github/workflows/publish-docker.yaml`)
@@ -98,8 +94,9 @@ changes **after** commit `5cdaeb49dc`._
   options and behavior.
 - Switched CI testing from deprecated `run-tests.yaml` to `gitwatch.yaml` using
   BATS directly.
-- Version number is now read from `VERSION` file or substituted placeholder, not
-  read directly by the script at runtime unless `VERSION` is present.
+- Version number is now read from `VERSION` file.
+- **`DEPRECATION`**: `-v` (verbose) and `-q` (quiet) flags are now shortcuts for
+  `-o DEBUG` and `-o QUIET`, respectively. The `-o` flag is the new standard.
 
 ### Removed
 
