@@ -115,17 +115,17 @@ jobs:
           # --- UNCOMMENT TESTS ONE-BY-ONE TO DEBUG ---
           # We use --tap for clean, standardized output
 
-          bats --tap add-failure.bats (Pass)
-          # bats --tap atomic-file.bats (Fail)
-          # bats --tap backoff.bats (Fail)
-          # bats --tap bash-compatibility.bats
-          # bats --tap case.bats
-          # bats --tap commitcmd.bats
-          # bats --tap commitlog.bats
-          # bats --tap commitmsg-unit.bats
-          # bats --tap custom-bins.bats
-          # bats --tap custom-events.bats
-          # bats --tap debounce.bats
+          bats --tap add-failure.bats ## (Pass)
+          # bats --tap atomic-file.bats ## (Fail)
+          # bats --tap backoff.bats ## (Fail)
+          # bats --tap bash-compatibility.bats ##
+          # bats --tap case.bats ##
+          # bats --tap commitcmd.bats ##
+          # bats --tap commitlog.bats ##
+          # bats --tap commitmsg-unit.bats ##
+          # bats --tap custom-bins.bats ##
+          # bats --tap custom-events.bats ##
+          # bats --tap debounce.bats ##
           # bats --tap dependency-failure.bats
           # bats --tap diff-lines.bats
           # bats --tap docker.bats
