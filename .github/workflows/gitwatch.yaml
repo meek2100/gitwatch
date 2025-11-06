@@ -155,7 +155,6 @@ jobs:
           # bats --tap symlinks.bats
           # bats --tap sync.bats
           # bats --tap syslog.bats
-          Example running all 43 tests sequentially:
           # bats --tap target-deletion.bats
           # bats --tap timeout.bats
           # bats --tap watcher-args.bats
