@@ -75,12 +75,22 @@ services:
       SKIP_IF_MERGING: "false"
       # Set to "true" to commit any pending changes on startup (-f)
       COMMIT_ON_START: "false"
-      # Set to "true" to enable verbose output for debugging (-v)
+
+      # --- Logging Configuration ---
+      # Set the logging verbosity.
+      # Options: QUIET, FATAL, ERROR, WARN, INFO (default), DEBUG, TRACE
+      # Overrides VERBOSE and QUIET flags if set.
+      LOG_LEVEL: "INFO"
+      # Set to "true" to enable verbose output (shortcut for LOG_LEVEL="DEBUG").
+      # Will be overridden by LOG_LEVEL.
       VERBOSE: "false"
-      # Set to "true" to suppress all stdout/stderr output (-q)
+      # Set to "true" to suppress all stdout/stderr output (shortcut for LOG_LEVEL="QUIET").
+      # Will be overridden by LOG_LEVEL.
       QUIET: "false"
-      # Set to "true" to log all messages to syslog (-S)
+      # Set to "true" to log all messages to syslog (-S).
       USE_SYSLOG: "false"
+      # --- End Logging ---
+
       # Set to "true" to disable file locking (-n).
       DISABLE_LOCKING: "false"
       # Overrides the default 150-character truncation for *individual lines*
