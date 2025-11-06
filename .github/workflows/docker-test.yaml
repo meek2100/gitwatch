@@ -36,7 +36,10 @@ jobs:
         # Set BATS_LIB_PATH to include action-installed libraries
         # Pass the matrix variable to the test script
         env:
-          BATS_LIB_PATH: "${{ steps.setup.outputs.bats-lib-path }}"
+          # --- THIS LINE IS THE FIX ---
+          # We must add the path to your local /tests directory,
+          # which contains the 'bats-custom' helpers.
+          BATS_LIB_PATH: "${{ steps.setup.outputs.bats-lib-path }}:${{ github.workspace }}/tests"
           TEST_BASE_IMAGE: ${{ matrix.base_image }}
         run: |
           # Change to the tests directory first
