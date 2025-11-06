@@ -5,7 +5,7 @@
 gitwatch \- watch file or directory and git commit all changes as they happen
 .SH "SYNOPSIS"
 .B gitwatch
-[\-s \fI<secs>\fP] [\-t \fI<secs>\fP] [\-d \fI<fmt>\fP] [\-r \fI<remote>\fP [\-b \fI<branch>\fP]] [\-m \fI<msg>\fP] [\-l|\-L \fI<lines>\fP] [\-x \fI<regex>\fP] [\-X \fI<glob/list>\fP] [\-M] [\-S] [\-v] [\-q] [\-n] [\-f] [\-V] \fI<target>\fP
+[\-s \fI<secs>\fP] [\-t \fI<secs>\fP] [\-d \fI<fmt>\fP] [\-r \fI<remote>\fP [\-b \fI<branch>\fP]] [\-m \fI<msg>\fP] [\-l|\-L \fI<lines>\fP] [\-x \fI<regex>\fP] [\-X \fI<glob/list>\fP] [\-M] [\-S] [\-o \fI<level>\fP] [\-v] [\-q] [\-n] [\-f] [\-V] \fI<target>\fP
 .SH "DESCRIPTION"
 .B gitwatch
 is a Bash script that monitors a \fI<target>\fP file or directory within a Git repository. When changes are detected, it automatically stages and commits them. It is designed to run as a persistent background process.

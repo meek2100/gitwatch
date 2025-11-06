@@ -21,14 +21,14 @@
 # These are the *default* arguments passed to every gitwatch.sh call
 # in the test suite.
 #
-# -v: Run in verbose mode by default.
-# -t 10: Set a global 10-second timeout (default is 60).
+# -o DEBUG: Run in verbose debug mode by default (replaces old -v).
+# -t 10:    Set a global 10-second timeout (default is 60).
 #
 # You can override this from the command line for a single run, e.g.:
-# export GITWATCH_TEST_ARGS="-q" # Run tests in quiet mode
+# export GITWATCH_TEST_ARGS="-o WARN" # Run tests at WARN level
 # make test
 #
-declare -a default_args=("-v" "-t" "10")
+declare -a default_args=("-o" "DEBUG" "-t" "10")
 
 # --- WARNING for override ---
 # Check if the user-set variable is different from the default string representation
