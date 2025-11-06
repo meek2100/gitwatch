@@ -88,22 +88,22 @@ repos:
     hooks:
       - id: docker-compose-check
         name: Validate Docker Compose
-  - repo: https://github.com/lovesegfault/beautysh
-    rev: v6.2.1
-    hooks:
-      - id: beautysh
-        name: Format Shell Scripts (Beautysh)
-        args: ["-i", "2"]
-        additional_dependencies:
-          - setuptools
-        exclude: ^tests/diff-lines.bats$
-  #- repo: https://github.com/meek2100/beautysh
-  #  rev: v6.4.2
+  #- repo: https://github.com/lovesegfault/beautysh
+  #  rev: v6.2.1
   #  hooks:
   #    - id: beautysh
   #      name: Format Shell Scripts (Beautysh)
-  #      args: ["--config", ".beautyshrc"]
-  #      exclude: ^gitwatch.sh$
+  #      args: ["-i", "2"]
+  #      additional_dependencies:
+  #        - setuptools
+  #      exclude: ^tests/diff-lines.bats$
+  - repo: https://github.com/meek2100/beautysh
+    rev: v6.4.1
+    hooks:
+      - id: beautysh
+        name: Format Shell Scripts (Beautysh)
+        args: ["--config", ".beautyshrc"]
+        exclude: ^gitwatch.sh$
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1
     hooks:
