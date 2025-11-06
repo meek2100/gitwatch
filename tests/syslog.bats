@@ -54,7 +54,7 @@ create_dummy_logger() {
   # 4. Start gitwatch in the background with -S (syslog) and -v (verbose)
   # STDOUT/STDERR should be empty
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -S "$testdir/local/$TEST_SUBDIR_NAME" > "$normal_output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -S "$testdir/local/$TEST_SUBDIR_NAME" > "$normal_output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"

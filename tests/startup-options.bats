@@ -25,7 +25,7 @@ load 'bats-custom/startup-shutdown'
 
   # 2. Start gitwatch with -f
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -f "$testdir/local/$TEST_SUBDIR_NAME" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -f "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   # 3. Wait for the new commit to appear (it should be immediate)
@@ -60,7 +60,7 @@ load 'bats-custom/startup-shutdown'
 
   # 2. Start gitwatch with -f and -r origin
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -f -r origin "$testdir/local/$TEST_SUBDIR_NAME" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -f -r origin "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   # 3. Wait for the remote hash to change (push success)
@@ -105,7 +105,7 @@ load 'bats-custom/startup-shutdown'
 
   # 4. Run gitwatch with -f, logging all output
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -f "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -f "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   # 5. Wait for the new commit to appear (it should be immediate)
@@ -149,7 +149,7 @@ load 'bats-custom/startup-shutdown'
   # 1. Start gitwatch with -f, logging all output
   # Note: Using WAITTIME from bats-custom/startup-shutdown.bash for the sleep duration
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -f "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -f "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   # 2. Wait longer than the script's default commit/debounce time
@@ -302,7 +302,7 @@ load 'bats-custom/startup-shutdown'
 
   # 4. Run gitwatch with -f, -r, and -R flags (expecting initial commit to succeed, but the subsequent pull-rebase to fail)
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -f -r origin -R "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -f -r origin -R "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 2 # Give time for initial commit (succeeds) and pull-rebase (fails)
@@ -385,7 +385,7 @@ load 'bats-custom/startup-shutdown'
   initial_hash=$(git log -1 --format=%H 2>/dev/null || echo "no_commit")
 
   # Start gitwatch
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$empty_repo_dir" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} "$empty_repo_dir" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1

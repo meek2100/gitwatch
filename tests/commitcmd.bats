@@ -16,7 +16,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
 @test "commit_command_single: Uses simple custom command output as commit message" {
   # Start gitwatch directly in the background
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -c "uname" "$testdir/local/$TEST_SUBDIR_NAME" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -c "uname" "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -37,7 +37,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
   # Start gitwatch directly in the background
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   # shellcheck disable=SC2016 # Intentional: expression must be preserved for remote bash -c execution
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -c 'echo "$(uname) is the uname of this device, the time is $(date)"' "$testdir/local/$TEST_SUBDIR_NAME" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -c 'echo "$(uname) is the uname of this device, the time is $(date)"' "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -59,7 +59,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
 @test "commit_command_overwrite: -c flag overrides -l, -L, -d flags" {
   # Start gitwatch directly in the background
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -c "uname" -l 123 -L 0 -d "+%Y" "$testdir/local/$TEST_SUBDIR_NAME" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -c "uname" -l 123 -L 0 -d "+%Y" "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -84,7 +84,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
 
   # Start gitwatch with custom command and the pipe flag -C
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -c "$custom_cmd" -C "$testdir/local/$TEST_SUBDIR_NAME" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -c "$custom_cmd" -C "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -116,7 +116,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
 
   # Start gitwatch with custom command that fails, logging all output
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -r origin -c "$failing_cmd" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -r origin -c "$failing_cmd" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -153,7 +153,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
 
   # 2. Start gitwatch with the hanging custom command, logging all output
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -r origin -c "$hanging_cmd" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -r origin -c "$hanging_cmd" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -192,7 +192,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
 
   # 1. Start gitwatch with -C, -l 10, but NO -c
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -l 10 -C "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -l 10 -C "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"

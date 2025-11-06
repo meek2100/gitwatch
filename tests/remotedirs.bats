@@ -41,7 +41,7 @@ teardown() {
   # Start gitwatch directly in the background
   # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -l 10 -g "$dotgittestdir/.git" "$testdir/local/$TEST_SUBDIR_NAME" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -l 10 -g "$dotgittestdir/.git" "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
@@ -89,7 +89,7 @@ teardown() {
 
   # Start gitwatch directly in the background with -r and -g
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -r origin -g "$dotgittestdir/.git" "$testdir/local/$TEST_SUBDIR_NAME" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -r origin -g "$dotgittestdir/.git" "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
@@ -144,7 +144,7 @@ teardown() {
   initial_hash=$(git --git-dir="$dotgittestdir/.git" log -1 --format=%H)
 
   # 4. Start gitwatch targeting the file AND specifying the external git dir
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -g "$dotgittestdir/.git" "$watched_file_path" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -g "$dotgittestdir/.git" "$watched_file_path" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1
@@ -178,7 +178,7 @@ teardown() {
   # 1. Start gitwatch with a non-absolute path for -g (e.g., just a name)
   # The script should try to resolve it and issue a warning.
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -g "mygitdir" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -g "mygitdir" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow watcher to initialize

@@ -29,7 +29,7 @@ load 'bats-custom/startup-shutdown'
   initial_hash=$(git log -1 --format=%H)
 
   # 2. Start gitwatch watching the file, logging all output
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -l 10 "$watched_file_path" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -l 10 "$watched_file_path" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # not needed locally, PID used below
   GITWATCH_PID=$!
   local watch_pid=$GITWATCH_PID
@@ -90,7 +90,7 @@ load 'bats-custom/startup-shutdown'
   # 2. Start gitwatch watching the subdirectory, logging all output
   _common_teardown # Ensures no zombie processes from the previous file test remain
 
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$sub_dir_path" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} "$sub_dir_path" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # not needed locally, PID used below
   GITWATCH_PID=$!
   local watch_pid=$GITWATCH_PID
@@ -150,7 +150,7 @@ load 'bats-custom/startup-shutdown'
 
   # 3. Start gitwatch (it will execute the failing dummy watcher)
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # not needed locally, PID used below
   GITWATCH_PID=$!
   local watch_pid=$GITWATCH_PID

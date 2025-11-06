@@ -39,7 +39,7 @@ setup() {
 
   # 3. Start gitwatch (with -l 10 to check commit message)
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1

@@ -38,7 +38,7 @@ load 'bats-custom/startup-shutdown'
   local TIMER_PID_FILE="${TMPDIR:-/tmp}/${lock_basename}.timer.pid"
 
   # 2. Start gitwatch in the background
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -s 10 "$target_path" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -s 10 "$target_path" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   local test_pid=$GITWATCH_PID

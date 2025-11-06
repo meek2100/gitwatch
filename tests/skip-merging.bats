@@ -60,7 +60,7 @@ load 'bats-custom/startup-shutdown'
   # 5. Start gitwatch with -M flag, logging all output
   verbose_echo "# DEBUG: Starting gitwatch with -M"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   # 6. Make another file change to trigger the watcher loop
@@ -137,7 +137,7 @@ load 'bats-custom/startup-shutdown'
   # 5. Start gitwatch *WITHOUT -M* flag
   verbose_echo "# DEBUG: Starting gitwatch *without* -M"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   # 6. Make another file change to trigger the watcher loop
@@ -221,7 +221,7 @@ load 'bats-custom/startup-shutdown'
   # 5. Start gitwatch with -M flag
   verbose_echo "# DEBUG: Starting gitwatch with -M in a rebase conflict state"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   # 6. Make another file change to trigger the watcher loop
@@ -266,7 +266,7 @@ load 'bats-custom/startup-shutdown'
   # 2. Start gitwatch with -M flag
   verbose_echo "# DEBUG: Starting gitwatch with -M in a cherry-pick state"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1
@@ -311,7 +311,7 @@ load 'bats-custom/startup-shutdown'
   # 2. Start gitwatch with -M flag
   verbose_echo "# DEBUG: Starting gitwatch with -M in a revert state"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1
@@ -355,7 +355,7 @@ load 'bats-custom/startup-shutdown'
   # 2. Start gitwatch with -M flag
   verbose_echo "# DEBUG: Starting gitwatch with -M in a REBASE_HEAD state"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -M "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1

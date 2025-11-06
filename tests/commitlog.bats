@@ -12,7 +12,7 @@ load 'bats-custom/startup-shutdown'
 @test "commit_log_messages_working: -l flag includes diffstat in commit message" {
   # Start gitwatch directly in the background
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -50,7 +50,7 @@ load 'bats-custom/startup-shutdown'
 
   # Start gitwatch directly in the background with a low line limit
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -l "$max_lines" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -l "$max_lines" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -103,7 +103,7 @@ load 'bats-custom/startup-shutdown'
 
   # 2. Start gitwatch with -l
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow watcher to initialize
@@ -133,7 +133,7 @@ load 'bats-custom/startup-shutdown'
 
   # Start gitwatch with -L (no color)
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -L 10 "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -L 10 "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -172,7 +172,7 @@ load 'bats-custom/startup-shutdown'
 
   # Start gitwatch directly in the background with -l 0 (unlimited)
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -l 0 "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -l 0 "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -219,7 +219,7 @@ load 'bats-custom/startup-shutdown'
 
   # 2. Start gitwatch. We use -l 0 to prove the env var overrides the flag logic's default.
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -l 0 "$testdir/local/$TEST_SUBDIR_NAME" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -l 0 "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -261,7 +261,7 @@ load 'bats-custom/startup-shutdown'
 
   # 2. Start gitwatch with -l 0 (unlimited lines)
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -l 0 "$testdir/local/$TEST_SUBDIR_NAME" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -l 0 "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -314,7 +314,7 @@ load 'bats-custom/startup-shutdown'
 
   # 2. Start gitwatch with -l
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS[@]}" -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow watcher to initialize

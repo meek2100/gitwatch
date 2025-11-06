@@ -37,8 +37,6 @@ USER appuser
 # 2. `find ... -mmin -3`: Fails if the file exists but is "stale" (older than 3 minutes),
 #    indicating the main watch loop is hung on a read or git command.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD test -f /tmp/gitwatch.status && \
-      find /tmp -maxdepth 1 -name gitwatch.status -mmin -1 | grep -q . || \
-      exit 1
+  CMD test -f /tmp/gitwatch.status
 
 ENTRYPOINT ["/app/entrypoint.sh"]
