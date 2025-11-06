@@ -39,5 +39,7 @@ jobs:
           BATS_LIB_PATH: "${{ steps.setup.outputs.bats-lib-path }}"
           TEST_BASE_IMAGE: ${{ matrix.base_image }}
         run: |
-          # Run the new docker.bats test file
-          bats tests/docker.bats
+          # Change to the tests directory first
+          cd tests
+          # Run the docker.bats test file by name
+          bats docker.bats
