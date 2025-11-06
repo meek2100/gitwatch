@@ -197,8 +197,7 @@ create_hanging_bin() {
   {
     # Print signature to indicate the hanging version was called
     echo "echo \"*** DUMMY HANG: $name called, will sleep 600s ***\" >&2"
-    # Sleep for 10 minutes (much longer than gitwatch.sh's
-    60s timeout)
+    # Sleep for 10 minutes (much longer than gitwatch.sh's 60s timeout)
     echo "sleep 600"
     # Exit cleanly if it ever wakes up, though it should be killed by 'timeout'
     echo "exit 0"
