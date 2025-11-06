@@ -39,7 +39,7 @@ load 'bats-custom/startup-shutdown'
   assert_output --partial "ERROR: 'git add' failed." \
     "Should log the git add failure"
   # 'git add' error message
-  assert_output --partial "fatal: in unreadable_file.txt"
+ assert_output --partial "error: open(\"unreadable_file.txt\"): Permission denied"
 
   # 5. Assert: No commit should have been made
   run git log -1 --format=%H
