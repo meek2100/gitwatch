@@ -69,6 +69,15 @@ let
                 logDiffLinesArg
               ]
             );
+        logArgs =
+          if cfg.logLevel != null then
+            logLevelArg
+          else if cfg.quiet then
+            quietFlag
+          else if cfg.verbose then
+            verboseFlag
+          else
+            "";
         allArgs = lib.strings.concatStringsSep " " (
           lib.lists.filter (s: s != "") [
             remoteArg
@@ -84,7 +93,7 @@ let
             skipIfMergingFlag
             commitOnStartFlag
             useSyslogFlag
-            (if cfg.quiet then quietFlag else verboseFlag)
+            logArgs
             disableLockingFlag
             messageAndLogArgs
             (lib.strings.escapeShellArg cfg.path)
@@ -147,8 +156,7 @@ in
         sleepTime = 5;
         timeout = 120;
         useSyslog = true;
-        verbose = false;
-        quiet = true;
+        logLevel = "INFO";
         disableLocking = false;
         logLineLength = 100;
         logDiffLines = 10;
@@ -212,6 +220,11 @@ in
             description = "If true, log messages to syslog (-S).";
             type = bool;
             default = false;
+          };
+          logLevel = lib.mkOption {
+            description = "Set logging verbosity (e.g., QUIET, WARN, INFO, DEBUG). Overrides 'verbose' and 'quiet' if set.";
+            type = nullOr str;
+            default = null;
           };
           verbose = lib.mkOption {
             description = "If true, enable verbose output for debugging (-v).";

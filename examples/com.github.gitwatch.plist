@@ -7,6 +7,8 @@
     <key>ProgramArguments</key>
     <array>
       <string>/usr/local/bin/gitwatch.sh</string>
+      <string>-o</string>
+      <string>INFO</string>
       <string>-s</string>
       <string>60</string>
       <string>-m</string>
