@@ -41,7 +41,17 @@
   "prettier.configPath": ".config/.prettierrc.yaml",
   "prettier.ignorePath": ".config/.prettierignore",
   "cSpell.enabled": true,
-  "cSpell.words": ["hist", "thist"],
+  "cSpell.words": [
+    "Archlinux",
+    "bpkg",
+    "fswatch",
+    "Gitwatch",
+    "hist",
+    "inotifywait",
+    "supervisord",
+    "Syncthing",
+    "thist"
+  ],
   "cSpell.ignorePaths": ["**/*.lock", "**/*.json"],
   "bats.testExplorer.paths": [
     {
