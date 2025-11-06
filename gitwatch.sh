@@ -1352,19 +1352,19 @@ _perform_commit() {
         # Use 'stat' to get size. Works on Linux and macOS.
         local file_size_kb=0
         if [ "$OS_TYPE" = "Linux" ]; then
-            # stat -c%s gives size in bytes
-            file_size_kb=$(stat -c%s "$file" 2>/dev/null || echo 0)
-            file_size_kb=$((file_size_kb / 1024))
+          # stat -c%s gives size in bytes
+          file_size_kb=$(stat -c%s "$file" 2>/dev/null || echo 0)
+          file_size_kb=$((file_size_kb / 1024))
         else # macOS
-            # stat -f%z gives size in bytes
-            file_size_kb=$(stat -f%z "$file" 2>/dev/null || echo 0)
-            file_size_kb=$((file_size_kb / 1024))
+          # stat -f%z gives size in bytes
+          file_size_kb=$(stat -f%z "$file" 2>/dev/null || echo 0)
+          file_size_kb=$((file_size_kb / 1024))
         fi
 
         # Check if > 50MB (51200 KB)
         if [ "$file_size_kb" -gt 51200 ]; then
-            log_warn "Warning: Skipping commit due to large untracked file (>=50MB). Please ignore or add manually: $file"
-            return 0 # Skip this entire commit attempt
+          log_warn "Warning: Skipping commit due to large untracked file (>=50MB). Please ignore or add manually: $file"
+          return 0 # Skip this entire commit attempt
         fi
       done <<< "$untracked_files"
     fi
