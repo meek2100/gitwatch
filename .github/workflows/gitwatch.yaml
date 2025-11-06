@@ -115,49 +115,49 @@ jobs:
           # --- UNCOMMENT TESTS ONE-BY-ONE TO DEBUG ---
           # We use --tap for clean, standardized output
 
-          bats --tap add-failure.bats ## (Pass)
+          # bats --tap add-failure.bats ## (Pass)
           # bats --tap atomic-file.bats ## (Fail)
           # bats --tap backoff.bats ## (Fail)
-          # bats --tap bash-compatibility.bats ##
-          # bats --tap case.bats ##
-          # bats --tap commitcmd.bats ##
-          # bats --tap commitlog.bats ##
-          # bats --tap commitmsg-unit.bats ##
-          # bats --tap custom-bins.bats ##
-          # bats --tap custom-events.bats ##
-          # bats --tap debounce.bats ##
-          # bats --tap dependency-failure.bats
-          # bats --tap diff-lines.bats
-          # bats --tap docker.bats
-          # bats --tap git-command-failure.bats
-          # bats --tap git-config-failure.bats
-          # bats --tap glob-conversion.bats
-          # bats --tap helpers.bats
-          # bats --tap hook-failure.bats
-          # bats --tap lfs.bats
-          # bats --tap lockfile-fallback.bats
-          # bats --tap lockfile-nohash.bats
-          # bats --tap lockfile-race.bats
-          # bats --tap lockfile-success.bats
-          # bats --tap notify-ignore.bats
-          # bats --tap perm-check.bats
-          # bats --tap pull-norebase-conflict.bats
-          # bats --tap pull-rebase.bats
-          # bats --tap quiet.bats
-          # bats --tap remotedirs.bats
-          # bats --tap signal-handling.bats
-          # bats --tap skip-merging.bats
-          # bats --tap spaces.bats
-          # bats --tap special-chars.bats
-          # bats --tap startup-options.bats
-          # bats --tap status-change.bats
-          # bats --tap submodule.bats
-          # bats --tap symlinks.bats
-          # bats --tap sync.bats
-          # bats --tap syslog.bats
-          # bats --tap target-deletion.bats
-          # bats --tap timeout.bats
-          # bats --tap watcher-args.bats
+          # bats --tap bash-compatibility.bats ## (Fail)
+          # bats --tap case.bats ## (Fail)
+          # bats --tap commitcmd.bats ## (Fail)
+          # bats --tap commitlog.bats ## (Fail)
+          # bats --tap commitmsg-unit.bats ## (Fail)
+          # bats --tap custom-bins.bats ## (Fail)
+          # bats --tap custom-events.bats ## (Fail)
+          # bats --tap debounce.bats ## (Fail)
+          # bats --tap dependency-failure.bats ## (Fail)
+          # bats --tap diff-lines.bats ## (Fail)
+          # bats --tap docker.bats ## (Fail)
+          # bats --tap git-command-failure.bats ## (Fail)
+          # bats --tap git-config-failure.bats ## (Fail)
+          # bats --tap glob-conversion.bats ## (Fail)
+          # bats --tap helpers.bats ## (Fail)
+          # bats --tap hook-failure.bats ## (Fail)
+          # bats --tap lfs.bats ## (Fail)
+          # bats --tap lockfile-fallback.bats ## (Fail)
+          # bats --tap lockfile-nohash.bats ## (Fail)
+          # bats --tap lockfile-race.bats ## (Fail)
+          # bats --tap lockfile-success.bats ## (Fail)
+          # bats --tap notify-ignore.bats ## (Fail)
+          # bats --tap perm-check.bats ## (Fail)
+          # bats --tap pull-norebase-conflict.bats ## (Fail)
+          # bats --tap pull-rebase.bats ## (Fail)
+          # bats --tap quiet.bats ## (Fail)
+          # bats --tap remotedirs.bats ## (Fail)
+          # bats --tap signal-handling.bats ## (Fail)
+          # bats --tap skip-merging.bats ## (Fail)
+          # bats --tap spaces.bats ## (Fail)
+          # bats --tap special-chars.bats ## (Fail)
+          # bats --tap startup-options.bats ## (Fail)
+          # bats --tap status-change.bats ## (Fail)
+          # bats --tap submodule.bats ## (Fail)
+          # bats --tap symlinks.bats ## (Fail)
+          # bats --tap sync.bats ## (Fail)
+          # bats --tap syslog.bats ## (Fail)
+          # bats --tap target-deletion.bats ## (Fail)
+          # bats --tap timeout.bats ## (Fail)
+          bats --tap watcher-args.bats ## (Fail)
 
           echo "===================================================================="
           echo "Finished running tests."
