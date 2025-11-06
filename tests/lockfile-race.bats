@@ -46,14 +46,14 @@ teardown() {
 
   # 1. Start Instance A in the background with -n
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -n -s "$test_sleep_time" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file_A" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -n -s "$test_sleep_time" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file_A" 2>&1 &
   # shellcheck disable=SC2034 # Used by manual teardown
   GITWATCH_PID_A=$!
   sleep 0.5 # Stagger starts slightly
 
   # 2. Start Instance B in the background with -n
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} -n -s "$test_sleep_time" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file_B" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -n -s "$test_sleep_time" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file_B" 2>&1 &
   # shellcheck disable=SC2034 # Used by manual teardown
   GITWATCH_PID_B=$!
 

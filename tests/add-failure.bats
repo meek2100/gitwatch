@@ -20,7 +20,7 @@ load 'bats-custom/startup-shutdown'
   initial_hash=$(git log -1 --format=%H)
 
   # 1. Start gitwatch in the background with verbose logging
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow watcher to initialize
@@ -39,7 +39,7 @@ load 'bats-custom/startup-shutdown'
   assert_output --partial "ERROR: 'git add' failed." \
     "Should log the git add failure"
   # 'git add' error message
- assert_output --partial "error: open(\"unreadable_file.txt\"): Permission denied"
+  assert_output --partial "error: open(\"unreadable_file.txt\"): Permission denied"
 
   # 5. Assert: No commit should have been made
   run git log -1 --format=%H

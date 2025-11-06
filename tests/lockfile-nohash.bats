@@ -59,7 +59,7 @@ load 'bats-custom/startup-shutdown'
   fi
   verbose_echo "# DEBUG: Successfully hid hash commands via PATH manipulation."
   # 4. Start gitwatch, which should fall back because of unwritable .git AND missing hash tools
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} "$target_path" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" "$target_path" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   # 5. Wait for initialization and check log
@@ -134,7 +134,7 @@ load 'bats-custom/startup-shutdown'
   fi
 
   # 4. Start gitwatch (Note: .git IS writable)
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} "$target_path" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" "$target_path" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 2

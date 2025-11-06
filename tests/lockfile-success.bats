@@ -36,7 +36,7 @@ teardown() {
   local target_path="$testdir/local/$TEST_SUBDIR_NAME"
 
   # 1. Start the first gitwatch instance in the background.
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} "$target_path" > "$output_file_1" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" "$target_path" > "$output_file_1" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID_1=$!
   local first_pid=$GITWATCH_PID_1
@@ -75,13 +75,13 @@ teardown() {
   mkdir -p "$target_path_2"
 
   # 1. Start the first instance on dir1
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} "$target_path_1" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" "$target_path_1" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID_1=$!
   sleep 1 # Allow lock acquisition
 
   # 2. Start the second instance on dir2
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} "$target_path_2" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" "$target_path_2" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID_2=$!
   sleep 1 # Allow lock acquisition

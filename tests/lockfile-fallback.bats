@@ -55,7 +55,7 @@ load 'bats-custom/startup-shutdown'
   assert_success "Failed to change permissions on .git directory"
 
   # 3. Start gitwatch, which should fail to touch the lockfile in GIT_DIR_PATH and fall back
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" ${GITWATCH_TEST_ARGS} "$target_path" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" "$target_path" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
 

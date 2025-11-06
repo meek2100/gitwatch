@@ -115,7 +115,7 @@ jobs:
           # --- UNCOMMENT TESTS ONE-BY-ONE TO DEBUG ---
           # We use --tap for clean, standardized output
 
-          # bats --tap add-failure.bats (Pass)
+          bats --tap add-failure.bats (Pass)
           # bats --tap atomic-file.bats (Fail)
           # bats --tap backoff.bats (Fail)
           # bats --tap bash-compatibility.bats

@@ -32,7 +32,8 @@ declare -a default_args=("-v" "-t" "10")
 
 # --- WARNING for override ---
 # Check if the user-set variable is different from the default string representation
-if [ -n "${GITWATCH_TEST_ARGS:-}" ] && [ "${GITWATCH_TEST_ARGS[*]}" != "${default_args[*]}" ]; then
+if [ -n "${GITWATCH_TEST_ARGS:-}" ] && [ "${GITWATCH_TEST_ARGS[*]}" != "${default_args[*]}" ];
+then
   echo "############################################################" >&3
   echo "# BATS WARNING: Global Test Arguments Overridden!" >&3
   echo "# Default args: (${default_args[*]})" >&3
@@ -43,6 +44,12 @@ fi
 # --- END WARNING ---
 
 export GITWATCH_TEST_ARGS="${GITWATCH_TEST_ARGS:-${default_args[@]}}"
+
+# --- FIX: Create a BASH array for safe, quoted expansion in tests ---
+# This new array is used by tests as "${GITWATCH_TEST_ARGS_ARRAY[@]}"
+# to satisfy shellcheck SC2086 and fix word-splitting issues.
+declare -a GITWATCH_TEST_ARGS_ARRAY=(${GITWATCH_TEST_ARGS})
+# --- END FIX ---
 
 
 # ---
@@ -79,7 +86,8 @@ WAITTIME=4
 # This is most commonly used to enable 'set -x' (command tracing).
 #
 ## 3. When to Use / Safety
-# This is for **local debugging only**. It creates a massive amount of
+# This is for **local debugging only**.
+# It creates a massive amount of
 # log output and may change test behavior (e.g., 'set -u' could
 # cause a test to fail that would normally pass).
 #
@@ -87,7 +95,8 @@ WAITTIME=4
 # For a quick test, uncomment the line below:
 # export BATS_SET_OPTIONS="-x"
 #
-if [ -n "${BATS_SET_OPTIONS:-}" ]; then
+if [ -n "${BATS_SET_OPTIONS:-}" ];
+then
   # --- WARNING ---
   echo "############################################################" >&3
   echo "# BATS WARNING: Shell Debug Mode Active!" >&3
@@ -127,7 +136,8 @@ fi
 # export BATS_QUICK_TEST="true"
 #
 export BATS_QUICK_TEST="${BATS_QUICK_TEST:-false}"
-if [ "${BATS_QUICK_TEST}" = "true" ]; then
+if [ "${BATS_QUICK_TEST}" = "true" ];
+then
   # --- WARNING ---
   echo "############################################################" >&3
   echo "# BATS WARNING: Quick Test Mode Active!" >&3
@@ -167,7 +177,8 @@ fi
 # or for debugging how your script handles a missing command.
 #
 # **This will cause most of your tests to fail**, as they
-# can no longer call the real 'git' or 'flock'. This is expected.
+# can no longer call the real 'git' or 'flock'.
+# This is expected.
 #
 ## 4. Local Override Example
 # To test the 'flock' dependency check, uncomment the line below:
@@ -175,7 +186,8 @@ fi
 #
 export BATS_MOCK_DEPENDENCIES="${BATS_MOCK_DEPENDENCIES:-}"
 
-if [ -n "$BATS_MOCK_DEPENDENCIES" ]; then
+if [ -n "$BATS_MOCK_DEPENDENCIES" ];
+then
   # --- WARNING ---
   echo "############################################################" >&3
   echo "# BATS WARNING: Dependency Mocking Active!" >&3
@@ -196,7 +208,8 @@ if [ -n "$BATS_MOCK_DEPENDENCIES" ]; then
 
   # 3. Create mock commands
   # Use tr to split the comma-separated list
-  for cmd in $(echo "$BATS_MOCK_DEPENDENCIES" | tr ',' ' '); do
+  for cmd in $(echo "$BATS_MOCK_DEPENDENCIES" | tr ',' ' ');
+  do
     echo "#!/usr/bin/env bash" > "$BATS_DUMMY_BIN_DIR/$cmd"
     echo "echo \"*** MOCK ERROR: '$cmd' is not installed (simulated by BATS_MOCK_DEPENDENCIES) ***\" >&2" >> "$BATS_DUMMY_BIN_DIR/$cmd"
     echo "exit 127" >> "$BATS_DUMMY_BIN_DIR/$cmd"
