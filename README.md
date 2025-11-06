@@ -81,7 +81,7 @@ install the script.
 
 ```shell
 # 1. Install required dependencies
-brew install fswatch flock coreutils
+brew install fswatch flock coreutils proctools
 
 # 2. Install gitwatch
 # (Use the "From Source" or "Releases" method above)

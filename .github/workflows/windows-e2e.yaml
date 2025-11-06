@@ -29,11 +29,8 @@ jobs:
       - name: Run Windows Installer
         shell: powershell
         run: |
-          # The installer needs all 3 files in the same directory
-          # We need to copy gitwatch.sh into the examples/windows directory for the test
-          Copy-Item -Path ".\gitwatch.sh" -Destination ".\examples\windows\gitwatch.sh" -Force
-
           # Run the installer script with Administrator privileges
+          # The installer will find gitwatch.sh in the project root.
           Start-Process powershell -Verb RunAs -ArgumentList "-File .\examples\windows\install.ps1"
 
           # Poll for gitwatch.bat to be available in the PATH
