@@ -1,5 +1,5 @@
 ---
-name: Gitwatch QA (Sequential Debug)
+name: Gitwatch QA
 
 on:
   push:
@@ -21,8 +21,6 @@ jobs:
       # Allow writing artifacts
       actions: write
     strategy:
-      # Fail-fast is false so you can see failures on both OSs
-      fail-fast: false
       matrix:
         os: [ubuntu-latest, macOS-latest]
     runs-on: ${{ matrix.os }}
@@ -96,7 +94,7 @@ jobs:
           grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
           echo "--- End of verification ---"
 
-      - name: Run BATS tests (one-by-one)
+      - name: Run tests (and coverage on Linux)
         shell: bash
         # Set BATS_LIB_PATH to include action-installed libraries and our custom module
         env:
@@ -107,62 +105,41 @@ jobs:
 
           cd tests
 
-          echo "===================================================================="
-          echo "Running BATS tests sequentially."
-          echo "Uncomment the 'bats ...' lines below to run them one-by-one."
-          echo "===================================================================="
+          # Get the number of available processor cores
+          NPROC=1
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            NPROC=$(nproc)
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            NPROC=$(sysctl -n hw.ncpu)
+          fi
 
-          # --- UNCOMMENT TESTS ONE-BY-ONE TO DEBUG ---
-          # We use --tap for clean, standardized output
+          echo "Running BATS tests in parallel using $NPROC cores..."
 
-          bats --tap add-failure.bats
-          # bats --tap atomic-file.bats
-          # bats --tap backoff.bats
-          # bats --tap bash-compatibility.bats
-          # bats --tap case.bats
-          # bats --tap commitcmd.bats
-          # bats --tap commitlog.bats
-          # bats --tap commitmsg-unit.bats
-          # bats --tap custom-bins.bats
-          # bats --tap custom-events.bats
-          # bats --tap debounce.bats
-          # bats --tap dependency-failure.bats
-          # bats --tap diff-lines.bats
-          # bats --tap docker.bats
-          # bats --tap git-command-failure.bats
-          # bats --tap git-config-failure.bats
-          # bats --tap glob-conversion.bats
-          # bats --tap helpers.bats
-          # bats --tap hook-failure.bats
-          # bats --tap lfs.bats
-          # bats --tap lockfile-fallback.bats
-          # bats --tap lockfile-nohash.bats
-          # bats --tap lockfile-race.bats
-          # bats --tap lockfile-success.bats
-          # bats --tap notify-ignore.bats
-          # bats --tap perm-check.bats
-          # bats --tap pull-norebase-conflict.bats
-          # bats --tap pull-rebase.bats
-          # bats --tap quiet.bats
-          # bats --tap remotedirs.bats
-          # bats --tap signal-handling.bats
-          # bats --tap skip-merging.bats
-          # bats --tap spaces.bats
-          # bats --tap special-chars.bats
-          # bats --tap startup-options.bats
-          # bats --tap status-change.bats
-          # bats --tap submodule.bats
-          # bats --tap symlinks.bats
-          # bats --tap sync.bats
-          # bats --tap syslog.bats
-          Example running all 43 tests sequentially:
-          # bats --tap target-deletion.bats
-          # bats --tap timeout.bats
-          # bats --tap watcher-args.bats
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            # Run with kcov on Linux
+            echo "Running with kcov for code coverage..."
+            mkdir -p ../coverage
+            # We must run kcov from the root of the repo to get correct paths
+            cd ..
+            # kcov manages its own parallel execution, but we point it to the bats files
+            # Note: kcov + BATS can be complex. This command runs all tests under one kcov instance.
+            # We use `find` to pass all test files to `bats` at once.
+            kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats $(find tests -name "*.bats")
+          else
+            # Run normally on macOS
+            # Use find and xargs to pipe test files to bats
+            # -n1: one file at a time per bats process
+            # -P $NPROC: run up to $NPROC processes in parallel
+            # We add --tap to get a standard output format, which is good for parallel runs
+            find . -name "*.bats" -print0 | xargs -0 -n1 -P "$NPROC" bats --tap
+          fi
 
-          echo "===================================================================="
-          echo "Finished running tests."
-          echo "===================================================================="
+          echo "Finished running tests"
 
-      # Note: The 'Upload coverage report (Linux)' step is removed
-      # as kcov is not being run in this sequential setup.
+      - name: Upload coverage report (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-linux
+          path: coverage/
+          retention-days: 7
