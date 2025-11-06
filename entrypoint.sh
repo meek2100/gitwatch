@@ -10,8 +10,8 @@ PUID=${PUID:-}
 PGID=${PGID:-}
 CONTAINER_USER="appuser"
 
-# --- Define GOSU_COMMAND as an array ---
-declare -a GOSU_COMMAND
+# --- Define execution command array ---
+declare -a EXEC_COMMAND
 
 if [ -n "$PUID" ] && [ -n "$PGID" ]; then
   # Check if PUID/PGID are different from default (1000/1000 in Alpine)
@@ -26,7 +26,7 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
     chown -R "$PUID":"$PGID" /home/appuser 2>/dev/null || true
     # --- END ADDED LINE ---
 
-    # Only chown critical files (like the scripts) and rely on gosu
+    # Only chown critical files (like the scripts) and rely on su-exec
     # to operate as the correct user on the mounted volumes. This avoids
     # slow recursive chown on large volumes.
     chown "$PUID":"$PGID" /app/entrypoint.sh /app/gitwatch.sh 2>/dev/null || true
@@ -34,14 +34,13 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
   else
     echo "Starting as default user ($CONTAINER_USER) with ID: $PUID/$PGID"
   fi
-  # --- CHANGED: Use su-exec instead of gosu ---
-  GOSU_COMMAND=( su-exec "$CONTAINER_USER" )
+  # Run the command as the specified user
+  EXEC_COMMAND=( su-exec "$CONTAINER_USER" )
 else
   # No PUID/PGID set, run as the default appuser (which is PID 1, but we use 'exec' later)
   echo "PUID/PGID not set. Running as default container user: $CONTAINER_USER"
   # Use 'exec' to replace the shell, will run as USER appuser defined in Dockerfile
-  # --- CHANGED: Set GOSU_COMMAND as an array ---
-  GOSU_COMMAND=( exec )
+  EXEC_COMMAND=( exec )
 fi
 # --------------------------------------------------
 
@@ -55,6 +54,10 @@ GIT_REMOTE=${GIT_REMOTE:-origin}
 GIT_BRANCH=${GIT_BRANCH:-main}
 GIT_EXTERNAL_DIR=${GIT_EXTERNAL_DIR:-} # Path to the external .git directory (e.g., /app/.git)
 TIMEOUT=${GIT_TIMEOUT:-60} # Git operation timeout
+
+# --- NEW: Logging Configuration ---
+LOG_LEVEL=${LOG_LEVEL:-} # Set logging level (e.g., INFO, DEBUG, WARN)
+# --- End New ---
 
 # Gitwatch behavior
 SLEEP_TIME=${SLEEP_TIME:-2}
@@ -97,7 +100,7 @@ export GW_PKILL_BIN=${GW_PKILL_BIN:-} # --- ADDED PKILL ---
 # --- Command Construction ---
 
 # Use a bash array to safely build the command and its arguments
-# Note: We do *not* include the script path here yet, it is added later with gosu/exec
+# Note: We do *not* include the script path here yet, it is added later with su-exec/exec
 cmd=( )
 
 # Add options with arguments (remote, branch, sleep time, date format)
@@ -136,6 +139,13 @@ if [ -n "${GIT_EXTERNAL_DIR}" ]; then
   cmd+=( -g "${GIT_EXTERNAL_DIR}" )
 fi
 
+# --- Logging Flags ---
+# Add log level if set. This is processed first by gitwatch.sh.
+if [ -n "${LOG_LEVEL}" ]; then
+  cmd+=( -o "${LOG_LEVEL}" )
+fi
+# --- End Logging Flags ---
+
 # --- Exclusion Logic: Pass variables to their respective flags ---
 
 # 1. Pass raw regex pattern (for backward compatibility) to -x
@@ -162,7 +172,7 @@ if [ "${SKIP_IF_MERGING}" = "true" ]; then
   cmd+=( -M )
 fi
 
-# --- Mutually exclusive logging flags ---
+# --- Verbose/Quiet shortcuts (gitwatch.sh handles precedence) ---
 if [ "${QUIET}" = "true" ]; then
   cmd+=( -q )
 elif [ "${VERBOSE}" = "true" ]; then
@@ -201,11 +211,10 @@ if [ -n "${GW_LOG_LINE_LENGTH}" ]; then
   echo "Exporting GW_LOG_LINE_LENGTH=${GW_LOG_LINE_LENGTH}"
 fi
 
-# Use 'gosu' or 'exec' to run the command, replacing the entrypoint shell process.
+# Use 'su-exec' or 'exec' to run the command, replacing the entrypoint shell process.
 # This ensures that signals (like TERM) go directly to gitwatch.sh (PID 1 best practice).
-# --- CHANGED: Use array expansion "${GOSU_COMMAND[@]}" ---
-"${GOSU_COMMAND[@]}" "/app/gitwatch.sh" "${cmd[@]}"
+"${EXEC_COMMAND[@]}" "/app/gitwatch.sh" "${cmd[@]}"
 
-# If 'exec' or 'gosu' fails, the script continues and exits with an error status.
-echo "ERROR: Exec/Gosu failed to start gitwatch.sh. Check permissions and path." >&2
+# If 'exec' or 'su-exec' fails, the script continues and exits with an error status.
+echo "ERROR: exec/su-exec failed to start gitwatch.sh. Check permissions and path." >&2
 exit 1
