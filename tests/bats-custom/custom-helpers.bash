@@ -68,7 +68,9 @@ wait_for_git_change() {
 
   verbose_echo "Initial output: '$initial_output'"
   if [ "$check_for_change" = false ];
-  then verbose_echo "Target output: '$target_output'"; fi
+  then
+    verbose_echo "Target output: '$target_output'";
+  fi
 
 
   while (( attempt <= max_attempts ));
@@ -122,7 +124,8 @@ wait_for_process_to_die() {
   local interval=$3
   local attempt=0
 
-  if ! [[ "$max_attempts" =~ ^[0-9]+$ ]] || ! [[ "$interval" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+  if ! [[ "$max_attempts" =~ ^[0-9]+$ ]] || ! [[ "$interval" =~ ^[0-9]+(\.[0-9]+)?$ ]];
+  then
     verbose_echo "Error: wait_for_process_to_die requires numeric arguments."
     return 1
   fi
@@ -194,7 +197,8 @@ create_hanging_bin() {
   {
     # Print signature to indicate the hanging version was called
     echo "echo \"*** DUMMY HANG: $name called, will sleep 600s ***\" >&2"
-    # Sleep for 10 minutes (much longer than gitwatch.sh's 60s timeout)
+    # Sleep for 10 minutes (much longer than gitwatch.sh's
+    60s timeout)
     echo "sleep 600"
     # Exit cleanly if it ever wakes up, though it should be killed by 'timeout'
     echo "exit 0"
@@ -217,9 +221,11 @@ is_command() {
 _get_path_hash() {
   local path_to_hash="$1"
   local path_hash=""
+
   if is_command "sha256sum"; then
     path_hash=$(echo -n "$path_to_hash" | sha256sum | (read -r hash _; echo "$hash"))
-  elif is_command "md5sum"; then
+  elif is_command "md5sum";
+  then
     path_hash=$(echo -n "$path_to_hash" | md5sum | (read -r hash _; echo "$hash"))
   else
     # Simple "hash" for POSIX compliance, replaces / with _
