@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Reusable Setup (Checkout, BATS, Version)
-        uses: ./.github/workflows/reusable-setup.yaml
+        uses: ./.github/actions/setup
         id: setup
         with:
           os: ${{ matrix.os }}

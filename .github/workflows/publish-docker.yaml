@@ -17,7 +17,7 @@ jobs:
       packages: write
     steps:
       - name: Reusable Setup (Checkout, Version)
-        uses: ./.github/workflows/reusable-setup.yaml
+        uses: ./.github/actions/setup
         with:
           os: ubuntu-latest
           setup-bats: false # This workflow doesn't use BATS

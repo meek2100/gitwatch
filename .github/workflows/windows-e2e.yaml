@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Reusable Setup (Checkout, Version)
-        uses: ./.github/workflows/reusable-setup.yaml
+        uses: ./.github/actions/setup
         with:
           os: windows-latest
           setup-bats: false # This workflow doesn't use BATS
