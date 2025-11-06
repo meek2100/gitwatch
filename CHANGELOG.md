@@ -20,7 +20,8 @@ and this project adheres to
 - **New Options:**
   - `-f`: Commit any pending changes on startup before starting the watch loop.
   - `-S`: Log messages to syslog instead of stderr/stdout.
-  - `-o <level>`: New 6-level hierarchical logging (FATAL, ERROR, WARN, INFO, DEBUG, TRACE)
+  - `-o <level>`: New 6-level hierarchical logging (FATAL, ERROR, WARN, INFO,
+    DEBUG, TRACE)
   - `-V`: Print version information (read from `VERSION` file) and exit.
 - **Robustness & Reliability:**
   - Added `flock` support for process locking to prevent concurrent runs on the
@@ -49,8 +50,8 @@ and this project adheres to
   - Added check for `sha256sum`/`md5sum` needed for unique lockfile names in
     `/tmp`.
 - **Containerization:**
-  - Created official `Dockerfile` using Alpine, a non-root user (`appuser`),
-    and best practices.
+  - Created official `Dockerfile` using Alpine, a non-root user (`appuser`), and
+    best practices.
   - Added `docker-compose.yaml` for easy configuration and deployment, including
     volume mounts for SSH keys and `.gitconfig`.
   - Created `entrypoint.sh` for flexible container startup configuration via
