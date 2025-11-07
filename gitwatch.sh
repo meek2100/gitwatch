@@ -555,24 +555,32 @@ OS_TYPE=$(uname)
 if [ -z "${GW_INW_BIN:-}" ]; then
   if [ "$OS_TYPE" = "Linux" ]; then
     INW="inotifywait"
-    if [ -z "${EVENTS:-}" ]; then EVENTS="close_write,move,move_self,delete,create,modify"; fi
   elif [ "$OS_TYPE" = "Darwin" ] || [ "$OS_TYPE" = "FreeBSD" ] || [ "$OS_TYPE" = "OpenBSD" ]; then
     INW="fswatch"
-    if [ -z "${EVENTS:-}" ]; then
-      # default events specified via a mask, see
-      # https://emcrisostomo.github.io/fswatch/doc/1.14.0/fswatch.html/Invoking-fswatch.html#Numeric-Event-Flags
-      # default of 414 = MovedTo + MovedFrom + Renamed + Removed + Updated + Created
-      #                = 256 + 128+ 16 + 8 + 4 + 2
-      EVENTS="414";
-    fi
   else
     # Fallback for other systems, default to inotifywait
     INW="inotifywait"
-    if [ -z "${EVENTS:-}" ]; then EVENTS="close_write,move,move_self,delete,create,modify"; fi
   fi
 else
   INW="$GW_INW_BIN"
 fi
+
+# --- FIX: Moved Event Defaulting Logic ---
+# Set default events based on the *watcher*, not based on GW_INW_BIN
+# This must happen *after* INW is determined, but *before* the -e check.
+if [ -z "${EVENTS:-}" ]; then # Only set if user did not provide -e
+  if [[ "$INW" == *"fswatch" ]]; then
+    # default events specified via a mask, see
+    # https://emcrisostomo.github.io/fswatch/doc/1.14.0/fswatch.html/Invoking-fswatch.html#Numeric-Event-Flags
+    # default of 414 = MovedTo + MovedFrom + Renamed + Removed + Updated + Created
+    #                = 256 + 128+ 16 + 8 + 4 + 2
+    EVENTS="414";
+  else
+    # Default for inotifywait
+    EVENTS="close_write,move,move_self,delete,create,modify";
+  fi
+fi
+# --- END FIX ---
 
 # --- Check for 'flock' dependency ---
 # Use GW_FLOCK_BIN if set, otherwise default to "flock"
@@ -793,7 +801,14 @@ if [ -d "$USER_PATH" ]; then
   EXCLUDE_REGEX="(${EXCLUDE_REGEX:1})"
   # --- End NEW ---
 
-  if [ "$INW" = "inotifywait" ]; then INW_ARGS=("-qmr" "-e" "$EVENTS" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS"); else INW_ARGS=("--recursive" "--event" "$EVENTS" "-E" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS"); fi
+  # --- FIX: Use glob matching (==) instead of exact matching (=) ---
+  if [[ "$INW" == *"inotifywait"* ]]; then
+    INW_ARGS=("-qmr" "-e" "$EVENTS" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS")
+  else
+    # Default to fswatch-style args
+    INW_ARGS=("--recursive" "--event" "$EVENTS" "-E" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS")
+  fi
+  # --- END FIX ---
   # GIT_ADD_ARGS logic moved to _perform_commit
   GIT_COMMIT_ARGS=""
 
@@ -809,7 +824,14 @@ elif [ -f "$USER_PATH" ]; then
   TARGETFILE_ABS="$TARGETDIR_ABS/$TARGETFILE"
 
   # GIT_DIR_PATH logic moved AFTER getopts, handled below
-  if [ "$INW" = "inotifywait" ]; then INW_ARGS=("-qm" "-e" "$EVENTS" "$TARGETFILE_ABS"); else INW_ARGS=("--event" "$EVENTS" "$TARGETFILE_ABS"); fi
+  # --- FIX: Use glob matching (==) instead of exact matching (=) ---
+  if [[ "$INW" == *"inotifywait"* ]]; then
+    INW_ARGS=("-qm" "-e" "$EVENTS" "$TARGETFILE_ABS")
+  else
+    # Default to fswatch-style args
+    INW_ARGS=("--event" "$EVENTS" "$TARGETFILE_ABS")
+  fi
+  # --- END FIX ---
   # GIT_ADD_ARGS logic moved to _perform_commit
   GIT_COMMIT_ARGS=""
 else

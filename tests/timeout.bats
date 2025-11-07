@@ -4,7 +4,7 @@
 load 'bats-support/load'
 load 'bats-assert/load'
 load 'bats-file/load'
-# Load custom helpers (includes create_hanging_bin)
+# Load custom helpers
 load 'bats-custom/custom-helpers'
 # Load setup/teardown
 load 'bats-custom/startup-shutdown'
@@ -72,6 +72,19 @@ EOF
   echo "$dummy_path"
 }
 
+# --- NEW HELPER: Find stdbuf ---
+# Finds the correct 'stdbuf' command (stdbuf on Linux, gstdbuf on macOS)
+get_stdbuf_cmd() {
+  if command -v "stdbuf" &>/dev/null; then
+    echo "stdbuf"
+  elif command -v "gstdbuf" &>/dev/null; then
+    echo "gstdbuf"
+  else
+    # Fallback to 'stdbuf' and let it fail if not found
+    echo "stdbuf"
+  fi
+}
+
 
 @test "timeout_git_push: Ensures hung git push command is terminated and logged" {
   local output_file
@@ -93,9 +106,11 @@ EOF
 
   verbose_echo "# DEBUG: Starting gitwatch with hanging 'push' binary and sleep=${test_sleep_time}s and -t ${TEST_TIMEOUT}"
 
-  # Note: GITWATCH_TEST_ARGS already contains the -t flag
-  # --- FIX: Use stdbuf to force line-buffering ---
-  stdbuf -oL -eL "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" -r origin "$target_dir" > "$output_file" 2>&1 &
+  # --- FIX: Use stdbuf helper ---
+  local stdbuf_cmd
+  stdbuf_cmd=$(get_stdbuf_cmd)
+  verbose_echo "# DEBUG: Using stdbuf command: '$stdbuf_cmd'"
+  "$stdbuf_cmd" -oL -eL "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" -r origin "$target_dir" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$target_dir"
@@ -105,7 +120,6 @@ EOF
   echo "change to trigger timeout" >> timeout_file.txt
 
   # 5. Wait for the script's internal timeout to be triggered.
-  # --- MODIFIED: Poll the log file instead of a blind sleep ---
   run wait_for_log_message "$output_file" "ERROR: 'git push' timed out"
   assert_success "Did not find push timeout error message in log."
 
@@ -139,8 +153,11 @@ EOF
   local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
 
   verbose_echo "# DEBUG: Starting gitwatch with hanging 'pull' binary and -R and -t ${TEST_TIMEOUT}"
-  # --- FIX: Use stdbuf to force line-buffering ---
-  stdbuf -oL -eL "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" -r origin -R "$target_dir" > "$output_file" 2>&1 &
+  # --- FIX: Use stdbuf helper ---
+  local stdbuf_cmd
+  stdbuf_cmd=$(get_stdbuf_cmd)
+  verbose_echo "# DEBUG: Using stdbuf command: '$stdbuf_cmd'"
+  "$stdbuf_cmd" -oL -eL "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" -r origin -R "$target_dir" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$target_dir"
@@ -150,7 +167,6 @@ EOF
   echo "change to trigger pull timeout" >> pull_timeout_file.txt
 
   # 5. Wait for the script's internal timeout (10s) to be triggered.
-  # --- MODIFIED: Poll the log file instead of a blind sleep ---
   run wait_for_log_message "$output_file" "ERROR: 'git pull' timed out"
   assert_success "Did not find pull timeout error message in log."
 
@@ -190,8 +206,11 @@ EOF
   initial_hash=$(git log -1 --format=%H)
   verbose_echo "# DEBUG: Starting gitwatch with hanging 'commit' binary and -t ${TEST_TIMEOUT}"
 
-  # --- FIX: Use stdbuf to force line-buffering ---
-  stdbuf -oL -eL "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" "$target_dir" > "$output_file" 2>&1 &
+  # --- FIX: Use stdbuf helper ---
+  local stdbuf_cmd
+  stdbuf_cmd=$(get_stdbuf_cmd)
+  verbose_echo "# DEBUG: Using stdbuf command: '$stdbuf_cmd'"
+  "$stdbuf_cmd" -oL -eL "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" "$target_dir" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow watcher to initialize
@@ -200,7 +219,6 @@ EOF
   echo "change to trigger commit timeout" >> commit_timeout_file.txt
 
   # 5. Wait for the script's internal timeout (10s) to be triggered.
-  # --- MODIFIED: Poll the log file instead of a blind sleep ---
   run wait_for_log_message "$output_file" "ERROR: 'git commit' timed out"
   assert_success "Did not find commit timeout error message in log."
 

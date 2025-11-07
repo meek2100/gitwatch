@@ -53,6 +53,8 @@ create_watcher_wrapper() {
 
   # The expected default events string
   local default_events="close_write,move,move_self,delete,create,modify"
+  # --- FIX: This is how printf %q will escape the $EVENTS string ---
+  local escaped_events="close_write,move,move_self,delete,create,modify"
   # The expected default exclude regex (must match the quoted regex output from printf %q in gitwatch.sh)
   local expected_regex="\(\.git/\|\.git\$\)"
 
@@ -67,8 +69,8 @@ create_watcher_wrapper() {
   # 3. Assert: Check log output for inotifywait arguments
   run cat "$output_file"
   assert_output --partial "*** inotifywait_CALLED ***" "Dummy inotifywait was not executed"
-  # Check for core inotifywait args, matching the expected format exactly
-  local expected_args="-qmr -e $default_events --exclude $expected_regex $testdir/local/$TEST_SUBDIR_NAME"
+  # --- FIX: Use the escaped_events variable ---
+  local expected_args="-qmr -e $escaped_events --exclude $expected_regex $testdir/local/$TEST_SUBDIR_NAME"
   assert_output --partial "ARGS: $expected_args" "Inotifywait default arguments not passed correctly"
 
   # 4. Cleanup
@@ -77,8 +79,7 @@ create_watcher_wrapper() {
 }
 
 @test "watcher_args_macos: Verifies correct arguments for fswatch" {
-  if [ "$RUNNER_OS" != "macOS" ];
-  then
+  if [ "$RUNNER_OS" != "macOS" ]; then
     skip "Test skipped: only runs on macOS runners."
   fi
 
