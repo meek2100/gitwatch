@@ -74,7 +74,7 @@ then
   local expected_args="-qmr -e $escaped_events --exclude $expected_regex $testdir/local/$TEST_SUBDIR_NAME"
 
   # --- FIX 2: Assert against the [INFO] log line, which is more stable ---
-  local info_log_regex="\(\(\.git/\|\.git\$\)\)" # Regex in info log is double-parented
+  local info_log_regex=((\.git/|\.git$))" # Regex in info log is double-parented
   local expected_info_log_line="[INFO] Starting file watch. Command: $dummy_inw -qmr -e $default_events --exclude $info_log_regex $testdir/local/$TEST_SUBDIR_NAME"
   assert_output --partial "$expected_info_log_line" "gitwatch.sh did not log the correct inotifywait command"
 
@@ -105,7 +105,7 @@ then
   # The expected default events number (414)
   local default_events="414"
   # The expected default exclude regex (must match the quoted regex output from printf %q in gitwatch.sh)
-  local expected_regex="\(\(\.git/\|\.git\$\)\)"
+  local expected_regex=((\.git/|\.git$))"
 
   # 2. Start gitwatch (should use fswatch syntax and arguments)
   # Expected args: --recursive --event <number> -E --exclude <regex> <path>
@@ -120,7 +120,7 @@ then
   assert_output --partial "*** fswatch_CALLED ***" "Dummy fswatch was not executed"
 
   # --- FIX: Assert against the [INFO] log line ---
-  local info_log_regex="\(\(\.git/\|\.git\$\)\)" # Regex in info log is double-parented
+  local info_log_regex=((\.git/|\.git$))" # Regex in info log is double-parented
   local expected_info_log_line="[INFO] Starting file watch. Command: $dummy_fswatch --recursive --event $default_events -E --exclude $info_log_regex $testdir/local/$TEST_SUBDIR_NAME"
   assert_output --partial "$expected_info_log_line" "gitwatch.sh did not log the correct fswatch command"
 
