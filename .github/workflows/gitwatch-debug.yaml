@@ -2,8 +2,16 @@
 name: Gitwatch QA (Sequential Debug)
 
 on:
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+    inputs:
+      branch:
+        description: "The branch, tag, or SHA to checkout"
+        required: true
+        default: "master"
+      test_files:
+        description: "Space-separated list/glob of test files (e.g., 'commitcmd.bats' or '*.bats'). Runs inside the 'tests/' directory."
+        required: false
+        default: "" # Default to running no tests
 
 permissions: {}
 
@@ -29,6 +37,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
           persist-credentials: false
+          ref: ${{ github.event.inputs.branch }} # <-- USES BRANCH INPUT
 
       - name: Reusable Setup (Checkout, BATS, Version)
         uses: ./.github/actions/setup
@@ -68,12 +77,6 @@ jobs:
             exit 1
           fi
 
-      # - name: Setup upterm session # Preserved commented-out step
-      #   uses: lhotari/action-upterm@v1
-
-      # Note: The 'Install kcov' step has been removed from here.
-      # It is now inside .github/actions/setup/action.yaml
-
       - name: Display gitwatch.sh content before testing
         shell: bash
         run: |
@@ -92,74 +95,34 @@ jobs:
           grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
           echo "--- End of verification ---"
 
-      - name: Run BATS tests (one-by-one)
+      - name: Run BATS tests (from UI input)
         shell: bash
         # Set BATS_LIB_PATH to include action-installed libraries and our custom module
         env:
           BATS_LIB_PATH: "${{ steps.setup.outputs.bats-lib-path }}:${{ github.workspace }}/tests"
+        # Only run this step if the 'test_files' input is not empty
+        if: github.event.inputs.test_files != ''
         run: |
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
 
+          # --- KEY CHANGE: CD INTO TESTS DIRECTORY ---
           cd tests
 
           echo "===================================================================="
-          echo "Running BATS tests sequentially."
-          echo "Uncomment the 'bats ...' lines below to run them one-by-one."
+          echo "Running BATS tests (from 'tests/' directory) from workflow_dispatch input:"
+          echo "${{ github.event.inputs.test_files }}"
           echo "===================================================================="
 
-          # --- UNCOMMENT TESTS ONE-BY-ONE TO DEBUG ---
-          # We use --tap for clean, standardized output
-
-          # bats --tap add-failure.bats ## (Fail)
-          # bats --tap atomic-file.bats ## (Fail)
-          # bats --tap backoff.bats ## (Fail)
-          # bats --tap bash-compatibility.bats ## (Fail)
-          # bats --tap case.bats ## (Fail)
-          # bats --tap commitcmd.bats ## (Fail)
-          # bats --tap commitlog.bats ## (Fail)
-          # bats --tap commitmsg-unit.bats ## (Fail)
-          # bats --tap custom-bins.bats ## (Fail)
-          # bats --tap custom-events.bats ## (Fail)
-          # bats --tap debounce.bats ## (Fail)
-          # bats --tap dependency-failure.bats ## (Fail)
-          # bats --tap diff-lines.bats ## (Fail)
-          # bats --tap docker.bats ## (Fail)
-          # bats --tap git-command-failure.bats ## (Fail)
-          # bats --tap git-config-failure.bats ## (Fail)
-          # bats --tap glob-conversion.bats ## (Fail)
-          # bats --tap helpers.bats ## (Fail)
-          # bats --tap hook-failure.bats ## (Fail)
-          # bats --tap large-file.bats ## (NEW)
-          # bats --tap lfs.bats ## (Fail)
-          # bats --tap lockfile-fallback.bats ## (Fail)
-          # bats --tap lockfile-nohash.bats ## (Fail)
-          # bats --tap lockfile-race.bats ## (Fail)
-          # bats --tap lockfile-success.bats ## (Fail)
-          # bats --tap logging-levels.bats ## (Fail)
-          # bats --tap notify-ignore.bats ## (Fail)
-          # bats --tap perm-check.bats ## (Fail)
-          # bats --tap pull-norebase-conflict.bats ## (Fail)
-          # bats --tap pull-rebase.bats ## (Fail)
-          # bats --tap quiet.bats ## (Fail)
-          # bats --tap remotedirs.bats ## (Fail)
-          # bats --tap signal-handling.bats ## (Fail)
-          # bats --tap skip-merging.bats ## (Fail)
-          # bats --tap spaces.bats ## (Fail)
-          # bats --tap special-chars.bats ## (Fail)
-          # bats --tap startup-options.bats ## (Fail)
-          # bats --tap status-change.bats ## (Fail)
-          # bats --tap submodule.bats ## (Fail)
-          # bats --tap symlinks.bats ## (Fail)
-          # bats --tap sync.bats ## (Fail)
-          # bats --tap syslog.bats ## (Fail)
-          # bats --tap target-deletion.bats ## (Fail)
-          # bats --tap timeout.bats ## (Fail)
-          bats --tap watcher-args.bats ## (Fail)
+          # Pass the space-separated string directly to bats
+          # The shell will handle word splitting and glob expansion
+          bats --tap ${{ github.event.inputs.test_files }}
 
           echo "===================================================================="
           echo "Finished running tests."
           echo "===================================================================="
 
-      # Note: The 'Upload coverage report (Linux)' step is removed
-      # as kcov is not being run in this sequential setup.
+      - name: No Tests Specified
+        if: github.event.inputs.test_files == ''
+        run: |
+          echo "No test files specified in 'test_files' input. Skipping BATS run."
