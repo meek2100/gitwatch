@@ -54,7 +54,7 @@ create_watcher_wrapper() {
   # The expected default events string
   local default_events="close_write,move,move_self,delete,create,modify"
   # The expected default exclude regex (must match the quoted regex output from printf %q in gitwatch.sh)
-  local expected_regex="'(\\.git/|\\.git\\$)'"
+  local expected_regex="\(\.git/\|\.git\$\)"
 
   # 2. Start gitwatch (should use inotifywait syntax and arguments)
   # Expected args: -qmr -e <events> --exclude <regex> <path>
@@ -98,7 +98,7 @@ create_watcher_wrapper() {
   # The expected default events number (414)
   local default_events="414"
   # The expected default exclude regex (must match the quoted regex output from printf %q in gitwatch.sh)
-  local expected_regex="'(\\.git/|\\.git\\$)'"
+  local expected_regex="\(\.git/\|\.git\$\)"
 
   # 2. Start gitwatch (should use fswatch syntax and arguments)
   # Expected args: --recursive --event <number> -E --exclude <regex> <path>
