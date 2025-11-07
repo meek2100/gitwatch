@@ -34,7 +34,8 @@ create_watcher_wrapper() {
 
 @test "watcher_args_linux: Verifies correct arguments for inotifywait" {
 
-  if [ "$RUNNER_OS" != "Linux" ]; then
+  if [ "$(uname)" != "Linux" ];
+then
     skip "Test skipped: only runs on Linux runners."
   fi
 
@@ -56,7 +57,7 @@ create_watcher_wrapper() {
   # --- FIX: This is how printf %q will escape the $EVENTS string ---
   local escaped_events="close_write,move,move_self,delete,create,modify"
   # The expected default exclude regex (must match the quoted regex output from printf %q in gitwatch.sh)
-  local expected_regex="\(\.git/\|\.git\$\)"
+  local expected_regex="\(\(\.git/\|\.git\$\)\)"
 
   # 2. Start gitwatch (should use inotifywait syntax and arguments)
   # Expected args: -qmr -e <events> --exclude <regex> <path>
@@ -71,7 +72,11 @@ create_watcher_wrapper() {
   assert_output --partial "*** inotifywait_CALLED ***" "Dummy inotifywait was not executed"
   # --- FIX: Use the escaped_events variable ---
   local expected_args="-qmr -e $escaped_events --exclude $expected_regex $testdir/local/$TEST_SUBDIR_NAME"
-  assert_output --partial "ARGS: $expected_args" "Inotifywait default arguments not passed correctly"
+
+  # --- FIX 2: Assert against the [INFO] log line, which is more stable ---
+  local info_log_regex="\(\(\.git/\|\.git\$\)\)" # Regex in info log is double-parented
+  local expected_info_log_line="[INFO] Starting file watch. Command: $dummy_inw -qmr -e $default_events --exclude $info_log_regex $testdir/local/$TEST_SUBDIR_NAME"
+  assert_output --partial "$expected_info_log_line" "gitwatch.sh did not log the correct inotifywait command"
 
   # 4. Cleanup
   unset GW_INW_BIN
@@ -79,7 +84,8 @@ create_watcher_wrapper() {
 }
 
 @test "watcher_args_macos: Verifies correct arguments for fswatch" {
-  if [ "$RUNNER_OS" != "macOS" ]; then
+  if [ "$(uname)" != "Darwin" ];
+then
     skip "Test skipped: only runs on macOS runners."
   fi
 
@@ -99,7 +105,7 @@ create_watcher_wrapper() {
   # The expected default events number (414)
   local default_events="414"
   # The expected default exclude regex (must match the quoted regex output from printf %q in gitwatch.sh)
-  local expected_regex="\(\.git/\|\.git\$\)"
+  local expected_regex="\(\(\.git/\|\.git\$\)\)"
 
   # 2. Start gitwatch (should use fswatch syntax and arguments)
   # Expected args: --recursive --event <number> -E --exclude <regex> <path>
@@ -112,9 +118,11 @@ create_watcher_wrapper() {
   # 3. Assert: Check log output for fswatch arguments
   run cat "$output_file"
   assert_output --partial "*** fswatch_CALLED ***" "Dummy fswatch was not executed"
-  # Check for core fswatch args, matching the expected format exactly
-  local expected_args="--recursive --event $default_events -E --exclude $expected_regex $testdir/local/$TEST_SUBDIR_NAME"
-  assert_output --partial "ARGS: $expected_args" "Fswatch default arguments not passed correctly"
+
+  # --- FIX: Assert against the [INFO] log line ---
+  local info_log_regex="\(\(\.git/\|\.git\$\)\)" # Regex in info log is double-parented
+  local expected_info_log_line="[INFO] Starting file watch. Command: $dummy_fswatch --recursive --event $default_events -E --exclude $info_log_regex $testdir/local/$TEST_SUBDIR_NAME"
+  assert_output --partial "$expected_info_log_line" "gitwatch.sh did not log the correct fswatch command"
 
   # 4. Cleanup
   unset GW_INW_BIN
