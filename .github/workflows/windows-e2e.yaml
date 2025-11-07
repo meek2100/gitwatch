@@ -3,6 +3,7 @@ name: Windows E2E Functional Test
 
 on:
   push:
+    branches: [master]
   pull_request:
     branches: [master]
   workflow_dispatch:
