@@ -27,6 +27,8 @@ and this project adheres to
   - Added a "large file safety gate" to `_perform_commit` that detects untracked
     files >=50MB (via `stat`) and skips the commit to prevent accidentally
     adding large binaries.
+  - Added BATS test (`tests/large-file.bats`) to verify the large file safety
+    gate.
   - Added BATS tests for filenames containing newlines (`\n`) to
     `tests/special-chars.bats`.
   - Added BATS tests for composite `git diff` parsing (rename+mode and
