@@ -12,6 +12,10 @@ on:
         description: "Space-separated list/glob of test files (e.g., 'commitcmd.bats' or '*.bats'). Runs inside the 'tests/' directory."
         required: false
         default: "" # Default to running no tests
+      timeout_in_minutes:
+        description: "Job timeout in minutes (default: 3, max: 2160)"
+        required: true
+        default: "3"
 
 permissions: {}
 
@@ -30,7 +34,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, macOS-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    # --- MODIFIED TIMEOUT ---
+    # Use the input from the workflow_dispatch form
+    # We use fromJSON to convert the input string (e.g., '3') to a number
+    timeout-minutes: ${{ fromJSON(github.event.inputs.timeout_in_minutes) }}
 
     steps:
       - name: Checkout Repository
