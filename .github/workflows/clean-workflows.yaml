@@ -15,4 +15,4 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repo: ${{ github.repository }}
-          days_to_keep: 1 # Keep runs for the last 30 days
+          save_period: 1
