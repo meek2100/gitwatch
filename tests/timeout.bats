@@ -13,6 +13,35 @@ load 'bats-custom/startup-shutdown'
 # This is more robust than hard-coding '10'
 TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' -f2 || echo 10)
 
+# --- Setup Function ---
+# This test file requires a remote for push/pull tests
+setup() {
+  setup_with_remote
+}
+
+# --- Helper ---
+# Helper to poll a log file for a specific message
+wait_for_log_message() {
+  local file="$1"
+  local pattern="$2"
+  local max_attempts=15 # Total wait 15s (must be > $TEST_TIMEOUT)
+  local delay=1
+  local attempt=1
+
+  while (( attempt <= max_attempts )); do
+    verbose_echo "# DEBUG: Checking log '$file' for '$pattern' (Attempt $attempt/$max_attempts)..."
+    if [ -f "$file" ] && grep -q "$pattern" "$file"; then
+      verbose_echo "# DEBUG: Found log message."
+      return 0
+    fi
+    sleep "$delay"
+    (( attempt++ ))
+  done
+
+  verbose_echo "# DEBUG: Timeout waiting for log message: '$pattern'"
+  return 1
+}
+
 @test "timeout_git_push: Ensures hung git push command is terminated and logged" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -46,7 +75,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
 
   # 5. Wait for the debounce period (1s) plus a small buffer, then wait for the
   # expected timeout period (10s) to be triggered by the script itself.
-  local total_wait_time=5
+  local total_wait_time=12
   verbose_echo "# DEBUG: Waiting ${total_wait_time}s for commit attempt and expected timeout failure..."
   # Wait for a fraction of the timeout period, just enough to see the failure log
   sleep "$total_wait_time"
@@ -91,7 +120,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
   echo "change to trigger pull timeout" >> pull_timeout_file.txt
 
   # 5. Wait for the script's internal timeout (10s) to be triggered.
-  local total_wait_time=5
+  local total_wait_time=12
   verbose_echo "# DEBUG: Waiting ${total_wait_time}s for commit/pull attempt and expected timeout failure..."
   sleep "$total_wait_time"
 
@@ -141,7 +170,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
   echo "change to trigger commit timeout" >> commit_timeout_file.txt
 
   # 5. Wait for the script's internal timeout (10s) to be triggered.
-  local total_wait_time=5
+  local total_wait_time=12
   verbose_echo "# DEBUG: Waiting ${total_wait_time}s for commit attempt and expected timeout failure..."
   sleep "$total_wait_time"
 
