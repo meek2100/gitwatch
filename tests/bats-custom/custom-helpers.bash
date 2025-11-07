@@ -173,40 +173,6 @@ create_failing_watcher_bin() {
   echo "$dummy_path"
 }
 
-# create_hanging_bin: Creates a dummy script that sleeps for a very long time,
-#                     simulating a hung command (e.g., git push to a dead server).
-#
-# Usage: create_hanging_bin <name>
-#
-# Arguments:
-#   name: The name of the binary to mock (e.g., git)
-#
-# Returns:
-#   The absolute path to the created dummy binary (to stdout).
-create_hanging_bin() {
-  local name="$1"
-  # shellcheck disable=SC2154 # testdir is sourced in the calling bats test file
-  local dummy_path="$testdir/bin/$name-hanging"
-
-  # Ensure the directory exists
-  # shellcheck disable=SC2154 # testdir is sourced in the calling bats test file
-  mkdir -p "$testdir/bin"
-
-  echo "#!/usr/bin/env bash" > "$dummy_path"
-  # Fix SC2129: Combine redirects
-  {
-    # Print signature to indicate the hanging version was called
-    echo "echo \"*** DUMMY HANG: $name called, will sleep 600s ***\" >&2"
-    # Sleep for 10 minutes (much longer than gitwatch.sh's 60s timeout)
-    echo "sleep 600"
-    # Exit cleanly if it ever wakes up, though it should be killed by 'timeout'
-    echo "exit 0"
-  } >> "$dummy_path"
-
-  chmod +x "$dummy_path"
-  echo "$dummy_path"
-}
-
 # Tests for the availability of a command
 is_command() {
   # Use command -v for better POSIX compliance and alias handling than hash

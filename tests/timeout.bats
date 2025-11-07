@@ -42,15 +42,45 @@ wait_for_log_message() {
   return 1
 }
 
+# --- Helper ---
+# Creates a mock 'git' binary that hangs *only* on a specific command
+create_mock_git_hang_on_cmd() {
+  local hang_cmd="$1"
+  local real_path
+  real_path=$(command -v git)
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  local dummy_path="$testdir/bin/git-mock-hang"
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  mkdir -p "$testdir/bin"
+
+  # Create the mock script
+  cat > "$dummy_path" << EOF
+#!/usr/bin/env bash
+# Mock Git script
+echo "# MOCK_GIT: Received command: \$@" >&2
+
+if [ "\$1" = "$hang_cmd" ]; then
+  echo "# MOCK_GIT: Hanging on '$hang_cmd', will sleep 600s..." >&2
+  sleep 600
+else
+  # Pass all other commands (config, add, commit, rev-parse) to the real git
+  exec $real_path "\$@"
+fi
+EOF
+
+  chmod +x "$dummy_path"
+  echo "$dummy_path"
+}
+
+
 @test "timeout_git_push: Ensures hung git push command is terminated and logged" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
-  # 1. Setup: Create a hanging dummy 'git' binary
-  # We rename the hanging binary to be what GW_GIT_BIN expects.
+  # 1. Setup: Create a hanging dummy 'git' binary that hangs on 'push'
   local dummy_git_path
-  dummy_git_path=$(create_hanging_bin "git")
+  dummy_git_path=$(create_mock_git_hang_on_cmd "push")
 
   # 2. Set environment variable to force gitwatch to use the hanging binary
   # shellcheck disable=SC2030,SC2031 # Exporting variable to be read by child process
@@ -61,7 +91,7 @@ wait_for_log_message() {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
 
-  verbose_echo "# DEBUG: Starting gitwatch with hanging git binary and sleep=${test_sleep_time}s and -t ${TEST_TIMEOUT}"
+  verbose_echo "# DEBUG: Starting gitwatch with hanging 'push' binary and sleep=${test_sleep_time}s and -t ${TEST_TIMEOUT}"
 
   # Note: GITWATCH_TEST_ARGS already contains the -t flag
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" -r origin "$target_dir" > "$output_file" 2>&1 &
@@ -73,16 +103,14 @@ wait_for_log_message() {
   # 4. Trigger a change
   echo "change to trigger timeout" >> timeout_file.txt
 
-  # 5. Wait for the debounce period (1s) plus a small buffer, then wait for the
-  # expected timeout period (10s) to be triggered by the script itself.
-  local total_wait_time=12
-  verbose_echo "# DEBUG: Waiting ${total_wait_time}s for commit attempt and expected timeout failure..."
-  # Wait for a fraction of the timeout period, just enough to see the failure log
-  sleep "$total_wait_time"
+  # 5. Wait for the script's internal timeout to be triggered.
+  # --- MODIFIED: Poll the log file instead of a blind sleep ---
+  run wait_for_log_message "$output_file" "ERROR: 'git push' timed out"
+  assert_success "Did not find push timeout error message in log."
 
   # 6. Assert: The commit/push failed due to timeout
   run cat "$output_file"
-  assert_output --partial "*** DUMMY HANG: git called, will sleep 600s ***" "Hanging dummy git binary was not called."
+  assert_output --partial "# MOCK_GIT: Hanging on 'push'" "Hanging dummy git binary was not called."
   assert_output --partial "ERROR: 'git push' timed out after ${TEST_TIMEOUT} seconds." "Push timeout error was not logged."
 
   # 7. Cleanup
@@ -96,9 +124,9 @@ wait_for_log_message() {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
-  # 1. Setup: Create a hanging dummy 'git' binary
+  # 1. Setup: Create a hanging dummy 'git' binary that hangs on 'pull'
   local dummy_git_path
-  dummy_git_path=$(create_hanging_bin "git")
+  dummy_git_path=$(create_mock_git_hang_on_cmd "pull")
 
   # 2. Set environment variable
   # shellcheck disable=SC2030,SC2031 # Exporting variable to be read by child process
@@ -109,7 +137,7 @@ wait_for_log_message() {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
 
-  verbose_echo "# DEBUG: Starting gitwatch with hanging git binary and -R and -t ${TEST_TIMEOUT}"
+  verbose_echo "# DEBUG: Starting gitwatch with hanging 'pull' binary and -R and -t ${TEST_TIMEOUT}"
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" -r origin -R "$target_dir" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
@@ -120,14 +148,14 @@ wait_for_log_message() {
   echo "change to trigger pull timeout" >> pull_timeout_file.txt
 
   # 5. Wait for the script's internal timeout (10s) to be triggered.
-  local total_wait_time=12
-  verbose_echo "# DEBUG: Waiting ${total_wait_time}s for commit/pull attempt and expected timeout failure..."
-  sleep "$total_wait_time"
+  # --- MODIFIED: Poll the log file instead of a blind sleep ---
+  run wait_for_log_message "$output_file" "ERROR: 'git pull' timed out"
+  assert_success "Did not find pull timeout error message in log."
 
   # 6. Assert: The commit succeeded, but the subsequent pull failed due to timeout
   run cat "$output_file"
   assert_output --partial "Running git commit command:" "Commit should succeed before pull attempt."
-  assert_output --partial "*** DUMMY HANG: git called, will sleep 600s ***" "Hanging dummy git binary was not called for pull."
+  assert_output --partial "# MOCK_GIT: Hanging on 'pull'" "Hanging dummy git binary was not called for pull."
   assert_output --partial "ERROR: 'git pull' timed out after ${TEST_TIMEOUT} seconds. Skipping push." "Pull timeout error was not logged."
 
   # 7. Cleanup
@@ -141,10 +169,9 @@ wait_for_log_message() {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
-  # 1. Setup: Create a hanging dummy 'git' binary
-  # This dummy binary will be called via 'timeout 10 /path/to/git-hanging commit...'
+  # 1. Setup: Create a hanging dummy 'git' binary that hangs on 'commit'
   local dummy_git_path
-  dummy_git_path=$(create_hanging_bin "git-commit-hang")
+  dummy_git_path=$(create_mock_git_hang_on_cmd "commit")
 
   # 2. Set environment variable to force gitwatch to use the hanging binary
   # We must use the full path to the hanging binary here.
@@ -159,7 +186,7 @@ wait_for_log_message() {
 
   cd "$target_dir"
   initial_hash=$(git log -1 --format=%H)
-  verbose_echo "# DEBUG: Starting gitwatch with hanging commit binary and -t ${TEST_TIMEOUT}"
+  verbose_echo "# DEBUG: Starting gitwatch with hanging 'commit' binary and -t ${TEST_TIMEOUT}"
 
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" "$target_dir" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
@@ -170,16 +197,16 @@ wait_for_log_message() {
   echo "change to trigger commit timeout" >> commit_timeout_file.txt
 
   # 5. Wait for the script's internal timeout (10s) to be triggered.
-  local total_wait_time=12
-  verbose_echo "# DEBUG: Waiting ${total_wait_time}s for commit attempt and expected timeout failure..."
-  sleep "$total_wait_time"
+  # --- MODIFIED: Poll the log file instead of a blind sleep ---
+  run wait_for_log_message "$output_file" "ERROR: 'git commit' timed out"
+  assert_success "Did not find commit timeout error message in log."
 
   # 6. Assert: Commit did NOT happen, and timeout error was logged
   run git log -1 --format=%H
   assert_equal "$initial_hash" "$output" "Commit hash should NOT change"
 
   run cat "$output_file"
-  assert_output --partial "*** DUMMY HANG: git-commit-hang called, will sleep 600s ***" "Hanging dummy git binary was not called for commit."
+  assert_output --partial "# MOCK_GIT: Hanging on 'commit'" "Hanging dummy git binary was not called for commit."
   assert_output --partial "ERROR: 'git commit' timed out after ${TEST_TIMEOUT} seconds." "Commit timeout error was not logged."
 
   # 7. Cleanup
