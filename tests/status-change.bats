@@ -69,20 +69,13 @@ load 'bats-custom/startup-shutdown'
   cat "$output_file" >&3
   verbose_echo "# DEBUG: --- End log content ---"
 
-  # Verify verbose output indicates no changes were detected by the final diff check
+  # --- MODIFIED ASSERTION ---
+  # Verify verbose output indicates no changes were detected by the final *write-tree* check.
   run cat "$output_file"
-  assert_output --partial "No relevant changes detected by git status (porcelain check)."
-  # Verify only one commit command was run
-  #local commit_count
+  refute_output --partial "No relevant changes detected by git status (porcelain check)."
+  assert_output --partial "Staged tree is identical to HEAD (only ephemeral metadata changed). Aborting commit."
+  # --- END MODIFICATION ---
 
-  # --- OLD: Verify via log count (Flaky) ---
-  # verbose_echo "# DEBUG: Grepping log file for 'Running git commit command:'"
-  # Count lines containing "Running git commit command:" in the log
-  # commit_count=$(grep -c "Running git commit command:" "$output_file")
-  # verbose_echo "# DEBUG: Commit count found: $commit_count"
-  # assert_equal "$commit_count" "1" # Only the initial commit should have run
-
-  # --- Verify commit history directly (Robust) ---
   # --- Verify commit history directly ---
   verbose_echo "# DEBUG: Verifying total commit count using git rev-list"
   # Count total commits: Initial commit (1) + commit from 'echo line1' (1) = 2

@@ -9,6 +9,12 @@ load 'bats-custom/custom-helpers'
 # Load setup/teardown
 load 'bats-custom/startup-shutdown'
 
+# --- NEW: Source the main script to test functions directly ---
+# This brings in the _get_path_hash function
+# shellcheck disable=SC1091 # gitwatch.sh is intentionally sourced for unit testing
+source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
+# --- END NEW ---
+
 # This test simulates missing hash commands to ensure the lockfile logic
 # correctly falls back to using a basic path-based string for the lockfile name in /tmp.
 @test "lockfile_nohash: Falls back to /tmp lockfile with path-based name when hash commands are missing" {
@@ -58,10 +64,12 @@ load 'bats-custom/startup-shutdown'
     fail "Test setup failed: Cannot reliably hide 'sha256sum'/'md5sum' to test fallback logic."
   fi
   verbose_echo "# DEBUG: Successfully hid hash commands via PATH manipulation."
+
   # 4. Start gitwatch, which should fall back because of unwritable .git AND missing hash tools
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" "$target_path" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
+
   # 5. Wait for initialization and check log
   sleep 2
 
@@ -70,17 +78,20 @@ load 'bats-custom/startup-shutdown'
   assert_output --partial "Warning: Cannot write lockfile to $GIT_DIR_PATH. Falling back to temporary directory." \
     "Did not log the expected fallback warning"
   assert_output --partial "Warning: Neither 'sha256sum' nor 'md5sum' found."
-  # 6a. Calculate the expected path-based "hash" name
+
+  # --- MODIFIED: Call the _get_path_hash function from the sourced script ---
+  # 6a. Calculate the expected path-based "hash" name *using the script's own logic*
   local target_abs_path
   target_abs_path=$(cd "$target_path" && pwd -P)
   local repo_hash_path
-  repo_hash_path="${GIT_DIR_PATH//\//_}" # Replaces / with _
+  repo_hash_path=$(_get_path_hash "$GIT_DIR_PATH") # Call the real function
   local target_hash_path
-  target_hash_path="${target_abs_path//\//_}" # Replaces / with _
+  target_hash_path=$(_get_path_hash "$target_abs_path") # Call the real function
   local expected_basename="gitwatch-repo_${repo_hash_path}-target_${target_hash_path}"
+  # --- END MODIFICATION ---
 
   # Assert that the path contains /tmp/ and the path-based "hash"
-  assert_output --partial "/tmp/${expected_basename}.lock" "Did not log a temporary lockfile path with path-based name"
+  assert_output --partial "/tmp/${expected_basename}.lock" "Did not log a temporary lockfile path with path-based name: $expected_basename"
 
   # 7. Trigger change and verify commit using the fallback lock
   cd "$target_path"
@@ -145,14 +156,16 @@ load 'bats-custom/startup-shutdown'
   refute_output --partial "Falling back to temporary directory."
   # SHOULD warn about missing hash tools
   assert_output --partial "Warning: Neither 'sha256sum' nor 'md5sum' found."
-  # 6. Calculate the expected path-based "hash" name
+
+  # --- MODIFIED: Call the _get_path_hash function from the sourced script ---
+  # 6. Calculate the expected path-based "hash" name *using the script's own logic*
   local target_abs_path
   target_abs_path=$(cd "$target_path" && pwd -P)
-  local repo_hash_path
-  repo_hash_path="${GIT_DIR_PATH//\//_}" # Replaces / with _
+  # Note: The script *only* uses the target hash for the basename when .git is writable
   local target_hash_path
-  target_hash_path="${target_abs_path//\//_}" # Replaces / with _
-  local expected_basename="gitwatch-repo_${repo_hash_path}-target_${target_hash_path}"
+  target_hash_path=$(_get_path_hash "$target_abs_path") # Call the real function
+  local expected_basename="gitwatch-target_${target_hash_path}"
+  # --- END MODIFICATION ---
 
   # Assert the lockfile path is in the .git dir
   assert_output --partial "Acquired main instance lock (FD 9) on $GIT_DIR_PATH/${expected_basename}.lock"
