@@ -94,7 +94,8 @@ EOF
   verbose_echo "# DEBUG: Starting gitwatch with hanging 'push' binary and sleep=${test_sleep_time}s and -t ${TEST_TIMEOUT}"
 
   # Note: GITWATCH_TEST_ARGS already contains the -t flag
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" -r origin "$target_dir" > "$output_file" 2>&1 &
+  # --- FIX: Use stdbuf to force line-buffering ---
+  stdbuf -oL -eL "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" -r origin "$target_dir" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$target_dir"
@@ -138,7 +139,8 @@ EOF
   local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
 
   verbose_echo "# DEBUG: Starting gitwatch with hanging 'pull' binary and -R and -t ${TEST_TIMEOUT}"
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" -r origin -R "$target_dir" > "$output_file" 2>&1 &
+  # --- FIX: Use stdbuf to force line-buffering ---
+  stdbuf -oL -eL "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" -r origin -R "$target_dir" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$target_dir"
@@ -188,7 +190,8 @@ EOF
   initial_hash=$(git log -1 --format=%H)
   verbose_echo "# DEBUG: Starting gitwatch with hanging 'commit' binary and -t ${TEST_TIMEOUT}"
 
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" "$target_dir" > "$output_file" 2>&1 &
+  # --- FIX: Use stdbuf to force line-buffering ---
+  stdbuf -oL -eL "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" "$target_dir" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow watcher to initialize
