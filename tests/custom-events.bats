@@ -25,8 +25,9 @@ create_watcher_wrapper() {
     echo "echo \"*** ${watcher_name}_CALLED ***\" >&2"
     # Print arguments to stderr for assertion, using printf %q for safe quoting
     echo "echo \"*** ARGS: \$(printf '%q ' \"\$@\") ***\" >&2"
-    # Execute the real binary with a minimal set of non-blocking arguments, piping to true to prevent indefinite blocking
-    echo "exec $real_path \"\$@\" | true"
+    # MODIFIED: Keep the process alive so gitwatch.sh doesn't exit.
+    # The BATS teardown hook will kill this sleep and the main GITWATCH_PID.
+    echo "sleep 10"
   } > "$dummy_path"
 
   chmod +x "$dummy_path"

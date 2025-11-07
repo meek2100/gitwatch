@@ -9,6 +9,34 @@ load 'bats-custom/custom-helpers'
 # Load setup/teardown
 load 'bats-custom/startup-shutdown'
 
+# --- NEW setup/teardown for this file ---
+local path_backup=""
+local DUMMY_BIN=""
+
+setup() {
+  # Call the common setup first
+  _common_setup 0
+
+  # Set up manual mock for the FATAL test
+  path_backup="$PATH"
+  # shellcheck disable=SC2154 # testdir is sourced
+  DUMMY_BIN="$testdir/dummy-bin"
+  mkdir -p "$DUMMY_BIN"
+  echo "#!/bin/bash" > "$DUMMY_BIN/flock"
+  echo "exit 127" >> "$DUMMY_BIN/flock"
+  chmod +x "$DUMMY_BIN/flock"
+  export PATH="$DUMMY_BIN:$PATH"
+}
+
+teardown() {
+  # Restore the path
+  export PATH="$path_backup"
+  # Call the common teardown
+  _common_teardown
+}
+# --- END NEW setup/teardown ---
+
+
 # --- HELPER: Create Mock Git ---
 create_mock_git_fail_commit() {
   local real_path="$1"
@@ -20,7 +48,8 @@ create_mock_git_fail_commit() {
   cat > "$dummy_path" << EOF
 #!/usr/bin/env bash
 echo "# MOCK_GIT: Received command: \$@" >&2
-if [ "\$1" = "commit" ]; then
+if [ "\$1" = "commit" ];
+then
   echo "# MOCK_GIT: Simulating 'git commit' failure" >&2
   exit 1
 else
@@ -38,7 +67,8 @@ EOF
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Mock 'flock' to be missing
-  export BATS_MOCK_DEPENDENCIES="flock"
+  # (This is now handled by the file's setup() function)
+  # export BATS_MOCK_DEPENDENCIES="flock"
 
   # 2. Run gitwatch with -o FATAL (or 1)
   # It should fail, and only the FATAL error should be in the log.

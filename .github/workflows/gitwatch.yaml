@@ -1,8 +1,9 @@
 ---
-name: Gitwatch QA (Sequential Debug)
+name: Gitwatch QA
 
 on:
   push:
+    branches: [master]
   pull_request:
     branches: [master]
 
@@ -65,7 +66,8 @@ jobs:
           if [ "$RUNNER_OS" == "Linux" ]; then
             sudo apt-get update
             sudo apt-get -y install inotify-tools util-linux
-          elif [ "$RUNNER_OS" == "macOS" ]; then
+          elif [ "$RUNNER_OS" == "macOS" ];
+          then
             brew install fswatch flock coreutils bash
           else
             echo "Unsupported OS: $RUNNER_OS"
@@ -90,13 +92,15 @@ jobs:
         run: |
           echo "--- Verifying gitwatch.sh content ---"
           # Verify the git write-tree check
-          grep -C 3 'if \[ "$staged_tree_hash" = "$head_tree_hash" \];' gitwatch.sh
+          grep -C 3 'if \[ "$staged_tree_hash" = "$head_tree_hash" \];'
+          gitwatch.sh
           echo "--- Verifying debounce logic (PID File Method) ---"
           # Verify the start of the new debounce logic block using the PID file
-          grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
+          grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];'
+          gitwatch.sh
           echo "--- End of verification ---"
 
-      - name: Run BATS tests (one-by-one)
+      - name: Run tests (and coverage on Linux)
         shell: bash
         # Set BATS_LIB_PATH to include action-installed libraries and our custom module
         env:
@@ -107,61 +111,48 @@ jobs:
 
           cd tests
 
-          echo "===================================================================="
-          echo "Running BATS tests sequentially."
-          echo "Uncomment the 'bats ...' lines below to run them one-by-one."
-          echo "===================================================================="
+          # Get the number of available processor cores
+          NPROC=1
+          if [ "$RUNNER_OS" == "Linux" ];
+          then
+            NPROC=$(nproc)
+          elif [ "$RUNNER_OS" == "macOS" ];
+          then
+            NPROC=$(sysctl -n hw.ncpu)
+          fi
 
-          # --- UNCOMMENT TESTS ONE-BY-ONE TO DEBUG ---
-          # We use --tap for clean, standardized output
+          echo "Running BATS tests in parallel using $NPROC cores..."
 
-          # bats --tap add-failure.bats ## (Fail)
-          # bats --tap atomic-file.bats ## (Fail)
-          # bats --tap backoff.bats ## (Fail)
-          # bats --tap bash-compatibility.bats ## (Fail)
-          # bats --tap case.bats ## (Fail)
-          # bats --tap commitcmd.bats ## (Fail)
-          # bats --tap commitlog.bats ## (Fail)
-          # bats --tap commitmsg-unit.bats ## (Fail)
-          # bats --tap custom-bins.bats ## (Fail)
-          # bats --tap custom-events.bats ## (Fail)
-          # bats --tap debounce.bats ## (Fail)
-          # bats --tap dependency-failure.bats ## (Fail)
-          # bats --tap diff-lines.bats ## (Fail)
-          # bats --tap docker.bats ## (Fail)
-          # bats --tap git-command-failure.bats ## (Fail)
-          # bats --tap git-config-failure.bats ## (Fail)
-          # bats --tap glob-conversion.bats ## (Fail)
-          # bats --tap helpers.bats ## (Fail)
-          # bats --tap hook-failure.bats ## (Fail)
-          # bats --tap lfs.bats ## (Fail)
-          # bats --tap lockfile-fallback.bats ## (Fail)
-          # bats --tap lockfile-nohash.bats ## (Fail)
-          # bats --tap lockfile-race.bats ## (Fail)
-          # bats --tap lockfile-success.bats ## (Fail)
-          # bats --tap notify-ignore.bats ## (Fail)
-          # bats --tap perm-check.bats ## (Fail)
-          # bats --tap pull-norebase-conflict.bats ## (Fail)
-          # bats --tap pull-rebase.bats ## (Fail)
-          # bats --tap quiet.bats ## (Fail)
-          # bats --tap remotedirs.bats ## (Fail)
-          # bats --tap signal-handling.bats ## (Fail)
-          # bats --tap skip-merging.bats ## (Fail)
-          # bats --tap spaces.bats ## (Fail)
-          # bats --tap special-chars.bats ## (Fail)
-          # bats --tap startup-options.bats ## (Fail)
-          # bats --tap status-change.bats ## (Fail)
-          # bats --tap submodule.bats ## (Fail)
-          # bats --tap symlinks.bats ## (Fail)
-          # bats --tap sync.bats ## (Fail)
-          # bats --tap syslog.bats ## (Fail)
-          # bats --tap target-deletion.bats ## (Fail)
-          # bats --tap timeout.bats ## (Fail)
-          bats --tap watcher-args.bats ## (Fail)
+          if [ "$RUNNER_OS" == "Linux" ];
+          then
+            # Run with kcov on Linux
+            echo "Running with kcov for code coverage..."
+            mkdir -p ../coverage
+            # We must run kcov from the root of the repo to get correct paths
+            cd ..
 
-          echo "===================================================================="
-          echo "Finished running tests."
-          echo "===================================================================="
+            # kcov manages its own parallel execution, but we point it to the bats files
+            # Note: kcov + BATS can be complex.
+            This command runs all tests under one kcov instance.
+            # We use `find` to pass all test files to `bats` at once.
+            kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats $(find tests -name "*.bats")
+          else
+            # Run normally on macOS
+            # Use find and xargs to pipe test files to bats
+            # -n1: one file at a time per bats process
+            # -P $NPROC: run up to $NPROC processes in parallel
 
-      # Note: The 'Upload coverage report (Linux)' step is removed
-      # as kcov is not being run in this sequential setup.
+            # We add --tap to get a standard output format, which is good for parallel runs
+            find .
+            -name "*.bats" -print0 | xargs -0 -n1 -P "$NPROC" bats --tap
+          fi
+
+          echo "Finished running tests"
+
+      - name: Upload coverage report (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-linux
+          path: coverage/
+          retention-days: 7

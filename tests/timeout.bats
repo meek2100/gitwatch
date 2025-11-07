@@ -30,7 +30,8 @@ wait_for_log_message() {
 
   while (( attempt <= max_attempts )); do
     verbose_echo "# DEBUG: Checking log '$file' for '$pattern' (Attempt $attempt/$max_attempts)..."
-    if [ -f "$file" ] && grep -q "$pattern" "$file"; then
+    if [ -f "$file" ] && grep -q "$pattern" "$file";
+    then
       verbose_echo "# DEBUG: Found log message."
       return 0
     fi
@@ -59,7 +60,8 @@ create_mock_git_hang_on_cmd() {
 # Mock Git script
 echo "# MOCK_GIT: Received command: \$@" >&2
 
-if [ "\$1" = "$hang_cmd" ]; then
+if [ "\$1" = "$hang_cmd" ];
+then
   echo "# MOCK_GIT: Hanging on '$hang_cmd', will sleep 600s..." >&2
   sleep 600
 else
@@ -75,9 +77,11 @@ EOF
 # --- NEW HELPER: Find stdbuf ---
 # Finds the correct 'stdbuf' command (stdbuf on Linux, gstdbuf on macOS)
 get_stdbuf_cmd() {
-  if command -v "stdbuf" &>/dev/null; then
+  if command -v "stdbuf" &>/dev/null;
+  then
     echo "stdbuf"
-  elif command -v "gstdbuf" &>/dev/null; then
+  elif command -v "gstdbuf" &>/dev/null;
+  then
     echo "gstdbuf"
   else
     # Fallback to 'stdbuf' and let it fail if not found
@@ -110,7 +114,8 @@ get_stdbuf_cmd() {
   local stdbuf_cmd
   stdbuf_cmd=$(get_stdbuf_cmd)
   verbose_echo "# DEBUG: Using stdbuf command: '$stdbuf_cmd'"
-  "$stdbuf_cmd" -oL -eL "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" -r origin "$target_dir" > "$output_file" 2>&1 &
+  # --- MODIFIED: Changed redirection to &> ---
+  "$stdbuf_cmd" -oL -eL "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" -r origin "$target_dir" &> "$output_file" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$target_dir"
@@ -122,12 +127,10 @@ get_stdbuf_cmd() {
   # 5. Wait for the script's internal timeout to be triggered.
   run wait_for_log_message "$output_file" "ERROR: 'git push' timed out"
   assert_success "Did not find push timeout error message in log."
-
   # 6. Assert: The commit/push failed due to timeout
   run cat "$output_file"
   assert_output --partial "# MOCK_GIT: Hanging on 'push'" "Hanging dummy git binary was not called."
   assert_output --partial "ERROR: 'git push' timed out after ${TEST_TIMEOUT} seconds." "Push timeout error was not logged."
-
   # 7. Cleanup
   unset GW_GIT_BIN
   rm -f "$dummy_git_path"
@@ -157,7 +160,8 @@ get_stdbuf_cmd() {
   local stdbuf_cmd
   stdbuf_cmd=$(get_stdbuf_cmd)
   verbose_echo "# DEBUG: Using stdbuf command: '$stdbuf_cmd'"
-  "$stdbuf_cmd" -oL -eL "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" -r origin -R "$target_dir" > "$output_file" 2>&1 &
+  # --- MODIFIED: Changed redirection to &> ---
+  "$stdbuf_cmd" -oL -eL "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" -r origin -R "$target_dir" &> "$output_file" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$target_dir"
@@ -169,13 +173,11 @@ get_stdbuf_cmd() {
   # 5. Wait for the script's internal timeout (10s) to be triggered.
   run wait_for_log_message "$output_file" "ERROR: 'git pull' timed out"
   assert_success "Did not find pull timeout error message in log."
-
   # 6. Assert: The commit succeeded, but the subsequent pull failed due to timeout
   run cat "$output_file"
   assert_output --partial "Running git commit command:" "Commit should succeed before pull attempt."
   assert_output --partial "# MOCK_GIT: Hanging on 'pull'" "Hanging dummy git binary was not called for pull."
   assert_output --partial "ERROR: 'git pull' timed out after ${TEST_TIMEOUT} seconds. Skipping push." "Pull timeout error was not logged."
-
   # 7. Cleanup
   unset GW_GIT_BIN
   rm -f "$dummy_git_path"
@@ -210,7 +212,8 @@ get_stdbuf_cmd() {
   local stdbuf_cmd
   stdbuf_cmd=$(get_stdbuf_cmd)
   verbose_echo "# DEBUG: Using stdbuf command: '$stdbuf_cmd'"
-  "$stdbuf_cmd" -oL -eL "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" "$target_dir" > "$output_file" 2>&1 &
+  # --- MODIFIED: Changed redirection to &> ---
+  "$stdbuf_cmd" -oL -eL "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -s "$test_sleep_time" "$target_dir" &> "$output_file" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   sleep 1 # Allow watcher to initialize
@@ -221,7 +224,6 @@ get_stdbuf_cmd() {
   # 5. Wait for the script's internal timeout (10s) to be triggered.
   run wait_for_log_message "$output_file" "ERROR: 'git commit' timed out"
   assert_success "Did not find commit timeout error message in log."
-
   # 6. Assert: Commit did NOT happen, and timeout error was logged
   run git log -1 --format=%H
   assert_equal "$initial_hash" "$output" "Commit hash should NOT change"
@@ -229,7 +231,6 @@ get_stdbuf_cmd() {
   run cat "$output_file"
   assert_output --partial "# MOCK_GIT: Hanging on 'commit'" "Hanging dummy git binary was not called for commit."
   assert_output --partial "ERROR: 'git commit' timed out after ${TEST_TIMEOUT} seconds." "Commit timeout error was not logged."
-
   # 7. Cleanup
   unset GW_GIT_BIN
   rm -f "$dummy_git_path"

@@ -11,14 +11,15 @@
       flake-utils,
     }:
     let
+      # --- ADDED LINE ---
+      lib = nixpkgs.lib;
       packages = flake-utils.lib.eachDefaultSystem (
         system:
         let
           pkgs = import nixpkgs {
             inherit system;
           };
-          # --- ADDED LINE ---
-          lib = nixpkgs.lib;
+           # --- REMOVED LINE ---
         in
         {
           packages = rec {
@@ -35,6 +36,7 @@
     packages
     // {
       modules = [ ./module.nix ];
-      license = nixpkgs.lib.licenses.gpl3Plus;
+      # --- MODIFIED: Use lib (defined above) ---
+      license = lib.licenses.gpl3Plus;
     };
 }
