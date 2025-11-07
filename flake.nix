@@ -11,7 +11,6 @@
       flake-utils,
     }:
     let
-      # --- ADDED LINE ---
       lib = nixpkgs.lib;
       packages = flake-utils.lib.eachDefaultSystem (
         system:
@@ -19,7 +18,6 @@
           pkgs = import nixpkgs {
             inherit system;
           };
-           # --- REMOVED LINE ---
         in
         {
           packages = rec {
