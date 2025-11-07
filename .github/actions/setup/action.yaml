@@ -13,7 +13,8 @@ inputs:
 outputs:
   bats-lib-path:
     description: "Path to BATS libraries if setup-bats was true"
-    value: ${{ steps.set-bats-paths.outputs.lib-path }}
+    # This output now comes directly from the bats-action step
+    value: ${{ steps.setup-bats.outputs.lib-path }}
 
 runs:
   using: "composite"
@@ -25,48 +26,19 @@ runs:
         persist-credentials: false
 
     # --- BATS INSTALLATION ---
-    - name: Install BATS Core (Linux)
-      if: ${{ inputs.setup-bats == 'true' && startsWith(inputs.os, 'ubuntu') }}
-      shell: bash
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y bats
-        sudo apt-get upgrade -y
-
-    - name: Install BATS Core (macOS)
-      if: ${{ inputs.setup-bats == 'true' && startsWith(inputs.os, 'macOS') }}
-      shell: bash
-      run: |
-        brew install bats-core
-        brew update && brew upgrade
-
-    - name: Install BATS Helper Libraries
+    # This single step installs bats-core and all helper libraries.
+    - name: Setup Bats and Bats libraries
       if: ${{ inputs.setup-bats == 'true' }}
-      shell: bash
-      run: |
-        echo "Cloning BATS helper libraries..."
-        # Clone into the paths defined in your original action file
-        git clone --depth 1 https://github.com/bats-core/bats-support.git "${{ github.workspace }}/tests/bats-support"
-        git clone --depth 1 https://github.com/bats-core/bats-assert.git "${{ github.workspace }}/tests/bats-assert"
-        git clone --depth 1 https://github.com/bats-core/bats-file.git   "${{ github.workspace }}/tests/bats-file"
-        echo "Helper libraries installed."
+      id: setup-bats # This ID provides the 'lib-path' output
+      uses: bats-core/bats-action@3.0.1
+      with:
+        # Install to ${{ github.workspace }} (which is in $HOME)
+        # to enable caching, as recommended by the action's README.
+        support-path: "${{ github.workspace }}/tests/bats-support"
+        assert-path: "${{ github.workspace }}/tests/bats-assert"
+        file-path: "${{ github.workspace }}/tests/bats-file"
+        # bats-detik is also installed by default
 
-    - name: Set BATS Library Path Output
-      # This step manually constructs the output path that bats-action *would have*
-      if: ${{ inputs.setup-bats == 'true' }}
-      id: set-bats-paths
-      shell: bash
-      run: |
-        BATS_SUPPORT_PATH="${{ github.workspace }}/tests/bats-support"
-        BATS_ASSERT_PATH="${{ github.workspace }}/tests/bats-assert"
-        BATS_FILE_PATH="${{ github.workspace }}/tests/bats-file"
-
-        # This is the colon-separated path the action was supposed to output
-        LIB_PATH="${BATS_SUPPORT_PATH}:${BATS_ASSERT_PATH}:${BATS_FILE_PATH}"
-
-        echo "BATS lib-path manually set to: $LIB_PATH"
-        echo "lib-path=$LIB_PATH" >> $GITHUB_OUTPUT
-    # --- END BATS SETUP ---
     # --- KCOV INSTALL (with caching) ---
     - name: Cache kcov
       if: ${{ inputs.setup-bats == 'true' && startsWith(inputs.os, 'ubuntu') }}
@@ -75,8 +47,8 @@ runs:
       with:
         # Cache the installation directory
         path: ~/kcov-installed
-        # A simple key, will rebuild if runner image changes
-        key: kcov-build-v1-${{ runner.os }}
+        # Rebuild cache if this action file is edited
+        key: kcov-build-v1-${{ runner.os }}-${{ hashFiles('.github/actions/setup/action.yaml') }}
 
     - name: Install kcov (build from source for Linux)
       if: ${{ inputs.setup-bats == 'true' && startsWith(inputs.os, 'ubuntu') && steps.cache-kcov.outputs.cache-hit != 'true' }}
