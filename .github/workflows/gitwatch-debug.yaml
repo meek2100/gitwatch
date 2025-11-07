@@ -163,5 +163,3 @@ jobs:
 
       # Note: The 'Upload coverage report (Linux)' step is removed
       # as kcov is not being run in this sequential setup.
-
-}

@@ -13,7 +13,6 @@ load 'bats-custom/startup-shutdown'
 # Copied from watcher-args.bats to keep this test self-contained.
 create_watcher_wrapper() {
   local watcher_name="$1"
-  local real_path="$2"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   local dummy_path="$testdir/bin/${watcher_name}_wrapper"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -45,11 +44,9 @@ create_watcher_wrapper() {
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Setup Environment: Use a dummy inotifywait to capture arguments
-  local real_inw_path
-  real_inw_path=$(command -v inotifywait)
   local dummy_inw
   # shellcheck disable=SC2155 # Declared on previous line
-  dummy_inw=$(create_watcher_wrapper "inotifywait" "$real_inw_path")
+  dummy_inw=$(create_watcher_wrapper "inotifywait")
   # shellcheck disable=SC2030,SC2031 # Exporting variable to be read by child process
   export GW_INW_BIN="$dummy_inw"
 
@@ -88,11 +85,9 @@ create_watcher_wrapper() {
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Setup Environment: Use a dummy fswatch to capture arguments
-  local real_fswatch_path
-  real_fswatch_path=$(command -v fswatch)
   local dummy_fswatch
   # shellcheck disable=SC2155 # Declared on previous line
-  dummy_fswatch=$(create_watcher_wrapper "fswatch" "$real_fswatch_path")
+  dummy_fswatch=$(create_watcher_wrapper "fswatch")
   # shellcheck disable=SC2030,SC2031 # Exporting variable to be read by child process
   export GW_INW_BIN="$dummy_fswatch"
 

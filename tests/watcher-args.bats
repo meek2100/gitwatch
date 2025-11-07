@@ -12,7 +12,6 @@ load 'bats-custom/startup-shutdown'
 # This utility creates a wrapper binary for the watcher to capture the arguments passed to it.
 create_watcher_wrapper() {
   local watcher_name="$1"
-  local real_path="$2"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   local dummy_path="$testdir/bin/${watcher_name}_wrapper"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -45,20 +44,14 @@ create_watcher_wrapper() {
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Setup Environment: Use a dummy inotifywait to capture arguments
-  local real_inw_path
-  real_inw_path=$(command -v inotifywait)
   local dummy_inw
   # shellcheck disable=SC2155 # Declared on previous line
-  dummy_inw=$(create_watcher_wrapper "inotifywait" "$real_inw_path")
+  dummy_inw=$(create_watcher_wrapper "inotifywait")
   # shellcheck disable=SC2030,SC2031 # Exporting variable to be read by child process
   export GW_INW_BIN="$dummy_inw"
 
   # The expected default events string
   local default_events="close_write,move,move_self,delete,create,modify"
-  # --- FIX: This is how printf %q will escape the $EVENTS string ---
-  local escaped_events="close_write,move,move_self,delete,create,modify"
-  # The expected default exclude regex (must match the quoted regex output from printf %q in gitwatch.sh)
-  local expected_regex="\(\(\.git/\|\.git\$\)\)"
 
   # 2. Start gitwatch (should use inotifywait syntax and arguments)
   # Expected args: -qmr -e <events> --exclude <regex> <path>
@@ -71,11 +64,9 @@ create_watcher_wrapper() {
   # 3. Assert: Check log output for inotifywait arguments
   run cat "$output_file"
   assert_output --partial "*** inotifywait_CALLED ***" "Dummy inotifywait was not executed"
-  # --- FIX: Use the escaped_events variable ---
-  local expected_args="-qmr -e $escaped_events --exclude $expected_regex $testdir/local/$TEST_SUBDIR_NAME"
 
   # --- FIX 2: Assert against the [INFO] log line, which is more stable ---
-  local info_log_regex=((\.git/|\.git$))" # Regex in info log is double-parented
+  local info_log_regex="\(\(\.git/\|\.git\$\)\)" # Regex in info log is double-parented
   local expected_info_log_line="[INFO] Starting file watch. Command: $dummy_inw -qmr -e $default_events --exclude $info_log_regex $testdir/local/$TEST_SUBDIR_NAME"
   assert_output --partial "$expected_info_log_line" "gitwatch.sh did not log the correct inotifywait command"
 
@@ -95,18 +86,14 @@ create_watcher_wrapper() {
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # 1. Setup Environment: Use a dummy fswatch to capture arguments
-  local real_fswatch_path
-  real_fswatch_path=$(command -v fswatch)
   local dummy_fswatch
   # shellcheck disable=SC2155 # Declared on previous line
-  dummy_fswatch=$(create_watcher_wrapper "fswatch" "$real_fswatch_path")
+  dummy_fswatch=$(create_watcher_wrapper "fswatch")
   # shellcheck disable=SC2030,SC2031 # Exporting variable to be read by child process
   export GW_INW_BIN="$dummy_fswatch"
 
   # The expected default events number (414)
   local default_events="414"
-  # The expected default exclude regex (must match the quoted regex output from printf %q in gitwatch.sh)
-  local expected_regex=((\.git/|\.git$))"
 
   # 2. Start gitwatch (should use fswatch syntax and arguments)
   # Expected args: --recursive --event <number> -E --exclude <regex> <path>
@@ -121,7 +108,7 @@ create_watcher_wrapper() {
   assert_output --partial "*** fswatch_CALLED ***" "Dummy fswatch was not executed"
 
   # --- FIX: Assert against the [INFO] log line ---
-  local info_log_regex=((\.git/|\.git$))" # Regex in info log is double-parented
+  local info_log_regex="\(\(\.git/\|\.git\$\)\)" # Regex in info log is double-parented
   local expected_info_log_line="[INFO] Starting file watch. Command: $dummy_fswatch --recursive --event $default_events -E --exclude $info_log_regex $testdir/local/$TEST_SUBDIR_NAME"
   assert_output --partial "$expected_info_log_line" "gitwatch.sh did not log the correct fswatch command"
 

@@ -10,8 +10,9 @@ load 'bats-custom/custom-helpers'
 load 'bats-custom/startup-shutdown'
 
 # --- NEW setup/teardown for this file ---
-local path_backup=""
-local DUMMY_BIN=""
+# These are script-global variables, not local, so setup/teardown can share them
+path_backup=""
+DUMMY_BIN=""
 
 setup() {
   # Call the common setup first
@@ -68,7 +69,6 @@ EOF
 
   # 1. Mock 'flock' to be missing
   # (This is now handled by the file's setup() function)
-  # export BATS_MOCK_DEPENDENCIES="flock"
 
   # 2. Run gitwatch with -o FATAL (or 1)
   # It should fail, and only the FATAL error should be in the log.
