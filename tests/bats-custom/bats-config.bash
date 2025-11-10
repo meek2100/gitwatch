@@ -32,24 +32,30 @@ declare -a default_args=("-o" "DEBUG" "-t" "10")
 
 # --- WARNING for override ---
 # Check if the user-set variable is different from the default string representation
-if [ -n "${GITWATCH_TEST_ARGS:-}" ] && [ "${GITWATCH_TEST_ARGS[*]}" != "${default_args[*]}" ];
+# FIX: Use "${default_args[*]}" to get the string representation for comparison.
+if [ -n "${GITWATCH_TEST_ARGS:-}" ] && [ "${GITWATCH_TEST_ARGS}" != "${default_args[*]}" ];
 then
   echo "############################################################" >&3
   echo "# BATS WARNING: Global Test Arguments Overridden!" >&3
   echo "# Default args: (${default_args[*]})" >&3
-  echo "# Current args: (${GITWATCH_TEST_ARGS[*]})" >&3
+  echo "# Current args: (${GITWATCH_TEST_ARGS})" >&3
   echo "# See tests/bats-custom/bats-config.bash to reset." >&3
   echo "############################################################" >&3
 fi
 # --- END WARNING ---
 
-export GITWATCH_TEST_ARGS="${GITWATCH_TEST_ARGS:-${default_args[@]}}"
+# FIX: Use "${default_args[*]}" to correctly export the space-separated string.
+export GITWATCH_TEST_ARGS="${GITWATCH_TEST_ARGS:-${default_args[*]}}"
 
 # --- FIX: Create a BASH array for safe, quoted expansion in tests ---
 # This new array is used by tests as "${GITWATCH_TEST_ARGS_ARRAY[@]}"
 # to satisfy shellcheck SC2086 and fix word-splitting issues.
-# shellcheck disable=SC2034,SC2206
-declare -a GITWATCH_TEST_ARGS_ARRAY=(${GITWATCH_TEST_ARGS})
+#
+# FIX: Use `read -r -a` to robustly parse the string into an array.
+# This correctly handles spaces and quotes, unlike the previous method.
+# shellcheck disable=SC2034
+declare -a GITWATCH_TEST_ARGS_ARRAY
+read -r -a GITWATCH_TEST_ARGS_ARRAY <<< "$GITWATCH_TEST_ARGS"
 # --- END FIX ---
 
 
