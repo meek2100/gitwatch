@@ -28,15 +28,26 @@ jobs:
           key:
             pre-commit-4|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml')
             }}
+
+      # --- MODIFIED STEP: Captures 'pre-commit' exit code ---
       - name: Run pre-commit hooks
         id: precommit_run
-        continue-on-error: true
+        outputs: # Declares 'precommit_exit_code' as an output
+          precommit_exit_code: ${{ steps.precommit_run.outputs.precommit_exit_code_internal }}
+        continue-on-error: true # <-- IMPORTANT
         run: |
           set -o pipefail
           pre-commit gc
 
           # Run command and tee to log
           pre-commit run --show-diff-on-failure --color=always --all-files | tee "${RAW_LOG}"
+
+          # Capture the exit code of 'pre-commit'
+          PRECOMMIT_EXIT_CODE=${PIPESTATUS[0]}
+          echo "Pre-commit raw exit code: ${PRECOMMIT_EXIT_CODE}"
+
+          # Save this exit code as an output
+          echo "precommit_exit_code_internal=${PRECOMMIT_EXIT_CODE}" >> $GITHUB_OUTPUT
 
           # Verification
           echo "--- Verifying ${RAW_LOG} content IN SAME STEP ---"
@@ -49,9 +60,16 @@ jobs:
           fi
           echo "--- End of verification ---"
 
+          # Exit with the pre-commit exit code
+          exit $PRECOMMIT_EXIT_CODE
+
+      # --- MODIFIED STEP: Reads 'precommit_exit_code' from previous step ---
       - name: Generate pre-commit Summary
         if: always()
         shell: bash
+        env:
+          # Get the output from the 'precommit_run' step
+          PRECOMMIT_EXIT_CODE: ${{ steps.precommit_run.outputs.precommit_exit_code }}
         run: |
           echo "--- Verifying ${RAW_LOG} exists before processing ---"
           if [ ! -f "${RAW_LOG}" ]; then
@@ -72,8 +90,7 @@ jobs:
           fi
           echo "Clean log file found. Proceeding with awk."
 
-          # This script sets the field separator to two or more dots.
-          # It uses 'exit 1' on failure.
+          # This 'awk' script now ONLY generates the table.
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
               FS = "[.][.]+"
@@ -84,7 +101,6 @@ jobs:
               passed = 0
               failed = 0
               skipped = 0
-              had_failures = 0 # Use 0 for false, 1 for true
           }
 
           {
@@ -103,7 +119,6 @@ jobs:
                   } else if (status == "Failed") {
                       print "| ❌ " hook_name " | Failed |"
                       failed++
-                      had_failures = 1 # Set failure flag
                   } else if (status == "Skipped") {
                       print "| ⏩ " hook_name " | Skipped |"
                       skipped++
@@ -115,26 +130,24 @@ jobs:
               print ""
               print "---"
               print "**Summary:** " passed " passed, " failed " failed, " skipped " skipped."
-
-              if (had_failures == 1) {
-                  exit 1
-              }
           }
           EOF
           )
 
-          # Run awk, capture its output, and check its exit code.
+          # Run awk, capture its output (the table)
           AWK_OUTPUT=$(awk "$AWK_SCRIPT" clean_log.log)
-          AWK_EXIT_CODE=$?
 
-          # Write the summary table (captured in AWK_OUTPUT) to the summary file
+          # Write the table to the summary file
           echo "$AWK_OUTPUT" >> $GITHUB_STEP_SUMMARY
 
-          # Add the overall status based on awk's exit code
+          # --- NEW FAILURE LOGIC ---
+          # Check the PRECOMMIT_EXIT_CODE from the previous step
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "$AWK_EXIT_CODE" -ne 0 ]; then
+          echo "Debug: PRECOMMIT_EXIT_CODE from previous step was: '${PRECOMMIT_EXIT_CODE}'"
+
+          if [ "${PRECOMMIT_EXIT_CODE}" != "0" ]; then
               echo ":red_circle: **Overall Status: Hooks Failed**" >> $GITHUB_STEP_SUMMARY
-              exit 1 # Fail the step
+              exit 1 # Fail this step
           else
               echo ":white_check_mark: **Overall Status: All Hooks Passed**" >> $GITHUB_STEP_SUMMARY
           fi
