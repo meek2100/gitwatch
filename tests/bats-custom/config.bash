@@ -33,8 +33,9 @@ export GITWATCH_TEST_ARGS="${GITWATCH_TEST_ARGS:-${default_args[*]}}"
 # --- Create a BASH array for safe, quoted expansion in tests ---
 # Use `read -r -a` to robustly parse the string into an array.
 #
-# shellcheck disable=SC2034 # This array is used externally by all .bats test files.
+# shellcheck disable=SC2034
 declare -a GITWATCH_TEST_ARGS_ARRAY
+# shellcheck disable=SC2034
 read -r -a GITWATCH_TEST_ARGS_ARRAY <<< "$GITWATCH_TEST_ARGS"
 
 # ---
