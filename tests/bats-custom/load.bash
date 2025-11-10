@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck disable=1090
+# shellcheck disable=SC1091
 
 # This file is the single entry point for all custom BATS logic
 # for the gitwatch test suite, modeled after the bats-assert/load.bash

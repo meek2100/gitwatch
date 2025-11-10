@@ -18,12 +18,13 @@ declare -a default_args=("-o" "DEBUG" "-t" "10")
 # Check if the user-set variable is different from the default string representation
 if [ -n "${GITWATCH_TEST_ARGS:-}" ] && [ "${GITWATCH_TEST_ARGS}" != "${default_args[*]}" ];
 then
-  echo "############################################################" >&3
-  echo "# BATS WARNING: Global Test Arguments Overridden!" >&3
-  echo "# Default args: (${default_args[*]})" >&3
-  echo "# Current args: (${GITWATCH_TEST_ARGS})" >&3
-  echo "# See tests/bats-custom/config.bash to reset." >&3
-  echo "############################################################" >&3
+  # Use verbose_echo (loaded first in load.bash)
+  verbose_echo "############################################################"
+  verbose_echo "# BATS WARNING: Global Test Arguments Overridden!"
+  verbose_echo "# Default args: (${default_args[*]})"
+  verbose_echo "# Current args: (${GITWATCH_TEST_ARGS})"
+  verbose_echo "# See tests/bats-custom/config.bash to reset."
+  verbose_echo "############################################################"
 fi
 # --- END WARNING ---
 
@@ -54,11 +55,11 @@ WAITTIME=4
 if [ -n "${BATS_SET_OPTIONS:-}" ];
 then
   # --- WARNING ---
-  echo "############################################################" >&3
-  echo "# BATS WARNING: Shell Debug Mode Active!" >&3
-  echo "# BATS_SET_OPTIONS=\"${BATS_SET_OPTIONS}\" is set." >&3
-  echo "# See tests/bats-custom/config.bash to disable." >&3
-  echo "############################################################" >&3
+  verbose_echo "############################################################"
+  verbose_echo "# BATS WARNING: Shell Debug Mode Active!"
+  verbose_echo "# BATS_SET_OPTIONS=\"${BATS_SET_OPTIONS}\" is set."
+  verbose_echo "# See tests/bats-custom/config.bash to disable."
+  verbose_echo "############################################################"
   # --- END WARNING ---
   # shellcheck disable=SC2086 # We explicitly WANT word splitting here
   set ${BATS_SET_OPTIONS}
@@ -71,10 +72,10 @@ export BATS_QUICK_TEST="${BATS_QUICK_TEST:-false}"
 if [ "${BATS_QUICK_TEST}" = "true" ];
 then
   # --- WARNING ---
-  echo "############################################################" >&3
-  echo "# BATS WARNING: Quick Test Mode Active!" >&3
-  echo "# BATS_QUICK_TEST=\"true\" is set. Slow tests will be SKIPPED." >&3
-  echo "# See tests/bats-custom/config.bash to disable." >&3
-  echo "############################################################" >&3
+  verbose_echo "############################################################"
+  verbose_echo "# BATS WARNING: Quick Test Mode Active!"
+  verbose_echo "# BATS_QUICK_TEST=\"true\" is set. Slow tests will be SKIPPED."
+  verbose_echo "# See tests/bats-custom/config.bash to disable."
+  verbose_echo "############################################################"
   # --- END WARNING ---
 fi
