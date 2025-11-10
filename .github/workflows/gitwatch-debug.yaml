@@ -143,6 +143,7 @@ jobs:
             exit 0
           fi
 
+          # This script uses 'exit 1' on failure.
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
             print "### BATS Test Results"
@@ -151,7 +152,7 @@ jobs:
             print "| --- | --- |"
             passed = 0
             failed = 0
-            overall_failed = "false"
+            had_failures = 0 # Use 0 for false, 1 for true
           }
 
           ($1 == "ok" || $1 == "not ok") && $2 ~ /^[0-9]+$/ {
@@ -170,7 +171,7 @@ jobs:
             } else {
               print "| ❌ " test_name " | Failed |"
               failed++
-              overall_failed = "true"
+              had_failures = 1 # Set failure flag
             }
           }
 
@@ -178,24 +179,26 @@ jobs:
             print ""
             print "---"
             print "**Summary:** " passed " passed, " failed " failed."
-            print "::set-output name=overall_failed::" overall_failed > "/dev/stderr"
+
+            if (had_failures == 1) {
+                exit 1
+            }
           }
           EOF
           )
 
-          AWK_STDOUT=""
-          AWK_STDERR=""
-          eval "$( \
-            awk "$AWK_SCRIPT" "${BATS_TAP_FILE}" 1> >(AWK_STDOUT=$(cat); echo "::set-output name=stdout_captured::true" >&2) \
-                                                2> >(AWK_STDERR=$(cat); echo "::set-output name=stderr_captured::true" >&2) \
-          )"
-          echo "$AWK_STDOUT" >> $GITHUB_STEP_SUMMARY
-          OVERALL_FAILED_FLAG=$(echo "$AWK_STDERR" | grep "^::set-output name=overall_failed::" | cut -d':' -f4)
+          # Run awk, capture its output, and check its exit code.
+          AWK_OUTPUT=$(awk "$AWK_SCRIPT" "${BATS_TAP_FILE}")
+          AWK_EXIT_CODE=$?
 
+          # Write the summary table (captured in AWK_OUTPUT) to the summary file
+          echo "$AWK_OUTPUT" >> $GITHUB_STEP_SUMMARY
+
+          # Add the overall status based on awk's exit code
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "$OVERALL_FAILED_FLAG" == "true" ]; then
+          if [ "$AWK_EXIT_CODE" -ne 0 ]; then
             echo ":red_circle: **Overall Status: Tests Failed**" >> $GITHUB_STEP_SUMMARY
-            exit 1
+            exit 1 # Fail the step
           else
             echo ":white_check_mark: **Overall Status: All Tests Passed**" >> $GITHUB_STEP_SUMMARY
           fi
