@@ -29,10 +29,8 @@ jobs:
             pre-commit-4|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml')
             }}
 
-      # --- MODIFIED STEP: 'outputs:' block removed ---
       - name: Run pre-commit hooks
         id: precommit_run
-        # The 'outputs:' block was here, and it was invalid. It is now removed.
         continue-on-error: true # <-- IMPORTANT
         run: |
           set -o pipefail
@@ -59,13 +57,11 @@ jobs:
 
           exit $PRECOMMIT_EXIT_CODE
 
-      # --- MODIFIED STEP: Reads 'precommit_exit_code_internal' ---
+      # --- MODIFIED STEP: Reads output directly in 'if' ---
       - name: Generate pre-commit Summary
         if: always()
         shell: bash
-        env:
-          # Get the output from the 'precommit_run' step using the correct variable name
-          PRECOMMIT_EXIT_CODE: ${{ steps.precommit_run.outputs.precommit_exit_code_internal }}
+        # The 'env:' block for the exit code has been removed
         run: |
           echo "--- Verifying ${RAW_LOG} exists before processing ---"
           if [ ! -f "${RAW_LOG}" ]; then
@@ -132,10 +128,13 @@ jobs:
 
           echo "$AWK_OUTPUT" >> $GITHUB_STEP_SUMMARY
 
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Debug: PRECOMMIT_EXIT_CODE from previous step was: '${PRECOMMIT_EXIT_CODE}'"
+          # --- KEY CHANGE ---
+          # The exit code is referenced directly from the step context.
 
-          if [ "${PRECOMMIT_EXIT_CODE}" != "0" ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Debug: PRECOMMIT_EXIT_CODE from previous step was: '${{ steps.precommit_run.outputs.precommit_exit_code_internal }}'"
+
+          if [ "${{ steps.precommit_run.outputs.precommit_exit_code_internal }}" != "0" ]; then
               echo ":red_circle: **Overall Status: Hooks Failed**" >> $GITHUB_STEP_SUMMARY
               exit 1 # Fail this step
           else
