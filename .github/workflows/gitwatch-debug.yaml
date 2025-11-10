@@ -95,11 +95,10 @@ jobs:
           grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
           echo "--- End of verification ---"
 
-      # --- MODIFIED STEP: Captures 'bats' exit code ---
+      # --- MODIFIED STEP: 'outputs:' block removed ---
       - name: Run BATS tests (from UI input)
         id: bats_run
-        outputs: # Declares 'bats_exit_code' as an output of this step
-          bats_exit_code: ${{ steps.bats_run.outputs.bats_exit_code_internal }}
+        # The 'outputs:' block was here, and it was invalid. It is now removed.
         shell: bash
         env:
           BATS_LIB_PATH: "${{ steps.setup.outputs.bats-lib-path }}:${{ github.workspace }}/tests"
@@ -113,15 +112,14 @@ jobs:
           echo "Current directory for BATS tests: $(pwd)"
           echo "Running BATS tests and writing to ${BATS_TAP_FILE}"
 
-          # Run bats and tee the output to the log file.
           bats --tap ${{ github.event.inputs.test_files }} | tee "${BATS_TAP_FILE}"
 
-          # Capture the exit code of 'bats' (the first command in the pipe)
+          # Capture the exit code of 'bats'
           BATS_EXIT_CODE=${PIPESTATUS[0]}
           echo "BATS raw exit code: ${BATS_EXIT_CODE}"
 
           # Save this exit code as an output for the next step
-          # Note: The 'id' of this output must match the 'outputs' block above
+          # This variable name is what the next step will read.
           echo "bats_exit_code_internal=${BATS_EXIT_CODE}" >> $GITHUB_OUTPUT
 
           echo "===================================================================="
@@ -130,8 +128,6 @@ jobs:
           echo "--- End of verification ---"
           echo "===================================================================="
 
-          # Exit with the BATS exit code.
-          # 'continue-on-error: true' will catch this and allow the workflow to proceed.
           exit $BATS_EXIT_CODE
 
       - name: No Tests Specified
@@ -139,14 +135,14 @@ jobs:
         run: |
           echo "No test files specified in 'test_files' input. Skipping BATS run."
 
-      # --- MODIFIED STEP: Reads 'bats_exit_code' from previous step ---
+      # --- MODIFIED STEP: Reads 'bats_exit_code_internal' ---
       - name: Generate Test Summary
         if: always() && github.event.inputs.test_files != ''
         shell: bash
         env:
           BATS_TAP_FILE: "${{ github.workspace }}/bats_results.tap"
-          # Get the output from the 'bats_run' step
-          BATS_EXIT_CODE: ${{ steps.bats_run.outputs.bats_exit_code }}
+          # Get the output from the 'bats_run' step using the correct variable name
+          BATS_EXIT_CODE: ${{ steps.bats_run.outputs.bats_exit_code_internal }}
         run: |
           echo "--- Reading summary from ${BATS_TAP_FILE} ---"
 
@@ -155,7 +151,6 @@ jobs:
             exit 0
           fi
 
-          # This 'awk' script now ONLY generates the table. It does not 'exit 1'.
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
             print "### BATS Test Results"
@@ -193,14 +188,10 @@ jobs:
           EOF
           )
 
-          # Run awk, capture its output (the table)
           AWK_OUTPUT=$(awk "$AWK_SCRIPT" "${BATS_TAP_FILE}")
 
-          # Write the table to the summary file
           echo "$AWK_OUTPUT" >> $GITHUB_STEP_SUMMARY
 
-          # --- NEW FAILURE LOGIC ---
-          # Check the BATS_EXIT_CODE from the previous step
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Debug: BATS_EXIT_CODE from previous step was: '${BATS_EXIT_CODE}'"
 

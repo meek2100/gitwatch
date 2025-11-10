@@ -29,17 +29,15 @@ jobs:
             pre-commit-4|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml')
             }}
 
-      # --- MODIFIED STEP: Captures 'pre-commit' exit code ---
+      # --- MODIFIED STEP: 'outputs:' block removed ---
       - name: Run pre-commit hooks
         id: precommit_run
-        outputs: # Declares 'precommit_exit_code' as an output
-          precommit_exit_code: ${{ steps.precommit_run.outputs.precommit_exit_code_internal }}
+        # The 'outputs:' block was here, and it was invalid. It is now removed.
         continue-on-error: true # <-- IMPORTANT
         run: |
           set -o pipefail
           pre-commit gc
 
-          # Run command and tee to log
           pre-commit run --show-diff-on-failure --color=always --all-files | tee "${RAW_LOG}"
 
           # Capture the exit code of 'pre-commit'
@@ -49,7 +47,6 @@ jobs:
           # Save this exit code as an output
           echo "precommit_exit_code_internal=${PRECOMMIT_EXIT_CODE}" >> $GITHUB_OUTPUT
 
-          # Verification
           echo "--- Verifying ${RAW_LOG} content IN SAME STEP ---"
           if [ -f "${RAW_LOG}" ]; then
             echo "File found. Contents:"
@@ -60,16 +57,15 @@ jobs:
           fi
           echo "--- End of verification ---"
 
-          # Exit with the pre-commit exit code
           exit $PRECOMMIT_EXIT_CODE
 
-      # --- MODIFIED STEP: Reads 'precommit_exit_code' from previous step ---
+      # --- MODIFIED STEP: Reads 'precommit_exit_code_internal' ---
       - name: Generate pre-commit Summary
         if: always()
         shell: bash
         env:
-          # Get the output from the 'precommit_run' step
-          PRECOMMIT_EXIT_CODE: ${{ steps.precommit_run.outputs.precommit_exit_code }}
+          # Get the output from the 'precommit_run' step using the correct variable name
+          PRECOMMIT_EXIT_CODE: ${{ steps.precommit_run.outputs.precommit_exit_code_internal }}
         run: |
           echo "--- Verifying ${RAW_LOG} exists before processing ---"
           if [ ! -f "${RAW_LOG}" ]; then
@@ -79,7 +75,6 @@ jobs:
           fi
           echo "File found. Proceeding with perl."
 
-          # Strip ANSI color codes
           perl -pe 's/\e\[[0-9;]*m//g' "${RAW_LOG}" > clean_log.log
 
           echo "--- Verifying clean_log.log exists ---"
@@ -90,7 +85,6 @@ jobs:
           fi
           echo "Clean log file found. Proceeding with awk."
 
-          # This 'awk' script now ONLY generates the table.
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
               FS = "[.][.]+"
@@ -134,14 +128,10 @@ jobs:
           EOF
           )
 
-          # Run awk, capture its output (the table)
           AWK_OUTPUT=$(awk "$AWK_SCRIPT" clean_log.log)
 
-          # Write the table to the summary file
           echo "$AWK_OUTPUT" >> $GITHUB_STEP_SUMMARY
 
-          # --- NEW FAILURE LOGIC ---
-          # Check the PRECOMMIT_EXIT_CODE from the previous step
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Debug: PRECOMMIT_EXIT_CODE from previous step was: '${PRECOMMIT_EXIT_CODE}'"
 
