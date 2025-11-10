@@ -111,10 +111,8 @@ jobs:
           echo "Current directory for BATS tests: $(pwd)"
           echo "Running BATS tests and writing to ${BATS_TAP_FILE}"
 
-          # Run bats and tee the output to the log file.
           bats --tap ${{ github.event.inputs.test_files }} | tee "${BATS_TAP_FILE}"
 
-          # --- Internal verification. This output does NOT go to the TAP file. ---
           echo "===================================================================="
           echo "Finished running tests. Verifying ${BATS_TAP_FILE} content..."
           if [ -f "${BATS_TAP_FILE}" ]; then
@@ -146,7 +144,8 @@ jobs:
           fi
 
           # --- FIXED AWK SCRIPT ---
-          # This script now looks for "ok [number] [test name]" (no dash)
+          # This script checks fields $1 and $2 directly, then rebuilds
+          # the test name from $3 to the end.
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
             print "### BATS Test Results"
@@ -157,18 +156,22 @@ jobs:
             failed = 0
             overall_failed = "false"
           }
-          # Match lines like "ok 1 Test Name" or "not ok 2 Test Name"
-          /^(ok|not ok) [0-9]+ / {
-            # Find the start of the test name (after the number and space)
-            name_start = index($0, $2 " ") + length($2) + 1
-            test_name = substr($0, name_start)
 
-            # Remove leading/trailing whitespace just in case
-            gsub(/^[ \t]+|[ \t]+$/, "", test_name)
+          # Check for lines starting with "ok" or "not ok"
+          # and that the second field is a number
+          ($1 == "ok" || $1 == "not ok") && $2 ~ /^[0-9]+$/ {
+            status = $1
+
+            # Rebuild the test name from $3 to the end of the line
+            test_name = ""
+            for (i = 3; i <= NF; i++) {
+                test_name = test_name (i == 3 ? "" : " ") $i
+            }
+
             # Sanitize for markdown table
             gsub(/\|/, "\\|", test_name)
 
-            if ($1 == "ok") {
+            if (status == "ok") {
               print "| ✅ " test_name " | Passed |"
               passed++
             } else {
@@ -177,6 +180,7 @@ jobs:
               overall_failed = "true"
             }
           }
+
           END {
             print ""
             print "---"
