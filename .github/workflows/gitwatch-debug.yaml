@@ -132,12 +132,11 @@ jobs:
         run: |
           echo "No test files specified in 'test_files' input. Skipping BATS run."
 
-      # --- MODIFIED STEP: Reads output directly in 'if' ---
+      # --- MODIFIED STEP: New, more robust 'awk' script ---
       - name: Generate Test Summary
         if: always() && github.event.inputs.test_files != ''
         shell: bash
         env:
-          # Only the TAP file path is needed here
           BATS_TAP_FILE: "${{ github.workspace }}/bats_results.tap"
         run: |
           echo "--- Reading summary from ${BATS_TAP_FILE} ---"
@@ -147,6 +146,7 @@ jobs:
             exit 0
           fi
 
+          # This 'awk' script is more robust for parsing TAP.
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
             print "### BATS Test Results"
@@ -157,17 +157,19 @@ jobs:
             failed = 0
           }
 
-          ($1 == "ok" || $1 == "not ok") && $2 ~ /^[0-9]+$/ {
-            status = $1
+          # Match lines like "ok 1 Test Name" or "not ok 2 Test Name"
+          /^(ok|not ok) [0-9]+ / {
+            status_word = $1
+            test_number = $2
 
-            test_name = ""
-            for (i = 3; i <= NF; i++) {
-                test_name = test_name (i == 3 ? "" : " ") $i
-            }
+            # Find the start of the test name, which is after the number and space
+            name_start = index($0, test_number " ") + length(test_number) + 1
+            test_name = substr($0, name_start)
 
+            # Sanitize for markdown table
             gsub(/\|/, "\\|", test_name)
 
-            if (status == "ok") {
+            if (status_word == "ok") {
               print "| ✅ " test_name " | Passed |"
               passed++
             } else {
@@ -187,10 +189,6 @@ jobs:
           AWK_OUTPUT=$(awk "$AWK_SCRIPT" "${BATS_TAP_FILE}")
 
           echo "$AWK_OUTPUT" >> $GITHUB_STEP_SUMMARY
-
-          # --- KEY CHANGE ---
-          # The exit code is referenced directly from the step context.
-          # This works because it is expanded *when the script runs*, not when the job starts.
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Debug: BATS_EXIT_CODE from previous step was: '${{ steps.bats_run.outputs.bats_exit_code_internal }}'"
