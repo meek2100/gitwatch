@@ -61,6 +61,7 @@ jobs:
           fi
           echo "File found. Proceeding with perl."
 
+          # Strip ANSI color codes
           perl -pe 's/\e\[[0-9;]*m//g' "${RAW_LOG}" > clean_log.log
 
           echo "--- Verifying clean_log.log exists ---"
@@ -71,6 +72,8 @@ jobs:
           fi
           echo "Clean log file found. Proceeding with awk."
 
+          # This script sets the field separator to two or more dots.
+          # It uses 'exit 1' on failure.
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
               FS = "[.][.]+"
@@ -81,7 +84,7 @@ jobs:
               passed = 0
               failed = 0
               skipped = 0
-              had_failures = "false"
+              had_failures = 0 # Use 0 for false, 1 for true
           }
 
           {
@@ -100,7 +103,7 @@ jobs:
                   } else if (status == "Failed") {
                       print "| ❌ " hook_name " | Failed |"
                       failed++
-                      had_failures = "true"
+                      had_failures = 1 # Set failure flag
                   } else if (status == "Skipped") {
                       print "| ⏩ " hook_name " | Skipped |"
                       skipped++
@@ -112,28 +115,34 @@ jobs:
               print ""
               print "---"
               print "**Summary:** " passed " passed, " failed " failed, " skipped " skipped."
-              print "::set-output name=overall_failed::" had_failures > "/dev/stderr"
+
+              if (had_failures == 1) {
+                  exit 1
+              }
           }
           EOF
           )
 
+          # Run awk, capture its output, and check its exit code.
+          AWK_OUTPUT=$(awk "$AWK_SCRIPT" clean_log.log)
+          AWK_EXIT_CODE=$?
 
-          AWK_STDOUT=""
-          AWK_STDERR=""
+          # Write the summary table (captured in AWK_OUTPUT) to the summary file
+          echo "$AWK_OUTPUT" >> $GITHUB_STEP_SUMMARY
 
-          eval "$( \
-            awk "$AWK_SCRIPT" clean_log.log 1> >(AWK_STDOUT=$(cat); echo "::set-output name=stdout_captured::true" >&2) \
-                                            2> >(AWK_STDERR=$(cat); echo "::set-output name=stderr_captured::true" >&2) \
-          )"
-
-          echo "$AWK_STDOUT" >> $GITHUB_STEP_SUMMARY
-
-          OVERALL_FAILED_FLAG=$(echo "$AWK_STDERR" | grep "^::set-output name=overall_failed::" | cut -d':' -f4)
-
+          # Add the overall status based on awk's exit code
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "$OVERALL_FAILED_FLAG" == "true" ]; then
+          if [ "$AWK_EXIT_CODE" -ne 0 ]; then
               echo ":red_circle: **Overall Status: Hooks Failed**" >> $GITHUB_STEP_SUMMARY
-              exit 1
+              exit 1 # Fail the step
           else
               echo ":white_check_mark: **Overall Status: All Hooks Passed**" >> $GITHUB_STEP_SUMMARY
           fi
+
+      - name: Provide log as artifact
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        if: ${{ ! cancelled() }}
+        with:
+          name: precommit-logs
+          path: "${{ env.RAW_LOG }}"
+          retention-days: 2
