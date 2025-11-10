@@ -37,7 +37,7 @@ runs:
         support-path: "${{ github.workspace }}/tests/bats-support"
         assert-path: "${{ github.workspace }}/tests/bats-assert"
         file-path: "${{ github.workspace }}/tests/bats-file"
-        # bats-detik is also installed by default
+        detik-install: false
 
     # --- KCOV INSTALL (with caching) ---
     - name: Cache kcov
