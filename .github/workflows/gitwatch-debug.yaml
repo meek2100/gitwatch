@@ -143,9 +143,6 @@ jobs:
             exit 0
           fi
 
-          # --- FIXED AWK SCRIPT ---
-          # This script checks fields $1 and $2 directly, then rebuilds
-          # the test name from $3 to the end.
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
             print "### BATS Test Results"
@@ -157,18 +154,14 @@ jobs:
             overall_failed = "false"
           }
 
-          # Check for lines starting with "ok" or "not ok"
-          # and that the second field is a number
           ($1 == "ok" || $1 == "not ok") && $2 ~ /^[0-9]+$/ {
             status = $1
 
-            # Rebuild the test name from $3 to the end of the line
             test_name = ""
             for (i = 3; i <= NF; i++) {
                 test_name = test_name (i == 3 ? "" : " ") $i
             }
 
-            # Sanitize for markdown table
             gsub(/\|/, "\\|", test_name)
 
             if (status == "ok") {
@@ -185,16 +178,19 @@ jobs:
             print ""
             print "---"
             print "**Summary:** " passed " passed, " failed " failed."
-            print "::set-output name=overall_failed::" overall_failed
+            print "::set-output name=overall_failed::" overall_failed > "/dev/stderr"
           }
           EOF
           )
 
-          AWK_OUTPUT=$(awk "$AWK_SCRIPT" "${BATS_TAP_FILE}")
-
-          echo "$AWK_OUTPUT" >> $GITHUB_STEP_SUMMARY
-
-          OVERALL_FAILED_FLAG=$(echo "$AWK_OUTPUT" | grep "^::set-output name=overall_failed::" | cut -d':' -f4)
+          AWK_STDOUT=""
+          AWK_STDERR=""
+          eval "$( \
+            awk "$AWK_SCRIPT" "${BATS_TAP_FILE}" 1> >(AWK_STDOUT=$(cat); echo "::set-output name=stdout_captured::true" >&2) \
+                                                2> >(AWK_STDERR=$(cat); echo "::set-output name=stderr_captured::true" >&2) \
+          )"
+          echo "$AWK_STDOUT" >> $GITHUB_STEP_SUMMARY
+          OVERALL_FAILED_FLAG=$(echo "$AWK_STDERR" | grep "^::set-output name=overall_failed::" | cut -d':' -f4)
 
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ "$OVERALL_FAILED_FLAG" == "true" ]; then
