@@ -95,46 +95,58 @@ jobs:
           grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
           echo "--- End of verification ---"
 
+      # --- MODIFIED STEP: Captures 'bats' exit code ---
       - name: Run BATS tests (from UI input)
         id: bats_run
+        outputs: # Declares 'bats_exit_code' as an output of this step
+          bats_exit_code: ${{ steps.bats_run.outputs.bats_exit_code_internal }}
         shell: bash
         env:
           BATS_LIB_PATH: "${{ steps.setup.outputs.bats-lib-path }}:${{ github.workspace }}/tests"
           BATS_TAP_FILE: "${{ github.workspace }}/bats_results.tap"
         if: github.event.inputs.test_files != ''
-        continue-on-error: true
+        continue-on-error: true # <-- IMPORTANT: This allows 'Generate Test Summary' to run on failure
         run: |
-          git config --global user.email "test@email.com"
-          git config --global user.name "test user"
+          set -o pipefail
 
           cd tests
           echo "Current directory for BATS tests: $(pwd)"
           echo "Running BATS tests and writing to ${BATS_TAP_FILE}"
 
+          # Run bats and tee the output to the log file.
           bats --tap ${{ github.event.inputs.test_files }} | tee "${BATS_TAP_FILE}"
+
+          # Capture the exit code of 'bats' (the first command in the pipe)
+          BATS_EXIT_CODE=${PIPESTATUS[0]}
+          echo "BATS raw exit code: ${BATS_EXIT_CODE}"
+
+          # Save this exit code as an output for the next step
+          # Note: The 'id' of this output must match the 'outputs' block above
+          echo "bats_exit_code_internal=${BATS_EXIT_CODE}" >> $GITHUB_OUTPUT
 
           echo "===================================================================="
           echo "Finished running tests. Verifying ${BATS_TAP_FILE} content..."
-          if [ -f "${BATS_TAP_FILE}" ]; then
-            echo "File found. Contents:"
-            ls -l "${BATS_TAP_FILE}"
-            cat "${BATS_TAP_FILE}"
-          else
-            echo "File ${BATS_TAP_FILE} NOT FOUND."
-          fi
+          cat "${BATS_TAP_FILE}"
           echo "--- End of verification ---"
           echo "===================================================================="
+
+          # Exit with the BATS exit code.
+          # 'continue-on-error: true' will catch this and allow the workflow to proceed.
+          exit $BATS_EXIT_CODE
 
       - name: No Tests Specified
         if: github.event.inputs.test_files == ''
         run: |
           echo "No test files specified in 'test_files' input. Skipping BATS run."
 
+      # --- MODIFIED STEP: Reads 'bats_exit_code' from previous step ---
       - name: Generate Test Summary
         if: always() && github.event.inputs.test_files != ''
         shell: bash
         env:
           BATS_TAP_FILE: "${{ github.workspace }}/bats_results.tap"
+          # Get the output from the 'bats_run' step
+          BATS_EXIT_CODE: ${{ steps.bats_run.outputs.bats_exit_code }}
         run: |
           echo "--- Reading summary from ${BATS_TAP_FILE} ---"
 
@@ -143,7 +155,7 @@ jobs:
             exit 0
           fi
 
-          # This script uses 'exit 1' on failure.
+          # This 'awk' script now ONLY generates the table. It does not 'exit 1'.
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
             print "### BATS Test Results"
@@ -152,7 +164,6 @@ jobs:
             print "| --- | --- |"
             passed = 0
             failed = 0
-            had_failures = 0 # Use 0 for false, 1 for true
           }
 
           ($1 == "ok" || $1 == "not ok") && $2 ~ /^[0-9]+$/ {
@@ -171,7 +182,6 @@ jobs:
             } else {
               print "| ❌ " test_name " | Failed |"
               failed++
-              had_failures = 1 # Set failure flag
             }
           }
 
@@ -179,26 +189,24 @@ jobs:
             print ""
             print "---"
             print "**Summary:** " passed " passed, " failed " failed."
-
-            if (had_failures == 1) {
-                exit 1
-            }
           }
           EOF
           )
 
-          # Run awk, capture its output, and check its exit code.
+          # Run awk, capture its output (the table)
           AWK_OUTPUT=$(awk "$AWK_SCRIPT" "${BATS_TAP_FILE}")
-          AWK_EXIT_CODE=$?
 
-          # Write the summary table (captured in AWK_OUTPUT) to the summary file
+          # Write the table to the summary file
           echo "$AWK_OUTPUT" >> $GITHUB_STEP_SUMMARY
 
-          # Add the overall status based on awk's exit code
+          # --- NEW FAILURE LOGIC ---
+          # Check the BATS_EXIT_CODE from the previous step
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "$AWK_EXIT_CODE" -ne 0 ]; then
+          echo "Debug: BATS_EXIT_CODE from previous step was: '${BATS_EXIT_CODE}'"
+
+          if [ "${BATS_EXIT_CODE}" != "0" ]; then
             echo ":red_circle: **Overall Status: Tests Failed**" >> $GITHUB_STEP_SUMMARY
-            exit 1 # Fail the step
+            exit 1 # Fail this summary step
           else
             echo ":white_check_mark: **Overall Status: All Tests Passed**" >> $GITHUB_STEP_SUMMARY
           fi
