@@ -61,7 +61,6 @@ jobs:
           fi
           echo "File found. Proceeding with perl."
 
-          # Strip ANSI color codes
           perl -pe 's/\e\[[0-9;]*m//g' "${RAW_LOG}" > clean_log.log
 
           echo "--- Verifying clean_log.log exists ---"
@@ -72,12 +71,8 @@ jobs:
           fi
           echo "Clean log file found. Proceeding with awk."
 
-          # --- FIXED AWK SCRIPT ---
-          # This script sets the field separator to two or more dots.
-          # This makes $1 the hook name and $NF the status.
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
-              # Set the Field Separator to be 2 or more dots
               FS = "[.][.]+"
               print "### Pre-commit Hook Results"
               print ""
@@ -89,19 +84,14 @@ jobs:
               had_failures = "false"
           }
 
-          # Check if the last field is one of our keywords
-          # This is more robust than a regex match on the whole line
           {
-              # Trim leading/trailing whitespace from the last field
               gsub(/^[ \t]+|[ \t]+$/, "", $NF)
 
               if ($NF == "Passed" || $NF == "Failed" || $NF == "Skipped") {
                   status = $NF
-                  hook_name = $1 # $1 is now the hook name thanks to FS
+                  hook_name = $1
 
-                  # Clean up (no files to check) from the hook name
                   sub(/\(no files to check\)$/, "", hook_name)
-                  # Trim whitespace
                   gsub(/^[ \t]+|[ \t]+$/, "", hook_name)
 
                   if (status == "Passed") {
@@ -122,16 +112,23 @@ jobs:
               print ""
               print "---"
               print "**Summary:** " passed " passed, " failed " failed, " skipped " skipped."
-              print "::set-output name=overall_failed::" had_failures
+              print "::set-output name=overall_failed::" had_failures > "/dev/stderr"
           }
           EOF
           )
 
-          AWK_OUTPUT=$(awk "$AWK_SCRIPT" clean_log.log)
 
-          echo "$AWK_OUTPUT" >> $GITHUB_STEP_SUMMARY
+          AWK_STDOUT=""
+          AWK_STDERR=""
 
-          OVERALL_FAILED_FLAG=$(echo "$AWK_OUTPUT" | grep "^::set-output name=overall_failed::" | cut -d':' -f4)
+          eval "$( \
+            awk "$AWK_SCRIPT" clean_log.log 1> >(AWK_STDOUT=$(cat); echo "::set-output name=stdout_captured::true" >&2) \
+                                            2> >(AWK_STDERR=$(cat); echo "::set-output name=stderr_captured::true" >&2) \
+          )"
+
+          echo "$AWK_STDOUT" >> $GITHUB_STEP_SUMMARY
+
+          OVERALL_FAILED_FLAG=$(echo "$AWK_STDERR" | grep "^::set-output name=overall_failed::" | cut -d':' -f4)
 
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ "$OVERALL_FAILED_FLAG" == "true" ]; then
@@ -140,11 +137,3 @@ jobs:
           else
               echo ":white_check_mark: **Overall Status: All Hooks Passed**" >> $GITHUB_STEP_SUMMARY
           fi
-
-      - name: Provide log as artifact
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
-        if: ${{ ! cancelled() }}
-        with:
-          name: precommit-logs
-          path: "${{ env.RAW_LOG }}"
-          retention-days: 2
