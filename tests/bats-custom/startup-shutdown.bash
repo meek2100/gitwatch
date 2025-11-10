@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-# Load global configuration (variables, debug flags) FIRST
-load 'bats-custom/bats-config'
-# Load custom helpers (like verbose_echo, wait_for_process_to_die) SECOND
-load 'bats-custom/custom-helpers'
-
 # Provides setup (default) and setup_with_spaces.
 # --- HELPER FUNCTIONS ---
 

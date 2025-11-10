@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-# Load global configuration (variables, debug flags) FIRST
-load 'bats-custom/bats-config'
-
 # BATS Custom Helper Functions
 
 # verbose_echo: Prints a message to BATS file descriptor 3 (>&3).
@@ -187,7 +184,8 @@ _get_path_hash() {
   local path_to_hash="$1"
   local path_hash=""
 
-  if is_command "sha256sum"; then
+  if is_command "sha256sum";
+  then
     path_hash=$(echo -n "$path_to_hash" | sha256sum | (read -r hash _; echo "$hash"))
   elif is_command "md5sum";
   then
