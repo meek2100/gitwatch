@@ -38,7 +38,7 @@ jobs:
           # Run command and tee to log
           pre-commit run --show-diff-on-failure --color=always --all-files | tee "${RAW_LOG}"
 
-          # Verification is now separate from the command
+          # Verification
           echo "--- Verifying ${RAW_LOG} content IN SAME STEP ---"
           if [ -f "${RAW_LOG}" ]; then
             echo "File found. Contents:"
@@ -73,10 +73,12 @@ jobs:
           echo "Clean log file found. Proceeding with awk."
 
           # --- FIXED AWK SCRIPT ---
-          # This script now robustly finds the status as the last word
-          # and treats everything before the dots as the hook name.
+          # This script sets the field separator to two or more dots.
+          # This makes $1 the hook name and $NF the status.
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
+              # Set the Field Separator to be 2 or more dots
+              FS = "[.][.]+"
               print "### Pre-commit Hook Results"
               print ""
               print "| Hook | Status |"
@@ -86,34 +88,36 @@ jobs:
               skipped = 0
               had_failures = "false"
           }
-          # Match lines with the dots and a status at the end
-          # e.g., "Hook Name.................Passed"
-          # e.g., "Hook Name.................(no files to check)Skipped"
-          /(\.+)(Passed|Failed|Skipped)$/ {
-              status = $NF
 
-              hook_name = $0
-              # Remove the status word from the end
-              sub(/(Passed|Failed|Skipped)$/, "", hook_name)
-              # Remove the "(no files to check)" part
-              sub(/\(no files to check\)$/, "", hook_name)
-              # Remove the trailing dots
-              sub(/\.+\s*$/, "", hook_name)
-              # Trim any other leading/trailing whitespace
-              gsub(/^[ \t]+|[ \t]+$/, "", hook_name)
+          # Check if the last field is one of our keywords
+          # This is more robust than a regex match on the whole line
+          {
+              # Trim leading/trailing whitespace from the last field
+              gsub(/^[ \t]+|[ \t]+$/, "", $NF)
 
-              if (status == "Passed") {
-                  print "| ✅ " hook_name " | Passed |"
-                  passed++
-              } else if (status == "Failed") {
-                  print "| ❌ " hook_name " | Failed |"
-                  failed++
-                  had_failures = "true"
-              } else if (status == "Skipped") {
-                  print "| ⏩ " hook_name " | Skipped |"
-                  skipped++
+              if ($NF == "Passed" || $NF == "Failed" || $NF == "Skipped") {
+                  status = $NF
+                  hook_name = $1 # $1 is now the hook name thanks to FS
+
+                  # Clean up (no files to check) from the hook name
+                  sub(/\(no files to check\)$/, "", hook_name)
+                  # Trim whitespace
+                  gsub(/^[ \t]+|[ \t]+$/, "", hook_name)
+
+                  if (status == "Passed") {
+                      print "| ✅ " hook_name " | Passed |"
+                      passed++
+                  } else if (status == "Failed") {
+                      print "| ❌ " hook_name " | Failed |"
+                      failed++
+                      had_failures = "true"
+                  } else if (status == "Skipped") {
+                      print "| ⏩ " hook_name " | Skipped |"
+                      skipped++
+                  }
               }
           }
+
           END {
               print ""
               print "---"
