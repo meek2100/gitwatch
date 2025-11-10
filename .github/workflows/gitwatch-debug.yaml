@@ -103,12 +103,14 @@ jobs:
           echo "--- End of verification ---"
 
       - name: Run BATS tests (from UI input)
+        id: bats_run # <-- Add an ID to track this step's outcome
         shell: bash
         # Set BATS_LIB_PATH to include action-installed libraries and our custom module
         env:
           BATS_LIB_PATH: "${{ steps.setup.outputs.bats-lib-path }}:${{ github.workspace }}/tests"
         # Only run this step if the 'test_files' input is not empty
         if: github.event.inputs.test_files != ''
+        continue-on-error: true # <-- Add this to allow summary to run on failure
         run: |
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
@@ -122,8 +124,8 @@ jobs:
           echo "===================================================================="
 
           # Pass the space-separated string directly to bats
-          # The shell will handle word splitting and glob expansion
-          bats --tap ${{ github.event.inputs.test_files }}
+          # --- MODIFICATION: Pipe output to tee to save results ---
+          bats --tap ${{ github.event.inputs.test_files }} | tee bats_results.tap
 
           echo "===================================================================="
           echo "Finished running tests."
@@ -133,3 +135,58 @@ jobs:
         if: github.event.inputs.test_files == ''
         run: |
           echo "No test files specified in 'test_files' input. Skipping BATS run."
+
+      # --- NEW STEP TO GENERATE SUMMARY ---
+      - name: Generate Test Summary
+        if: always() && steps.bats_run.outcome != 'skipped' # Always run this, except if bats was skipped
+        shell: bash
+        run: |
+          # We must be in the same directory where bats_results.tap was created
+          cd tests
+
+          if [ ! -f bats_results.tap ]; then
+            echo "BATS results file (bats_results.tap) not found." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          # Use awk to parse the TAP output and generate GitHub-flavored Markdown
+          awk '
+          BEGIN {
+            print "### BATS Test Results"
+            print ""
+            print "| Test | Status |"
+            print "| --- | --- |"
+            passed = 0
+            failed = 0
+          }
+          # Match lines like "ok 1 - Test Name" or "not ok 2 - Test Name"
+          /^(ok|not ok) [0-9]+ - / {
+            # Find the start of the test name (after the "- ")
+            name_start = index($0, "- ") + 2
+            test_name = substr($0, name_start)
+            # Sanitize for markdown table
+            gsub(/\|/, "\\|", test_name)
+
+            if ($1 == "ok") {
+              print "| ✅ " test_name " | Passed |"
+              passed++
+            } else {
+              print "| ❌ " test_name " | Failed |"
+              failed++
+            }
+          }
+          END {
+            print ""
+            print "---"
+            print "**Summary:** " passed " passed, " failed " failed."
+          }
+          ' bats_results.tap >> $GITHUB_STEP_SUMMARY
+
+          # Add a final status message to the summary based on the BATS step outcome
+          if [ "${{ steps.bats_run.outcome }}" == "failure" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo ":red_circle: **Overall Status: Tests Failed**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo ":white_check_mark: **Overall Status: All Tests Passed**" >> $GITHUB_STEP_SUMMARY
+          fi
