@@ -29,10 +29,91 @@ jobs:
             pre-commit-4|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml')
             }}
       - name: Run pre-commit hooks
+        id: precommit_run
+        continue-on-error: true
         run: |
           set -o pipefail
           pre-commit gc
           pre-commit run --show-diff-on-failure --color=always --all-files | tee "${RAW_LOG}"
+
+      # --- NEW STEP TO GENERATE SUMMARY ---
+      - name: Generate pre-commit Summary
+        if: always()
+        shell: bash
+        run: |
+          # Strip ANSI color codes from the log to make parsing reliable
+          # We use perl as it's generally available on runners
+          perl -pe 's/\e\[[0-9;]*m//g' "${RAW_LOG}" > clean_log.log
+
+          # Use awk to parse the clean log
+          AWK_SCRIPT=$(cat << 'EOF'
+          BEGIN {
+              print "### Pre-commit Hook Results"
+              print ""
+              print "| Hook | Status |"
+              print "| --- | --- |"
+              passed = 0
+              failed = 0
+              skipped = 0
+              had_failures = "false"
+          }
+          # Match lines with the dots and a status at the end
+          # e.g., "Hook Name.................Passed"
+          # e.g., "Hook Name.................(no files to check)Skipped"
+          /(\.+)(Passed|Failed|Skipped)$/ {
+              status = $NF
+
+              # Get the hook name by removing the trailing dots and status
+              hook_name = $0
+              sub(/(\.+)(Passed|Failed|Skipped)$/, "", hook_name)
+
+              # Also handle (no files to check)
+              sub(/\(no files to check\)$/, "", hook_name)
+
+              # Trim trailing whitespace
+              gsub(/[ \t]+$/, "", hook_name)
+
+              if (status == "Passed") {
+                  print "| ✅ " hook_name " | Passed |"
+                  passed++
+              } else if (status == "Failed") {
+                  print "| ❌ " hook_name " | Failed |"
+                  failed++
+                  had_failures = "true"
+              } else if (status == "Skipped") {
+                  print "| ⏩ " hook_name " | Skipped |"
+                  skipped++
+              }
+          }
+          END {
+              print ""
+              print "---"
+              print "**Summary:** " passed " passed, " failed " failed, " skipped " skipped."
+              # Output a special line for the shell to capture
+              print "::set-output name=overall_failed::" had_failures
+          }
+          EOF
+          )
+
+          # Execute awk and capture its full output
+          AWK_OUTPUT=$(awk "$AWK_SCRIPT" clean_log.log)
+
+          # Write the summary table part to $GITHUB_STEP_SUMMARY
+          echo "$AWK_OUTPUT" >> $GITHUB_STEP_SUMMARY
+
+          # Extract the overall_failed status from the awk output
+          OVERALL_FAILED_FLAG=$(echo "$AWK_OUTPUT" | grep "^::set-output name=overall_failed::" | cut -d':' -f4)
+
+          # Add the final status message to the summary
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "$OVERALL_FAILED_FLAG" == "true" ]; then
+              echo ":red_circle: **Overall Status: Hooks Failed**" >> $GITHUB_STEP_SUMMARY
+              # Fail this step to make the job red
+              exit 1
+          else
+              echo ":white_check_mark: **Overall Status: All Hooks Passed**" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Provide log as artifact
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
         if: ${{ ! cancelled() }}
