@@ -4,10 +4,9 @@
 load 'bats-support/load'
 load 'bats-assert/load'
 load 'bats-file/load'
-# Load custom helpers
-load 'bats-custom/custom-helpers'
-# Load setup/teardown
-load 'bats-custom/startup-shutdown'
+
+# Load ALL custom config, helpers, and setup/teardown hooks
+load 'bats-custom/load'
 
 # Test to ensure the SECOND critical permission check (on the .git directory)
 # exits gracefully with the critical permission error (Exit Code 7) when Read/Execute fail.

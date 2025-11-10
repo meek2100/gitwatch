@@ -4,10 +4,9 @@
 load 'bats-support/load'
 load 'bats-assert/load'
 load 'bats-file/load'
-# Load custom helpers
-load 'bats-custom/custom-helpers'
-# Load setup/teardown
-load 'bats-custom/startup-shutdown'
+
+# Load ALL custom config, helpers, and setup/teardown hooks
+load 'bats-custom/load'
 
 @test "hook_failure_commit: Git pre-commit hook failure is handled gracefully and push is skipped" {
   local output_file

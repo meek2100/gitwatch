@@ -4,10 +4,9 @@
 load 'bats-support/load'
 load 'bats-assert/load'
 load 'bats-file/load'
-# Load custom helpers
-load 'bats-custom/custom-helpers'
-# Load setup/teardown
-load 'bats-custom/startup-shutdown'
+
+# Load ALL custom config, helpers, and setup/teardown hooks
+load 'bats-custom/load'
 
 @test "case_insensitive_rename: Handles file rename (e.g., file.txt -> FILE.txt)" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function

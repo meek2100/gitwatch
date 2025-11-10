@@ -4,10 +4,9 @@
 load 'bats-support/load'
 load 'bats-assert/load'
 load 'bats-file/load'
-# Load custom helpers
-load 'bats-custom/custom-helpers'
-# Load setup/teardown
-load 'bats-custom/startup-shutdown'
+
+# Load ALL custom config, helpers, and setup/teardown hooks
+load 'bats-custom/load'
 
 # This test file units tests the glob-to-regex conversion logic
 # that is used inside gitwatch.sh for the -X flag.
