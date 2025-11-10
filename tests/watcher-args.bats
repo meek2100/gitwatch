@@ -114,9 +114,15 @@ create_watcher_wrapper() {
   # --- FIX: Assert against the [INFO] log line ---
   # ---
   # --- FIX: The info log prints the regex unescaped. ---
-  local info_log_regex="((\.git/|\.git$))" # <-- THIS IS THE FIX
+  local info_log_regex="((\.git/|\.git$))"
+  # ---
+  # --- FIX: Resolve the physical path for macOS symlink issue (/var vs /private/var)
+  # shellcheck disable=SC2154 # testdir is sourced via setup function
+  local resolved_testdir
+  resolved_testdir=$(cd "$testdir" && pwd -P)
   # --- END FIX ---
-  local expected_info_log_line="[INFO] Starting file watch. Command: $dummy_fswatch --recursive --event $default_events -E --exclude $info_log_regex $testdir/local/$TEST_SUBDIR_NAME"
+  #
+  local expected_info_log_line="[INFO] Starting file watch. Command: $dummy_fswatch --recursive --event $default_events -E --exclude $info_log_regex $resolved_testdir/local/$TEST_SUBDIR_NAME"
   assert_output --partial "$expected_info_log_line" "gitwatch.sh did not log the correct fswatch command"
 
   # 4. Cleanup
