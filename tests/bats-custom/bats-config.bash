@@ -55,6 +55,7 @@ export GITWATCH_TEST_ARGS="${GITWATCH_TEST_ARGS:-${default_args[*]}}"
 # This correctly handles spaces and quotes, unlike the previous method.
 # shellcheck disable=SC2034
 declare -a GITWATCH_TEST_ARGS_ARRAY
+# shellcheck disable=SC2034
 read -r -a GITWATCH_TEST_ARGS_ARRAY <<< "$GITWATCH_TEST_ARGS"
 # --- END FIX ---
 
