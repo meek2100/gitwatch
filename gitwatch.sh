@@ -569,14 +569,18 @@ fi
 # Set default events based on the *watcher*, not based on GW_INW_BIN
 # This must happen *after* INW is determined, but *before* the -e check.
 if [ -z "${EVENTS:-}" ]; then # Only set if user did not provide -e
-  if [[ "$INW" == *"fswatch" ]]; then
+  # ---
+  # BUGFIX: Base default events on OS_TYPE, not the unreliable $INW path.
+  # $OS_TYPE was set reliably earlier.
+  # ---
+  if [ "$OS_TYPE" = "Darwin" ] || [ "$OS_TYPE" = "FreeBSD" ] || [ "$OS_TYPE" = "OpenBSD" ]; then
     # default events specified via a mask, see
     # https://emcrisostomo.github.io/fswatch/doc/1.14.0/fswatch.html/Invoking-fswatch.html#Numeric-Event-Flags
     # default of 414 = MovedTo + MovedFrom + Renamed + Removed + Updated + Created
     #                = 256 + 128+ 16 + 8 + 4 + 2
     EVENTS="414";
   else
-    # Default for inotifywait
+    # Default for inotifywait (Linux or other)
     EVENTS="close_write,move,move_self,delete,create,modify";
   fi
 fi
