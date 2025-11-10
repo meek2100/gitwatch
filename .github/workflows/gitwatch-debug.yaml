@@ -103,54 +103,68 @@ jobs:
           echo "--- End of verification ---"
 
       - name: Run BATS tests (from UI input)
-        id: bats_run # <-- Add an ID to track this step's outcome
+        id: bats_run
         shell: bash
-        # Set BATS_LIB_PATH to include action-installed libraries and our custom module
         env:
           BATS_LIB_PATH: "${{ steps.setup.outputs.bats-lib-path }}:${{ github.workspace }}/tests"
-        # Only run this step if the 'test_files' input is not empty
         if: github.event.inputs.test_files != ''
-        continue-on-error: true # <-- Add this to allow summary to run on failure
+        continue-on-error: true
         run: |
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
 
-          # --- KEY CHANGE: CD INTO TESTS DIRECTORY ---
+          # Ensure we are in the tests directory to run bats and save the results
           cd tests
+          echo "Current directory for BATS tests: $(pwd)"
 
           echo "===================================================================="
           echo "Running BATS tests (from 'tests/' directory) from workflow_dispatch input:"
           echo "${{ github.event.inputs.test_files }}"
           echo "===================================================================="
 
-          # Pass the space-separated string directly to bats
-          # --- MODIFICATION: Pipe output to tee to save results ---
+          # Run bats and tee the output to bats_results.tap
+          # The file will be created in the `tests/` directory
           bats --tap ${{ github.event.inputs.test_files }} | tee bats_results.tap
 
           echo "===================================================================="
           echo "Finished running tests."
           echo "===================================================================="
+          # Also, ensure we capture the exit code of bats for later use if continue-on-error is true
+          # Note: continue-on-error true means steps.bats_run.outcome will still be "success"
+          # if a script fails. We'll rely on parsing the TAP file for actual test results.
 
       - name: No Tests Specified
         if: github.event.inputs.test_files == ''
         run: |
           echo "No test files specified in 'test_files' input. Skipping BATS run."
 
-      # --- NEW STEP TO GENERATE SUMMARY ---
+      # --- MODIFIED STEP TO GENERATE SUMMARY ---
       - name: Generate Test Summary
-        if: always() && steps.bats_run.outcome != 'skipped' # Always run this, except if bats was skipped
+        if: always() && github.event.inputs.test_files != '' # Only run if tests were actually attempted
         shell: bash
         run: |
-          # We must be in the same directory where bats_results.tap was created
+          # Navigate to the 'tests' directory where bats_results.tap should be
           cd tests
+          echo "Current directory for summary generation: $(pwd)"
 
-          if [ ! -f bats_results.tap ]; then
-            echo "BATS results file (bats_results.tap) not found." >> $GITHUB_STEP_SUMMARY
-            exit 0
+          # --- DEBUGGING: List files and cat the TAP file ---
+          echo "--- Contents of current directory (tests/) ---"
+          ls -l
+          echo "--- End of directory listing ---"
+
+          echo "--- Content of bats_results.tap (if exists) ---"
+          if [ -f bats_results.tap ]; then
+            cat bats_results.tap
+          else
+            echo "bats_results.tap NOT FOUND."
+            echo "No BATS test results to summarize. Ensure tests ran and generated output." >> $GITHUB_STEP_SUMMARY
+            exit 0 # Exit cleanly if no results file to avoid awk errors
           fi
+          echo "--- End of bats_results.tap content ---"
 
           # Use awk to parse the TAP output and generate GitHub-flavored Markdown
-          awk '
+          # We'll also capture if any 'not ok' lines were found to set the overall status
+          AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
             print "### BATS Test Results"
             print ""
@@ -158,14 +172,13 @@ jobs:
             print "| --- | --- |"
             passed = 0
             failed = 0
+            overall_failed = "false" # Flag to track if any test failed
           }
           # Match lines like "ok 1 - Test Name" or "not ok 2 - Test Name"
           /^(ok|not ok) [0-9]+ - / {
-            # Find the start of the test name (after the "- ")
             name_start = index($0, "- ") + 2
             test_name = substr($0, name_start)
-            # Sanitize for markdown table
-            gsub(/\|/, "\\|", test_name)
+            gsub(/\|/, "\\|", test_name) # Sanitize for markdown table
 
             if ($1 == "ok") {
               print "| ✅ " test_name " | Passed |"
@@ -173,20 +186,34 @@ jobs:
             } else {
               print "| ❌ " test_name " | Failed |"
               failed++
+              overall_failed = "true"
             }
           }
           END {
             print ""
             print "---"
             print "**Summary:** " passed " passed, " failed " failed."
+            # Output a special line that we can grep for in the shell to determine overall status
+            print "::set-output name=overall_failed::" overall_failed
           }
-          ' bats_results.tap >> $GITHUB_STEP_SUMMARY
+          EOF
+          )
 
-          # Add a final status message to the summary based on the BATS step outcome
-          if [ "${{ steps.bats_run.outcome }}" == "failure" ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
+          # Execute awk and capture its output, including the custom output for overall_failed
+          AWK_OUTPUT=$(echo -e "$(cat bats_results.tap)" | awk "$AWK_SCRIPT")
+          echo "$AWK_OUTPUT" >> $GITHUB_STEP_SUMMARY
+
+          # Extract the overall_failed status from the awk output
+          OVERALL_FAILED_FLAG=$(echo "$AWK_OUTPUT" | grep "^::set-output name=overall_failed::" | cut -d':' -f4)
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "$OVERALL_FAILED_FLAG" == "true" ]; then
             echo ":red_circle: **Overall Status: Tests Failed**" >> $GITHUB_STEP_SUMMARY
           else
-            echo "" >> $GITHUB_STEP_SUMMARY
             echo ":white_check_mark: **Overall Status: All Tests Passed**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # If any tests failed according to our awk script, fail this step to make the job red
+          if [ "$OVERALL_FAILED_FLAG" == "true" ]; then
+              exit 1
           fi
