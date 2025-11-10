@@ -95,16 +95,14 @@ jobs:
           grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
           echo "--- End of verification ---"
 
-      # --- MODIFIED STEP: 'outputs:' block removed ---
       - name: Run BATS tests (from UI input)
         id: bats_run
-        # The 'outputs:' block was here, and it was invalid. It is now removed.
         shell: bash
         env:
           BATS_LIB_PATH: "${{ steps.setup.outputs.bats-lib-path }}:${{ github.workspace }}/tests"
           BATS_TAP_FILE: "${{ github.workspace }}/bats_results.tap"
         if: github.event.inputs.test_files != ''
-        continue-on-error: true # <-- IMPORTANT: This allows 'Generate Test Summary' to run on failure
+        continue-on-error: true
         run: |
           set -o pipefail
 
@@ -119,7 +117,6 @@ jobs:
           echo "BATS raw exit code: ${BATS_EXIT_CODE}"
 
           # Save this exit code as an output for the next step
-          # This variable name is what the next step will read.
           echo "bats_exit_code_internal=${BATS_EXIT_CODE}" >> $GITHUB_OUTPUT
 
           echo "===================================================================="
@@ -135,14 +132,13 @@ jobs:
         run: |
           echo "No test files specified in 'test_files' input. Skipping BATS run."
 
-      # --- MODIFIED STEP: Reads 'bats_exit_code_internal' ---
+      # --- MODIFIED STEP: Reads output directly in 'if' ---
       - name: Generate Test Summary
         if: always() && github.event.inputs.test_files != ''
         shell: bash
         env:
+          # Only the TAP file path is needed here
           BATS_TAP_FILE: "${{ github.workspace }}/bats_results.tap"
-          # Get the output from the 'bats_run' step using the correct variable name
-          BATS_EXIT_CODE: ${{ steps.bats_run.outputs.bats_exit_code_internal }}
         run: |
           echo "--- Reading summary from ${BATS_TAP_FILE} ---"
 
@@ -192,10 +188,14 @@ jobs:
 
           echo "$AWK_OUTPUT" >> $GITHUB_STEP_SUMMARY
 
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Debug: BATS_EXIT_CODE from previous step was: '${BATS_EXIT_CODE}'"
+          # --- KEY CHANGE ---
+          # The exit code is referenced directly from the step context.
+          # This works because it is expanded *when the script runs*, not when the job starts.
 
-          if [ "${BATS_EXIT_CODE}" != "0" ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Debug: BATS_EXIT_CODE from previous step was: '${{ steps.bats_run.outputs.bats_exit_code_internal }}'"
+
+          if [ "${{ steps.bats_run.outputs.bats_exit_code_internal }}" != "0" ]; then
             echo ":red_circle: **Overall Status: Tests Failed**" >> $GITHUB_STEP_SUMMARY
             exit 1 # Fail this summary step
           else
