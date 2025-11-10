@@ -29,8 +29,9 @@ load 'bats-custom/startup-shutdown'
 
   # 3. Assert: Check log output for the expected fallback timeout and mocked version
   run cat "$output_file"
-  assert_output --partial "Using read timeout: 1 seconds (Bash version: $expected_version)" \
-    "The script failed to calculate the fallback timeout of 1 second for mocked Bash 3.x"
+  # FIX: Added the [DEBUG] prefix to the assertion
+  assert_output --partial "[DEBUG] Using read timeout: 1 seconds (Bash version: $expected_version)" \
+    "The script failed to find the [DEBUG] log for fallback timeout of 1 second for mocked Bash 3.x"
 
   # 4. Cleanup environment variable
   unset MOCK_BASH_MAJOR_VERSION
@@ -58,8 +59,9 @@ load 'bats-custom/startup-shutdown'
 
   # 3. Assert: Check log output for the expected fractional timeout and mocked version
   run cat "$output_file"
-  assert_output --partial "Using read timeout: 0.1 seconds (Bash version: $expected_version)" \
-    "The script failed to calculate the fractional timeout of 0.1 seconds for mocked Bash 4.x"
+  # FIX: Added the [DEBUG] prefix to the assertion
+  assert_output --partial "[DEBUG] Using read timeout: 0.1 seconds (Bash version: $expected_version)" \
+    "The script failed to find the [DEBUG] log for fractional timeout of 0.1 seconds for mocked Bash 4.x"
 
   # 4. Cleanup environment variable
   unset MOCK_BASH_MAJOR_VERSION
@@ -88,9 +90,11 @@ load 'bats-custom/startup-shutdown'
 
   # 3. Assert: Check log output for the *overridden* timeout
   run cat "$output_file"
-  assert_output --partial "Using read timeout: 5.5 seconds (Bash version: 4)" \
-    "The script failed to use the GW_READ_TIMEOUT override value"
-  refute_output --partial "Using read timeout: 0.1 seconds" # Should not use the default
+  # FIX: Added the [DEBUG] prefix to the assertion
+  assert_output --partial "[DEBUG] Using read timeout: 5.5 seconds (Bash version: 4)" \
+    "The script failed to find the [DEBUG] log for the GW_READ_TIMEOUT override value"
+  # FIX: Added the [DEBUG] prefix to the refute
+  refute_output --partial "[DEBUG] Using read timeout: 0.1 seconds" # Should not use the default
 
   # 4. Cleanup environment variable
   unset GW_READ_TIMEOUT
