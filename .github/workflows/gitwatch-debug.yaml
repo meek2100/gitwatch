@@ -100,7 +100,6 @@ jobs:
         shell: bash
         env:
           BATS_LIB_PATH: "${{ steps.setup.outputs.bats-lib-path }}:${{ github.workspace }}/tests"
-          # --- MODIFIED: Use full path for log file ---
           BATS_TAP_FILE: "${{ github.workspace }}/bats_results.tap"
         if: github.event.inputs.test_files != ''
         continue-on-error: true
@@ -108,22 +107,16 @@ jobs:
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
 
-          # Still need to cd for bats to find tests
           cd tests
           echo "Current directory for BATS tests: $(pwd)"
+          echo "Running BATS tests and writing to ${BATS_TAP_FILE}"
 
-          echo "===================================================================="
-          echo "Running BATS tests (from 'tests/' directory)..."
-          echo "${{ github.event.inputs.test_files }}"
-          echo "Writing TAP output to ${BATS_TAP_FILE}"
-          echo "===================================================================="
-
-          # Write to the full path specified in env var
+          # Run bats and tee the output to the log file.
           bats --tap ${{ github.event.inputs.test_files }} | tee "${BATS_TAP_FILE}"
 
+          # --- Internal verification. This output does NOT go to the TAP file. ---
           echo "===================================================================="
-          echo "Finished running tests."
-          echo "--- Verifying ${BATS_TAP_FILE} content IN SAME STEP ---"
+          echo "Finished running tests. Verifying ${BATS_TAP_FILE} content..."
           if [ -f "${BATS_TAP_FILE}" ]; then
             echo "File found. Contents:"
             ls -l "${BATS_TAP_FILE}"
@@ -139,26 +132,21 @@ jobs:
         run: |
           echo "No test files specified in 'test_files' input. Skipping BATS run."
 
-      # --- MODIFIED STEP TO GENERATE SUMMARY ---
       - name: Generate Test Summary
         if: always() && github.event.inputs.test_files != ''
         shell: bash
         env:
-          # --- MODIFIED: Use full path for log file ---
           BATS_TAP_FILE: "${{ github.workspace }}/bats_results.tap"
         run: |
           echo "--- Reading summary from ${BATS_TAP_FILE} ---"
 
-          # --- MODIFIED: Check full path ---
           if [ ! -f "${BATS_TAP_FILE}" ]; then
             echo "BATS results file (${BATS_TAP_FILE}) not found." >> $GITHUB_STEP_SUMMARY
             exit 0
           fi
 
-          echo "--- File content ---"
-          cat "${BATS_TAP_FILE}"
-          echo "--- End file content ---"
-
+          # --- FIXED AWK SCRIPT ---
+          # This script now looks for "ok [number] [test name]" (no dash)
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
             print "### BATS Test Results"
@@ -169,9 +157,15 @@ jobs:
             failed = 0
             overall_failed = "false"
           }
-          /^(ok|not ok) [0-9]+ - / {
-            name_start = index($0, "- ") + 2
+          # Match lines like "ok 1 Test Name" or "not ok 2 Test Name"
+          /^(ok|not ok) [0-9]+ / {
+            # Find the start of the test name (after the number and space)
+            name_start = index($0, $2 " ") + length($2) + 1
             test_name = substr($0, name_start)
+
+            # Remove leading/trailing whitespace just in case
+            gsub(/^[ \t]+|[ \t]+$/, "", test_name)
+            # Sanitize for markdown table
             gsub(/\|/, "\\|", test_name)
 
             if ($1 == "ok") {
@@ -192,7 +186,6 @@ jobs:
           EOF
           )
 
-          # --- MODIFIED: Pass file directly to awk ---
           AWK_OUTPUT=$(awk "$AWK_SCRIPT" "${BATS_TAP_FILE}")
 
           echo "$AWK_OUTPUT" >> $GITHUB_STEP_SUMMARY
