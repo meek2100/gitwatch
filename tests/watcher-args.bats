@@ -66,7 +66,11 @@ create_watcher_wrapper() {
   assert_output --partial "*** inotifywait_CALLED ***" "Dummy inotifywait was not executed"
 
   # --- FIX 2: Assert against the [INFO] log line, which is more stable ---
-  local info_log_regex="\(\(\.git/\|\.git\$\)\)" # Regex in info log is double-parented
+  # ---
+  # --- FIX: The info log prints the regex unescaped. ---
+  # The old test expected `\(\(\.git/\|\.git$\)\)`, but the new logger prints `((\.git/|\.git$))`.
+  local info_log_regex="((\.git/|\.git$))" # <-- THIS IS THE FIX
+  # --- END FIX ---
   local expected_info_log_line="[INFO] Starting file watch. Command: $dummy_inw -qmr -e $default_events --exclude $info_log_regex $testdir/local/$TEST_SUBDIR_NAME"
   assert_output --partial "$expected_info_log_line" "gitwatch.sh did not log the correct inotifywait command"
 
@@ -108,7 +112,10 @@ create_watcher_wrapper() {
   assert_output --partial "*** fswatch_CALLED ***" "Dummy fswatch was not executed"
 
   # --- FIX: Assert against the [INFO] log line ---
-  local info_log_regex="\(\(\.git/\|\.git\$\)\)" # Regex in info log is double-parented
+  # ---
+  # --- FIX: The info log prints the regex unescaped. ---
+  local info_log_regex="((\.git/|\.git$))" # <-- THIS IS THE FIX
+  # --- END FIX ---
   local expected_info_log_line="[INFO] Starting file watch. Command: $dummy_fswatch --recursive --event $default_events -E --exclude $info_log_regex $testdir/local/$TEST_SUBDIR_NAME"
   assert_output --partial "$expected_info_log_line" "gitwatch.sh did not log the correct fswatch command"
 
