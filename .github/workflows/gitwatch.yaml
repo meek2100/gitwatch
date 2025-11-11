@@ -69,8 +69,8 @@ jobs:
           elif [ "$RUNNER_OS" == "macOS" ];
           then
             # --- Install Docker CLI & Buildx via Homebrew ---
-            # Colima provides the functional Docker daemon needed for macOS runners.
-            brew install fswatch flock coreutils bash parallel docker docker-buildx colima
+            # FIX: Add 'qemu' for Colima's preferred VM driver in CI.
+            brew install fswatch flock coreutils bash parallel docker docker-buildx colima qemu
           else
             echo "Unsupported OS: $RUNNER_OS"
             exit 1
