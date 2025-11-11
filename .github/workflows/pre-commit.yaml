@@ -1,0 +1,150 @@
+---
+name: pre-commit
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RAW_LOG: pre-commit.log
+      SKIP: no-commit-to-branch
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+      - run: python -m pip install pre-commit regex
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.cache/pre-commit/
+          key:
+            pre-commit-4|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml')
+            }}
+
+      - name: Run pre-commit hooks
+        id: precommit_run
+        continue-on-error: true # <-- IMPORTANT
+        run: |
+          set -o pipefail
+          pre-commit gc
+
+          pre-commit run --show-diff-on-failure --color=always --all-files | tee "${RAW_LOG}"
+
+          # Capture the exit code of 'pre-commit'
+          PRECOMMIT_EXIT_CODE=${PIPESTATUS[0]}
+          echo "Pre-commit raw exit code: ${PRECOMMIT_EXIT_CODE}"
+
+          # Save this exit code as an output
+          echo "precommit_exit_code_internal=${PRECOMMIT_EXIT_CODE}" >> $GITHUB_OUTPUT
+
+          echo "--- Verifying ${RAW_LOG} content IN SAME STEP ---"
+          if [ -f "${RAW_LOG}" ]; then
+            echo "File found. Contents:"
+            ls -l "${RAW_LOG}"
+            cat "${RAW_LOG}"
+          else
+            echo "File ${RAW_LOG} NOT FOUND."
+          fi
+          echo "--- End of verification ---"
+
+          exit $PRECOMMIT_EXIT_CODE
+
+      # --- MODIFIED STEP: Reads output directly in 'if' ---
+      - name: Generate pre-commit Summary
+        if: always()
+        shell: bash
+        # The 'env:' block for the exit code has been removed
+        run: |
+          echo "--- Verifying ${RAW_LOG} exists before processing ---"
+          if [ ! -f "${RAW_LOG}" ]; then
+            echo "Raw log file (${RAW_LOG}) NOT FOUND."
+            echo "Raw log file (${RAW_LOG}) NOT FOUND." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+          echo "File found. Proceeding with perl."
+
+          perl -pe 's/\e\[[0-9;]*m//g' "${RAW_LOG}" > clean_log.log
+
+          echo "--- Verifying clean_log.log exists ---"
+          if [ ! -f "clean_log.log" ]; then
+            echo "Clean log file (clean_log.log) was NOT created by perl."
+            echo "Clean log file (clean_log.log) was NOT created by perl." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+          echo "Clean log file found. Proceeding with awk."
+
+          AWK_SCRIPT=$(cat << 'EOF'
+          BEGIN {
+              FS = "[.][.]+"
+              print "### Pre-commit Hook Results"
+              print ""
+              print "| Hook | Status |"
+              print "| --- | --- |"
+              passed = 0
+              failed = 0
+              skipped = 0
+          }
+
+          {
+              gsub(/^[ \t]+|[ \t]+$/, "", $NF)
+
+              if ($NF == "Passed" || $NF == "Failed" || $NF == "Skipped") {
+                  status = $NF
+                  hook_name = $1
+
+                  sub(/\(no files to check\)$/, "", hook_name)
+                  gsub(/^[ \t]+|[ \t]+$/, "", hook_name)
+
+                  if (status == "Passed") {
+                      print "| ✅ " hook_name " | Passed |"
+                      passed++
+                  } else if (status == "Failed") {
+                      print "| ❌ " hook_name " | Failed |"
+                      failed++
+                  } else if (status == "Skipped") {
+                      print "| ⏩ " hook_name " | Skipped |"
+                      skipped++
+                  }
+              }
+          }
+
+          END {
+              print ""
+              print "---"
+              print "**Summary:** " passed " passed, " failed " failed, " skipped " skipped."
+          }
+          EOF
+          )
+
+          AWK_OUTPUT=$(awk "$AWK_SCRIPT" clean_log.log)
+
+          echo "$AWK_OUTPUT" >> $GITHUB_STEP_SUMMARY
+
+          # --- KEY CHANGE ---
+          # The exit code is referenced directly from the step context.
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Debug: PRECOMMIT_EXIT_CODE from previous step was: '${{ steps.precommit_run.outputs.precommit_exit_code_internal }}'"
+
+          if [ "${{ steps.precommit_run.outputs.precommit_exit_code_internal }}" != "0" ]; then
+              echo ":red_circle: **Overall Status: Hooks Failed**" >> $GITHUB_STEP_SUMMARY
+              exit 1 # Fail this step
+          else
+              echo ":white_check_mark: **Overall Status: All Hooks Passed**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Provide log as artifact
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        if: ${{ ! cancelled() }}
+        with:
+          name: precommit-logs
+          path: "${{ env.RAW_LOG }}"
+          retention-days: 2

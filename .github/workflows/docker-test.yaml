@@ -1,0 +1,49 @@
+---
+name: Docker E2E Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  docker-e2e:
+    strategy:
+      matrix:
+        base_image: ["alpine:3.20", "alpine:edge"]
+    name: "Docker E2E Tests (${{ matrix.base_image }})"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+
+      - name: Reusable Setup (Checkout, BATS, Version)
+        uses: ./.github/actions/setup
+        id: setup
+        with:
+          os: ubuntu-latest
+          setup-bats: true
+
+      - name: Run Docker E2E BATS tests
+        shell: bash
+        # Set BATS_LIB_PATH to include action-installed libraries
+        # Pass the matrix variable to the test script
+        env:
+          # --- THIS LINE IS THE FIX ---
+          # We must add the path to your local /tests directory,
+          # which contains the 'bats-custom' helpers.
+          BATS_LIB_PATH: "${{ steps.setup.outputs.bats-lib-path }}:${{ github.workspace }}/tests"
+          TEST_BASE_IMAGE: ${{ matrix.base_image }}
+        run: |
+          # Change to the tests directory first
+          cd tests
+          # Run the docker.bats test file by name
+          bats docker.bats

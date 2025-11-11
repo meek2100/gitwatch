@@ -1,0 +1,91 @@
+name: "Reusable Setup"
+description: "Checks out code, sets up BATS, and substitutes version."
+
+inputs:
+  os:
+    description: "The OS of the runner (ubuntu-latest, macOS-latest, windows-latest)"
+    required: true
+  setup-bats:
+    description: "Whether to set up BATS"
+    required: false
+    default: "false"
+
+outputs:
+  bats-lib-path:
+    description: "Path to BATS libraries if setup-bats was true"
+    # This output now comes directly from the bats-action step
+    value: ${{ steps.setup-bats.outputs.lib-path }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+
+    # --- BATS INSTALLATION ---
+    # This single step installs bats-core and all helper libraries.
+    - name: Setup Bats and Bats libraries
+      if: ${{ inputs.setup-bats == 'true' }}
+      id: setup-bats # This ID provides the 'lib-path' output
+      uses: bats-core/bats-action@3.0.1
+      with:
+        # Install to ${{ github.workspace }} (which is in $HOME)
+        # to enable caching, as recommended by the action's README.
+        support-path: "${{ github.workspace }}/tests/bats-support"
+        assert-path: "${{ github.workspace }}/tests/bats-assert"
+        file-path: "${{ github.workspace }}/tests/bats-file"
+        detik-install: false
+
+    # --- KCOV INSTALL (with caching) ---
+    - name: Cache kcov
+      if: ${{ inputs.setup-bats == 'true' && startsWith(inputs.os, 'ubuntu') }}
+      id: cache-kcov
+      uses: actions/cache@v4
+      with:
+        # Cache the installation directory
+        path: ~/kcov-installed
+        # Rebuild cache if this action file is edited
+        key: kcov-build-v1-${{ runner.os }}-${{ hashFiles('.github/actions/setup/action.yaml') }}
+
+    - name: Install kcov (build from source for Linux)
+      if: ${{ inputs.setup-bats == 'true' && startsWith(inputs.os, 'ubuntu') && steps.cache-kcov.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: |
+        echo "Installing kcov dependencies..."
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake pkg-config \
+                                  libcurl4-openssl-dev libelf-dev libdw-dev \
+                                  binutils-dev libiberty-dev
+
+        echo "Cloning and building kcov..."
+        git clone --depth 1 https://github.com/SimonKagstrom/kcov.git
+        cd kcov
+        mkdir build
+        cd build
+        # Install to a local, cacheable directory
+        cmake .. -DCMAKE_INSTALL_PREFIX=~/kcov-installed
+        make
+        make install
+        echo "kcov installed to ~/kcov-installed"
+
+    - name: Add kcov to PATH
+      if: ${{ inputs.setup-bats == 'true' && startsWith(inputs.os, 'ubuntu') }}
+      shell: bash
+      run: |
+        echo "$HOME/kcov-installed/bin" >> $GITHUB_PATH
+        echo "kcov path added. Location: $(command -v kcov)"
+    # --- END KCOV INSTALL ---
+    - name: Substitute Version Number into gitwatch.sh
+      shell: bash
+      run: |
+        VERSION_NUMBER=$(cat VERSION)
+        # Handle macOS sed -i incompatibility
+        if [ "${{ inputs.os }}" == "macOS-latest" ]; then
+          sed -i '' "s/%%GITWATCH_VERSION%%/${VERSION_NUMBER}/g" gitwatch.sh
+        else
+          sed -i "s/%%GITWATCH_VERSION%%/${VERSION_NUMBER}/g" gitwatch.sh
+        fi
+        echo "Substituted version ${VERSION_NUMBER} into gitwatch.sh for testing."

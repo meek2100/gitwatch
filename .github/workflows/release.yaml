@@ -1,0 +1,200 @@
+---
+name: Create Release and Update Files
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The new version number (e.g., 0.7.0)"
+        required: true
+
+permissions:
+  contents: write # Needed to push branches, tags, and commits
+  pull-requests: write # Needed to create a pull request
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          # Use a token with write permissions
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Fetch all history to enable comparing tags
+          fetch-depth: 0
+
+      - name: Configure Git User
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Get Version Numbers
+        id: get_version
+        run: |
+          VERSION_NUMBER=${{ github.event.inputs.version }}
+          TAG_NAME="v${VERSION_NUMBER}"
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "version_number=${VERSION_NUMBER}" >> $GITHUB_OUTPUT
+          echo "release_branch=release/${TAG_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Create Release Branch
+        run: |
+          git checkout -b ${{ steps.get_version.outputs.release_branch }} master
+
+      - name: Update VERSION file
+        run: |
+          echo "${{ steps.get_version.outputs.version_number }}" > VERSION
+
+      - name: Update package.json
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
+          jq --arg new_version "${{ steps.get_version.outputs.version_number }}" '.version = $new_version' package.json > temp.json && mv temp.json package.json
+
+      - name: Substitute Version in gitwatch.sh
+        run: |
+          sed -i "s/%%GITWATCH_VERSION%%/${{ steps.get_version.outputs.version_number }}/g" gitwatch.sh
+
+      - name: Update Man Page Date
+        run: |
+          RELEASE_DATE=$(date +'%B %Y')
+          VERSION_NUMBER="${{ steps.get_version.outputs.version_number }}"
+          # Use % as the sed delimiter
+          sed -i "s%.TH \"GITWATCH\" \"1\" \".*\" \"gitwatch.*\" \"User Commands\"%.TH \"GITWATCH\" \"1\" \"${RELEASE_DATE}\" \"gitwatch ${VERSION_NUMBER}\" \"User Commands\"%" gitwatch.1
+
+      - name: Consolidate Changelog Fragments and Update CHANGELOG.md
+        id: update_changelog
+        run: |
+          TAG_NAME="${{ steps.get_version.outputs.tag_name }}"
+          VERSION_NUMBER="${{ steps.get_version.outputs.version_number }}"
+          RELEASE_DATE=$(date +'%Y-%m-%d')
+          UNRELEASED_HEADER="## [Unreleased]"
+          NEW_VERSION_HEADER="## [${VERSION_NUMBER}] - ${RELEASE_DATE}"
+          CHANGELOG_FILE="CHANGELOG.md"
+          FRAGMENT_DIR=".changelog"
+          RELEASE_NOTES_FILE="release_notes.txt"
+
+          # 1. Create a buffer for release notes
+          # We use a non-markdown format for the GITHUB_OUTPUT to avoid issues
+          echo "Release Notes for ${TAG_NAME}:" > $RELEASE_NOTES_FILE
+          echo "" >> $RELEASE_NOTES_FILE
+
+          # 2. Consolidate fragments if the directory exists
+          if [ -d "$FRAGMENT_DIR" ] && [ "$(ls -A $FRAGMENT_DIR | grep -v '.gitkeep')" ]; then
+            echo "Consolidating fragments from $FRAGMENT_DIR..."
+            # Find all markdown files, sort them, and append to release notes
+            find "$FRAGMENT_DIR" -type f -name "*.md" -print0 | sort -z | xargs -0 -I {} sh -c 'cat {}; echo;' >> $RELEASE_NOTES_FILE
+          else
+            echo "No fragments found in $FRAGMENT_DIR. Release notes will be minimal."
+            echo "* No specific changes documented for this release." >> $RELEASE_NOTES_FILE
+          fi
+
+          # 3. Update CHANGELOG.md
+          if ! grep -q "^${UNRELEASED_HEADER}$" $CHANGELOG_FILE; then
+            echo "Error: Could not find '${UNRELEASED_HEADER}' section in CHANGELOG.md. Adding it."
+            awk 'NR==3{print "\n## [Unreleased]\n"} {print}' "${CHANGELOG_FILE}" > "${CHANGELOG_FILE}.tmp" && mv "${CHANGELOG_FILE}.tmp" "${CHANGELOG_FILE}"
+          fi
+
+          # Read the consolidated notes into a variable for sed
+          # We must escape characters for awk
+          NOTES_CONTENT=$(cat $RELEASE_NOTES_FILE | sed -e 's/\\/\\\\/g' -e 's/&/\\&/g' -e 's/$/\\n/')
+
+          # Use awk to insert the new header and notes, replacing [Unreleased]
+          awk -v header="$NEW_VERSION_HEADER" -v notes="$NOTES_CONTENT" '
+          BEGIN { inserted = 0 }
+          /## \[Unreleased\]/ && !inserted {
+            print header
+            print notes
+            inserted = 1
+            next # Skip printing the "[Unreleased]" line
+          }
+          { print }
+          ' $CHANGELOG_FILE > $CHANGELOG_FILE.tmp && mv $CHANGELOG_FILE.tmp $CHANGELOG_FILE
+
+          # 4. Clear the fragments directory for the next cycle
+          rm -rf $FRAGMENT_DIR/*
+          echo "# Add changelog fragments here for the next release (e.g., 123.added.md)" > $FRAGMENT_DIR/.gitkeep
+
+          # 5. Set GitHub Action output
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          cat $RELEASE_NOTES_FILE >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Install Formatting Tools
+        run: |
+          npm install -g prettier
+
+      - name: Format package.json with Prettier
+        run: |
+          prettier --write package.json
+
+      - name: Format CHANGELOG.md with Prettier
+        run: |
+          prettier --write CHANGELOG.md
+
+      - name: Commit updated files
+        id: commit_files
+        run: |
+          # Add the .changelog directory's .gitkeep file
+          # --- MODIFICATION: Add gitwatch.1 ---
+          git add VERSION package.json CHANGELOG.md gitwatch.sh .changelog/ gitwatch.1
+          # --- END MODIFICATION ---
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+            echo "committed=false" >> $GITHUB_OUTPUT
+          else
+            git commit -m "chore: Prepare release ${{ steps.get_version.outputs.tag_name }}"
+            echo "committed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Push Release Branch
+        run: |
+          git push origin ${{ steps.get_version.outputs.release_branch }}
+
+      - name: Create and Push Tag
+        if: steps.commit_files.outputs.committed == 'true'
+        run: |
+          git tag ${{ steps.get_version.outputs.tag_name }}
+          git push origin ${{ steps.get_version.outputs.tag_name }}
+
+      - name: Create GitHub Release
+        if: steps.commit_files.outputs.committed == 'true'
+        uses: softprops/action-gh-release@v2.0.8
+        with:
+          tag_name: ${{ steps.get_version.outputs.tag_name }}
+          name: Release ${{ steps.get_version.outputs.tag_name }}
+          body: ${{ steps.update_changelog.outputs.notes }}
+          files: |
+            gitwatch.sh
+            gitwatch.1
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare CHANGELOG.md for next cycle
+        run: |
+          # Add the [Unreleased] header back
+          UNRELEASED_HEADER="## [Unreleased]"
+          CHANGELOG_FILE="CHANGELOG.md"
+          awk 'NR==3{print "\n## [Unreleased]\n"} {print}' "${CHANGELOG_FILE}" > "${CHANGELOG_FILE}.tmp" && mv "${CHANGELOG_FILE}.tmp" "${CHANGELOG_FILE}"
+
+      - name: Commit 'Unreleased' header to release branch
+        run: |
+          git add CHANGELOG.md
+          if git diff --staged --quiet; then
+            echo "No changes detected in CHANGELOG.md after re-add."
+          else
+            git commit -m "chore: Prepare CHANGELOG.md for next version"
+            git push origin ${{ steps.get_version.outputs.release_branch }}
+          fi
+
+      - name: Create Pull Request to master
+        uses: repo-sync/pull-request@v2
+        with:
+          source_branch: ${{ steps.get_version.outputs.release_branch }}
+          destination_branch: "master"
+          pr_title: "Merge release: ${{ steps.get_version.outputs.tag_name }}"
+          pr_body: "This PR merges the release preparations for ${{ steps.get_version.outputs.tag_name }} back into master."
+          pr_reviewer: "${{ github.actor }}"
+          token: ${{ secrets.GITHUB_TOKEN }}

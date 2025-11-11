@@ -1,0 +1,61 @@
+---
+name: Docker Build and Publish
+
+on:
+  push:
+    tags:
+      - "v*" # Trigger on tags like v0.5, v0.6, v1.0.0
+  workflow_dispatch: # Keep this so you can still run it manually
+
+permissions: {}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+
+      - name: Reusable Setup (Checkout, Version)
+        uses: ./.github/actions/setup
+        with:
+          os: ubuntu-latest
+          setup-bats: false # This workflow doesn't use BATS
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            # This will create a Docker tag for the Git tag (e.g., v0.6)
+            type=ref,event=tag
+            # This will create a 'latest' tag if the tag is on the master branch
+            type=ref,event=branch,pattern=master,value=latest
+            # This will create a SHA-based tag
+            type=sha
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -1,0 +1,306 @@
+---
+name: Gitwatch QA (Sequential Debug)
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "The branch, tag, or SHA to checkout"
+        required: true
+        default: "master"
+      test_files:
+        description: "Space-separated list/glob of test files (e.g., 'commitcmd.bats' or '*.bats'). Runs inside the 'tests/' directory."
+        required: false
+        default: "*.bats" # Default runs all tests
+      timeout_in_minutes:
+        description: "Job timeout in minutes (default: 3, max: 2160)"
+        required: true
+        default: "3"
+
+permissions: {}
+
+jobs:
+  #-------------------------------------------------------------------------
+  bats:
+    name: BATS Tests
+    if: "!contains(github.event.head_commit.message, '#noaction')"
+    permissions:
+      contents: read
+      actions: write
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macOS-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ fromJSON(github.event.inputs.timeout_in_minutes) }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Reusable Setup (Checkout, BATS, Version)
+        uses: ./.github/actions/setup
+        id: setup
+        with:
+          os: ${{ matrix.os }}
+          setup-bats: true
+
+      - name: Cache apt packages (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt
+          key: ${{ runner.os }}-apt-${{ hashFiles('**/gitwatch.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-apt-
+
+      - name: Cache brew packages (macOS)
+        if: matrix.os == 'macOS-latest'
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/Homebrew
+          key: ${{ runner.os }}-brew-${{ hashFiles('**/gitwatch.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-brew-
+
+      - name: Install gitwatch OS dependencies
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get -y install inotify-tools util-linux
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            brew install fswatch flock coreutils bash
+          else
+            echo "Unsupported OS: $RUNNER_OS"
+            exit 1
+          fi
+
+      - name: Verify script content before test
+        shell: bash
+        run: |
+          echo "--- Verifying gitwatch.sh content ---"
+          grep -C 3 'if \[ "$staged_tree_hash" = "$head_tree_hash" \];' gitwatch.sh
+          echo "--- Verifying debounce logic (PID File Method) ---"
+          grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
+          echo "--- End of verification ---"
+
+      - name: Archive gitwatch.sh script for debugging
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gitwatch-script-debug-${{ matrix.os }}
+          path: gitwatch.sh
+          retention-days: 7
+
+      - name: Run BATS tests (from UI input)
+        id: bats_run
+        shell: bash
+        env:
+          BATS_LIB_PATH: "${{ steps.setup.outputs.bats-lib-path }}:${{ github.workspace }}/tests"
+          BATS_TAP_FILE: "${{ github.workspace }}/bats_results.tap"
+        if: github.event.inputs.test_files != ''
+        continue-on-error: true # <-- IMPORTANT
+        run: |
+          set -o pipefail
+
+          # Configure git for tests that require it
+          git config --global user.email "test@email.com"
+          git config --global user.name "test user"
+
+          # Get the test file glob from the workflow input
+          TEST_FILES_TO_RUN=${{ github.event.inputs.test_files }}
+          echo "Test files glob: $TEST_FILES_TO_RUN"
+
+          if [ "$RUNNER_OS" == "Linux" ];
+          then
+            # Run with kcov on Linux
+            echo "Running with kcov for code coverage..."
+            mkdir -p ./coverage
+            # CWD is repo root
+            echo "Current directory for kcov: $(pwd)"
+
+            kcov --include-path=./ --exclude-path=tests/ coverage/ bats --tap $(find tests -name "$TEST_FILES_TO_RUN") | tee "${BATS_TAP_FILE}"
+          else
+            # Run sequentially on macOS for stable, clean logs
+            cd tests
+            echo "Current directory for BATS tests: $(pwd)"
+            echo "Running tests sequentially for clear debug logging..."
+            bats --tap $TEST_FILES_TO_RUN | tee "${BATS_TAP_FILE}"
+          fi
+
+          # Capture the exit code of 'bats' (or 'kcov')
+          BATS_EXIT_CODE=${PIPESTATUS[0]}
+          echo "BATS raw exit code: ${BATS_EXIT_CODE}"
+          echo "bats_exit_code_internal=${BATS_EXIT_CODE}" >> $GITHUB_OUTPUT
+
+          echo "===================================================================="
+          echo "Finished running tests. Verifying ${BATS_TAP_FILE} content..."
+          if [ -f "${BATS_TAP_FILE}" ]; then
+            cat "${BATS_TAP_FILE}"
+          else
+            echo "ERROR: BATS_TAP_FILE not found at ${BATS_TAP_FILE}"
+          fi
+          echo "--- End of verification ---"
+          echo "===================================================================="
+
+          exit $BATS_EXIT_CODE
+
+      - name: No Tests Specified
+        if: github.event.inputs.test_files == ''
+        run: |
+          echo "No test files specified in 'test_files' input. Skipping BATS run."
+
+      - name: Upload coverage report (Linux)
+        if: matrix.os == 'ubuntu-latest' && github.event.inputs.test_files != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-linux-debug
+          path: coverage/
+          retention-days: 7
+
+      # --- MODIFIED STEP: Simplified table, prepends number to test name, platform-safe awk ---
+      - name: Generate Test Summary
+        if: always() && github.event.inputs.test_files != ''
+        shell: bash
+        env:
+          BATS_TAP_FILE: "${{ github.workspace }}/bats_results.tap"
+        run: |
+          echo "--- Reading summary from ${BATS_TAP_FILE} ---"
+
+          if [ ! -f "${BATS_TAP_FILE}" ]; then
+            echo "BATS results file (${BATS_TAP_FILE}) not found." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          AWK_SCRIPT=$(cat << 'EOF'
+          BEGIN {
+            print "### BATS Test Results"
+            print ""
+            print "| Test | File | Status |"
+            print "| --- | --- | --- |"
+            passed = 0
+            failed = 0
+            skipped = 0
+            planned_tests = 0
+            current_file = "N/A"
+          }
+
+          # Capture the total planned tests
+          /^1\.\.[0-9]+/ {
+            split($0, a, "..")
+            planned_tests = a[2]
+            next
+          }
+
+          /^# file: / {
+            current_file = $3
+            sub(/.*\//, "", current_file)
+            next
+          }
+
+          # Use POSIX-compatible regex match and field splitting
+          /^(ok|not ok) [0-9]+ / {
+            status_word = $1
+            test_number = 0
+            test_name_full = ""
+
+            if (status_word == "not") {
+                # Line is "not ok 1 test_name..."
+                status_word = "not ok"
+                test_number = $3
+                # Rebuild full name from $4 onwards
+                test_name_full = $4
+                for (i = 5; i <= NF; i++) {
+                  test_name_full = test_name_full " " $i
+                }
+            } else {
+                # Line is "ok 2 test_name..."
+                status_word = "ok"
+                test_number = $2
+                # Rebuild full name from $3 onwards
+                test_name_full = $3
+                for (i = 4; i <= NF; i++) {
+                  test_name_full = test_name_full " " $i
+                }
+            }
+
+            file_name = current_file
+            status = ""
+            icon = ""
+
+            # Check for # skip
+            skip_pos = index(test_name_full, "# skip")
+            if (skip_pos == 0) {
+              skip_pos = index(test_name_full, "# SKIP")
+            }
+
+            if (status_word == "ok" && skip_pos > 0) {
+                # --- IS SKIPPED ---
+                skipped++
+                status = "Skipped"
+                icon = "🟡"
+                # Get the test name *before* the skip directive
+                test_name_full = substr(test_name_full, 1, skip_pos - 1)
+            } else {
+                # --- IS PASS/FAIL ---
+                if (status_word == "ok") {
+                    status = "Passed"
+                    icon = "✅"
+                    passed++
+                } else {
+                    status = "Failed"
+                    icon = "❌"
+                    failed++
+                }
+            }
+
+            # Clean up the full test name (which might have trailing spaces if it was a skip)
+            gsub(/^ */, "", test_name_full)
+            gsub(/ *$/, "", test_name_full)
+
+            gsub(/\|/, "\\|", file_name)
+            gsub(/\|/, "\\|", test_name_full)
+
+            print "| " test_number " " test_name_full " | " file_name " | " icon " " status " |"
+          }
+
+          # Calculate and print the final summary
+          END {
+            total_run = passed + failed + skipped
+            not_run = 0
+            if (planned_tests > total_run) {
+               not_run = planned_tests - total_run
+            }
+
+            print ""
+            print "---"
+            print "**Summary:** " passed " passed, " failed " failed, " skipped " skipped, " not_run " not run."
+          }
+          EOF
+          )
+
+          AWK_OUTPUT=$(awk "$AWK_SCRIPT" "${BATS_TAP_FILE}")
+
+          echo "$AWK_OUTPUT" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Debug: BATS_EXIT_CODE from previous step was: '${{ steps.bats_run.outputs.bats_exit_code_internal }}'"
+
+          if [ "${{ steps.bats_run.outputs.bats_exit_code_internal }}" != "0" ]; then
+            echo ":red_circle: **Overall Status: Tests Failed**" >> $GITHUB_STEP_SUMMARY
+            exit 1 # Fail this summary step
+          else
+            echo ":white_check_mark: **Overall Status: All Tests Passed**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload BATS TAP Artifact
+        uses: actions/upload-artifact@v4
+        if: always() && github.event.inputs.test_files != ''
+        with:
+          name: bats-results-tap-${{ matrix.os }}
+          path: ${{ github.workspace }}/bats_results.tap
+          retention-days: 7

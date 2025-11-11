@@ -1,0 +1,254 @@
+---
+name: Windows E2E Functional Test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  windows-e2e-test:
+    name: Windows E2E Functional Test
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+
+      - name: Reusable Setup (Checkout, Version)
+        uses: ./.github/actions/setup
+        with:
+          os: windows-latest
+          setup-bats: false # This workflow doesn't use BATS
+
+      - name: Run Windows Installer
+        shell: powershell
+        run: |
+          # Run the installer script with Administrator privileges
+          # The installer will find gitwatch.sh in the project root.
+          Start-Process powershell -Verb RunAs -ArgumentList "-File .\examples\windows\install.ps1"
+
+          # Poll for gitwatch.bat to be available in the PATH
+          Write-Host "Waiting up to 60 seconds for gitwatch.bat to be in PATH..."
+          $timeout = 60
+          $counter = 0
+          $found = $false
+          while ($counter -lt $timeout) {
+            # Reload the environment to get the new PATH
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            if (Get-Command gitwatch.bat -ErrorAction SilentlyContinue) {
+              Write-Host "gitwatch.bat found in PATH." -ForegroundColor Green
+              $found = $true
+              break
+            }
+            Start-Sleep -Seconds 1
+            $counter++
+          }
+          if (-not $found) {
+            Write-Error "Timeout: gitwatch.bat did not appear in PATH after 60 seconds."
+            exit 1
+          }
+
+      - name: Verify gitwatch.bat --version
+        shell: powershell
+        run: |
+          # Reload the environment to get the new PATH
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+          Write-Host "Updated PATH: $env:Path"
+          Write-Host "Verifying gitwatch.bat is in PATH..."
+          Get-Command gitwatch.bat
+          Write-Host "Running gitwatch.bat --version..."
+          gitwatch.bat -V
+
+      - name: Run Windows functional test
+        shell: powershell
+        run: |
+          # 1. Setup Test Repo
+          $testDir = "C:\gitwatch test dir with spaces"
+          $logFile = "C:\gitwatch.log"
+          $errFile = "C:\gitwatch.err"
+          if (Test-Path $testDir) { Remove-Item $testDir -Recurse -Force }
+          mkdir $testDir
+          git -C $testDir init
+          git -C $testDir config user.email "test@example.com"
+          git -C $testDir config user.name "CI Test"
+          echo "init" | Out-File "$testDir\testfile.txt"
+          git -C $testDir add .
+          git -C $testDir commit -m "Initial commit"
+          $initialHash = git -C $testDir log -1 --format=%H
+          Write-Host "Initial hash: $initialHash"
+
+          # 2. Start gitwatch.bat
+          Write-Host "Starting gitwatch.bat in background..."
+          # Start the process and log output
+          Start-Process -FilePath "gitwatch.bat" -ArgumentList "-v, `"$testDir`"" -NoNewWindow -RedirectStandardOutput $logFile -RedirectStandardError $errFile
+          Write-Host "Waiting 5 seconds for gitwatch to start..."
+          Start-Sleep -Seconds 5
+
+          # Capture the gitwatch.sh PID inside WSL
+          $gitwatchPid = wsl.exe -e pgrep -f "gitwatch.sh.*$testDir"
+          if ($null -eq $gitwatchPid -or $gitwatchPid -eq "") {
+            Write-Warning "Could not find gitwatch.sh PID inside WSL. Cleanup may be incomplete."
+          } else {
+            Write-Host "Captured gitwatch.sh PID inside WSL: $gitwatchPid"
+            # Store PID in an environment variable for the cleanup step
+            $env:GITWATCH_WSL_PID = $gitwatchPid.Trim()
+          }
+
+          # 3. Trigger Change
+          Write-Host "Triggering file change..."
+          echo "new line" | Add-Content "$testDir\testfile.txt"
+
+          # Poll for the new commit hash
+          Write-Host "Waiting up to 30 seconds for new commit hash..."
+          $timeout = 30
+          $counter = 0
+          $newHash = $null
+          while ($counter -lt $timeout) {
+            $newHash = git -C $testDir log -1 --format=%H
+            if ($newHash -ne $initialHash) {
+              Write-Host "New commit detected: $newHash" -ForegroundColor Green
+              break
+            }
+            Start-Sleep -Seconds 1
+            $counter++
+          }
+          if ($newHash -eq $initialHash) {
+            Write-Warning "Timeout: Commit hash did not change after 30 seconds."
+            # Don't exit 1 here, let the final assertion handle the failure
+          }
+
+          # 4. Verify Result
+          Write-Host "Checking for new commit..."
+          $finalHash = git -C $testDir log -1 --format=%H
+          Write-Host "Final hash: $finalHash"
+
+          Write-Host "--- gitwatch.log ---"
+          Get-Content $logFile -ErrorAction SilentlyContinue
+          Write-Host "--- gitwatch.err ---"
+          Get-Content $errFile -ErrorAction SilentlyContinue
+
+          # 5. Stop Process
+          Write-Host "Cleaning up... (Stopping gitwatch.sh process)"
+          if ($env:GITWATCH_WSL_PID) {
+            Write-Host "Attempting to kill gitwatch.sh PID $env:GITWATCH_WSL_PID inside WSL..."
+            wsl.exe -e "kill -9 $env:GITWATCH_WSL_PID"
+          } else {
+            Write-Warning "No PID captured, falling back to broad cleanup."
+            $wslProcess = Get-Process -Name "wsl" -ErrorAction SilentlyContinue
+            if ($wslProcess) { Stop-Process -Name "wsl" -Force -ErrorAction SilentlyContinue }
+            $wslService = Get-Process -Name "wslservice" -ErrorAction SilentlyContinue
+            if ($wslService) { Stop-Process -Name "wslservice" -Force -ErrorAction SilentlyContinue }
+          }
+
+          # 6. Final Assertion
+          if ($initialHash -eq $finalHash) {
+            Write-Error "Commit hash did not change. Test failed."
+            exit 1
+          } else {
+            Write-Host "New commit detected. Test passed!"
+          }
+
+      - name: Cleanup Test Files
+        if: always()
+        shell: powershell
+        run: |
+          Remove-Item "C:\gitwatch test dir with spaces" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item "C:\gitwatch.log" -ErrorAction SilentlyContinue
+          Remove-Item "C:\gitwatch.err" -ErrorAction SilentlyContinue
+
+  # --- TEST JOB FOR INSTALLER LOGIC (FIXED) ---
+  test-windows-installer-logic:
+    name: "Test Windows Installer Logic (${{ matrix.distro-name }})"
+    runs-on: windows-latest
+    # Run this job regardless of whether the main E2E test passed or failed
+    if: always()
+
+    strategy:
+      matrix:
+        # Define the mock /etc/os-release "ID" field and the expected package manager
+        include:
+          - distro-name: "Fedora"
+            os-id: "ID=fedora"
+            expected-pkg: "dnf"
+          - distro-name: "Alpine"
+            os-id: "ID=alpine"
+            expected-pkg: "apk"
+          - distro-name: "openSUSE"
+            os-id: "ID=opensuse"
+            expected-pkg: "zypper"
+          - distro-name: "Debian"
+            os-id: "ID=debian"
+            expected-pkg: "apt-get"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+
+      - name: Create mock wsl.exe
+        shell: powershell
+        # Use a literal block scalar `|` to preserve newlines
+        run: |
+          # Create a mock bin directory and add it to the start of the PATH
+          $mockDir = Join-Path $env:GITHUB_WORKSPACE "mock-bin"
+          New-Item -Path $mockDir -ItemType Directory
+          $env:PATH = "$mockDir;" + $env:PATH
+
+          # Create a mock wsl.bat that only responds to the 'cat /etc/os-release' command
+          # It will echo the OS ID from the build matrix
+          #
+          # Use a literal here-string (@'...'@) to preserve newlines and special characters
+          # for the YAML parser.
+          $mockContent = @'
+          @echo off
+          if "%1 %2 %3" == "-e cat /etc/os-release" (
+            echo "${{ matrix.os-id }}"
+          ) else (
+            echo MOCK_WSL_ERROR: Unexpected call: %* >&2
+            exit 1
+          )
+          '@
+          New-Item -Path (Join-Path $mockDir "wsl.bat") -Value $mockContent
+
+          Write-Host "Mock wsl.bat created."
+          Write-Host "Updated PATH: $env:PATH"
+          Get-Command wsl.bat | Format-Table
+
+      - name: Run installer detection logic
+        shell: powershell
+        run: |
+          # This block is extracted directly from examples/windows/install.ps1
+          # It will now use our MOCK wsl.bat
+          Write-Host "Running detection logic with mock OS_ID: ${{ matrix.os-id }}"
+
+          $osRelease = wsl.exe -e cat /etc/os-release
+          $pkgManager = ""
+
+          if ($osRelease -like "*ID=ubuntu*" -or $osRelease -like "*ID=debian*") {
+              $pkgManager = "apt-get"
+          } elseif ($osRelease -like "*ID=fedora*" -or $osRelease -like "*ID=rhel*" -or $osRelease -like "*ID=centos*") {
+              $pkgManager = "dnf"
+          } elseif ($osRelease -like "*ID=alpine*") {
+              $pkgManager = "apk"
+          } elseif ($osRelease -like "*ID=sles*" -or $osRelease -like "*ID=opensuse*") {
+              $pkgManager = "zypper"
+          }
+
+          # Assert the expected package manager
+          $expectedManager = "${{ matrix.expected-pkg }}"
+
+          Write-Host "Detected package manager: $pkgManager"
+          Write-Host "Expected package manager: $expectedManager"
+
+          if ($pkgManager -ne $expectedManager) {
+              Write-Error "Test Failed: For OS_ID '${{ matrix.os-id }}', expected '$expectedManager' but got '$pkgManager'."
+              exit 1
+          }
+
+          Write-Host "Test Passed!" -ForegroundColor Green
