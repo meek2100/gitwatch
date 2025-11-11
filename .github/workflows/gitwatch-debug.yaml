@@ -110,11 +110,15 @@ jobs:
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
 
-          cd tests
+          # --- MODIFICATION ---
+          # Run from the repository root, not from inside /tests
           echo "Current directory for BATS tests: $(pwd)"
           echo "Running BATS tests and writing to ${BATS_TAP_FILE}"
 
-          bats --tap ${{ github.event.inputs.test_files }} | tee "${BATS_TAP_FILE}"
+          # Prepend 'tests/' to the user's file glob.
+          # This ensures bats prints the '# file: ...' line.
+          bats --tap tests/${{ github.event.inputs.test_files }} | tee "${BATS_TAP_FILE}"
+          # --- END MODIFICATION ---
 
           # Capture the exit code of 'bats'
           BATS_EXIT_CODE=${PIPESTATUS[0]}
