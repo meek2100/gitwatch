@@ -8,7 +8,7 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-@test "commit_only_when_git_status_change: Does not commit if only timestamp changes (touch)" {
+@test "commit_only_when_git_status_change_does_not_commit_if_only_timestamp_changes_touch" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")

@@ -9,7 +9,7 @@ load 'bats-file/load'
 load 'bats-custom/load'
 
 # Test 1: Commit on start successfully commits staged changes
-@test "startup_commit_f: -f flag commits staged changes on startup" {
+@test "startup_commit_f_flag_commits_staged_changes_on_startup" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
@@ -44,7 +44,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "startup_commit_f_with_push: -f flag also pushes the initial commit to remote" {
+@test "startup_commit_f_with_push_f_flag_also_pushes_the_initial_commit_to_remote" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
@@ -79,7 +79,7 @@ load 'bats-custom/load'
 }
 
 # --- CORRECTED TEST: -f with staged and unstaged changes ---
-@test "startup_commit_f_all_changes: -f flag commits staged, unstaged, and untracked files" {
+@test "startup_commit_f_all_changes_f_flag_commits_staged_unstaged_and_untracked_files" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -132,7 +132,7 @@ load 'bats-custom/load'
 }
 
 # Test 2: Commit on start does nothing if no changes are pending
-@test "startup_commit_no_change: -f flag does nothing if no changes are pending" {
+@test "startup_commit_no_change_f_flag_does_nothing_if_no_changes_are_pending" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -170,7 +170,7 @@ load 'bats-custom/load'
 
 
 # --- NEW TEST: check_git_config warning ---
-@test "startup_git_config_check: Warns if git config user.name or user.email is missing" {
+@test "startup_git_config_check_warns_if_git_config_user_name_or_user_email_is_missing" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -206,7 +206,7 @@ load 'bats-custom/load'
 
 
 # Test 3: Version flag
-@test "startup_version_V: -V flag prints version and exits" {
+@test "startup_version_V_v_flag_prints_version_and_exits" {
   # 1. Get the expected version number dynamically from the VERSION file
   local version_file="${BATS_TEST_DIRNAME}/../VERSION"
   local expected_version_number
@@ -219,7 +219,7 @@ load 'bats-custom/load'
   assert_output "gitwatch.sh version $expected_version_number" "Output should be the version string"
 }
 
-@test "startup_non_git_repo: Exits gracefully with code 6 if target is not a git repo" {
+@test "startup_non_git_repo_exits_gracefully_with_code_6_if_target_is_not_a_git_repo" {
   local non_repo_dir
   non_repo_dir=$(mktemp -d)
 
@@ -235,13 +235,14 @@ load 'bats-custom/load'
   rm -rf "$non_repo_dir"
 }
 
-@test "startup_permission_check_target: Exits with code 7 when target directory is unwritable" {
+@test "startup_permission_check_target_exits_with_code_7_when_target_directory_is_unwritable" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
   local original_perms
 
   # 1. Get original permissions of the target directory
-  if [ "$RUNNER_OS" == "Linux" ]; then
+  if [ "$RUNNER_OS" == "Linux" ];
+  then
     original_perms=$(stat -c "%a" "$target_dir")
   else
     # Use stat -f "%A" for macOS/BSD permissions
@@ -266,7 +267,7 @@ load 'bats-custom/load'
   assert_success "Failed to restore original permissions"
 }
 
-@test "startup_commit_f_pull_rebase_conflict: -f flag fails commit gracefully and skips push on pull-rebase conflict" {
+@test "startup_commit_f_pull_rebase_conflict_f_flag_fails_commit_gracefully" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -330,7 +331,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "startup_shelp_flags: Help output contains all expected flags (exhaustive)" {
+@test "startup_shelp_flags_help_output_contains_all_expected_flags_exhaustive" {
   # 1. Run gitwatch without arguments to get the help message
   run "${BATS_TEST_DIRNAME}/../gitwatch.sh"
   assert_failure # Should fail because no target is given (exit 0 after help is fine too)
@@ -361,7 +362,7 @@ load 'bats-custom/load'
   assert_output --partial "SECURITY WARNING: The -c flag executes arbitrary code"
 }
 
-@test "startup_help_h: -h flag prints help and exits with success" {
+@test "startup_help_h_h_flag_prints_help_and_exits_with_success" {
   run "${BATS_TEST_DIRNAME}/../gitwatch.sh" -h
   assert_success "Running gitwatch -h should exit successfully (code 0)"
   assert_output --partial "Usage:"
@@ -369,7 +370,7 @@ load 'bats-custom/load'
 }
 
 # --- NEW TEST: Empty Repository Startup ---
-@test "startup_commit_empty_repo: Creates first commit in an empty repository" {
+@test "startup_commit_empty_repo_creates_first_commit_in_an_empty_repository" {
   local empty_repo_dir
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   empty_repo_dir=$(mktemp -d "$testdir/empty-repo.XXXXX")
@@ -381,7 +382,8 @@ load 'bats-custom/load'
 
   # Get initial hash (should fail or be empty)
   local initial_hash
-  initial_hash=$(git log -1 --format=%H 2>/dev/null || echo "no_commit")
+  initial_hash=$(git log -1 --format=%H 2>/dev/null ||
+  echo "no_commit")
 
   # Start gitwatch
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" "$empty_repo_dir" &

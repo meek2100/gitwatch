@@ -8,7 +8,7 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-@test "symlinks_modify_via_symlink: Modifying a file via a symlink triggers commit" {
+@test "symlinks_modify_via_symlink_modifying_a_file_via_a_symlink_triggers_commit" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
@@ -44,8 +44,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "symlinks_change_target: Changing a symlink's target triggers commit" {
-
+@test "symlinks_change_target_changing_a_symlinks_target_triggers_commit" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
@@ -81,7 +80,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "symlinks_add_new: Adding a new symlink triggers commit" {
+@test "symlinks_add_new_adding_a_new_symlink_triggers_commit" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
@@ -116,7 +115,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "symlinks_ignore_external: Ignores modifications to files outside the repo (via symlink)" {
+@test "symlinks_ignore_external_ignores_modifications_to_files_outside_the_repo" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 

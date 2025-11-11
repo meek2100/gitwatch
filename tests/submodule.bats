@@ -15,7 +15,7 @@ setup() {
   setup_with_remote
 }
 
-@test "submodule: Detects and commits changes to a submodule" {
+@test "submodule_detects_and_commits_changes_to_a_submodule" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
   # This is the bare repo path created by setup_with_remote

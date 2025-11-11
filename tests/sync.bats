@@ -8,7 +8,7 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-@test "syncing_correctly: Commits and pushes adds, subdir adds, and removals" {
+@test "syncing_correctly_commits_and_pushes_adds_subdir_adds_and_removals" {
   # Start gitwatch directly in the background
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -r origin "$testdir/local/$TEST_SUBDIR_NAME" &
@@ -97,7 +97,7 @@ load 'bats-custom/load'
 }
 
 # --- NEW TEST ---
-@test "atomic_save_move: Handles atomic saves (move) correctly" {
+@test "atomic_save_move_handles_atomic_saves_move_correctly" {
   # Start gitwatch
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
