@@ -12,7 +12,7 @@ load 'bats-custom/load'
 # This is more robust than hard-coding '10'
 TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' -f2 || echo 10)
 
-@test "commit_command_single: Uses simple custom command output as commit message" {
+@test "commit_command_single_uses_simple_custom_command_output_as_commit_message" {
   # Start gitwatch directly in the background
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -c "uname" "$testdir/local/$TEST_SUBDIR_NAME" &
@@ -32,7 +32,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
   assert_output --partial "$(uname)"
 }
 
-@test "commit_command_format: Uses complex custom command with substitutions" {
+@test "commit_command_format_uses_complex_custom_command_with_substitutions" {
   # Start gitwatch directly in the background
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   # shellcheck disable=SC2016 # Intentional: expression must be preserved for remote bash -c execution
@@ -55,7 +55,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
   assert_output --partial "$(date +%Y)"
 }
 
-@test "commit_command_overwrite: -c flag overrides -l, -L, -d flags" {
+@test "commit_command_overwrite_c_flag_overrides_l_L_d_flags" {
   # Start gitwatch directly in the background
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -c "uname" -l 123 -L 0 -d "+%Y" "$testdir/local/$TEST_SUBDIR_NAME" &
@@ -77,9 +77,10 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
   refute_output --partial "$(date +%Y)" # Should not be in commit msg due to -c override
 }
 
-@test "commit_command_pipe_C: -c and -C flags pipe list of changed files to command" {
+@test "commit_command_pipe_C_c_and_C_flags_pipe_list_of_changed_files_to_command" {
   # shellcheck disable=SC2016 # Intentional: variable expansion must be deferred to command execution time
-  local custom_cmd='while IFS= read -r file; do echo "Changed: $file"; done'
+  local custom_cmd='while IFS= read -r file;
+  do echo "Changed: $file"; done'
 
   # Start gitwatch with custom command and the pipe flag -C
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -106,7 +107,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
   cd /tmp
 }
 
-@test "commit_command_failure: -c failure uses fallback message and logs error" {
+@test "commit_command_failure_c_failure_uses_fallback_message_and_logs_error" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -142,7 +143,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
   cd /tmp
 }
 
-@test "commit_command_timeout: -c hanging command uses timeout fallback message and logs error" {
+@test "commit_command_timeout_c_hanging_command_uses_timeout_fallback_message_and_logs_error" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -184,7 +185,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
 }
 
 # --- NEW TEST: -C without -c ---
-@test "commit_command_pipe_C_ignored: -C flag is ignored if -c is not provided" {
+@test "commit_command_pipe_C_ignored_C_flag_is_ignored_if_c_is_not_provided" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")

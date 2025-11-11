@@ -28,9 +28,10 @@ create_dummy_bin() {
   echo "$dummy_path"
 }
 
-@test "custom_bins_env_vars: Uses GW_GIT_BIN, GW_INW_BIN, GW_FLOCK_BIN, GW_TIMEOUT_BIN, GW_PKILL_BIN if set" {
+@test "custom_bins_env_vars_uses_gw_git_bin_gw_inw_bin_gw_flock_bin_gw_timeout_bin_gw_pkill_bin_if_set" {
   # Skip if running on macOS as fswatch replacement is more complex
-  if [ "$RUNNER_OS" == "macOS" ]; then
+  if [ "$RUNNER_OS" == "macOS" ];
+  then
     skip "Custom bins test skipped: requires Linux environment for simple inotifywait setup."
   fi
 
@@ -77,7 +78,7 @@ create_dummy_bin() {
   export GW_INW_BIN="$dummy_inw"
   export GW_FLOCK_BIN="$dummy_flock"
   export GW_TIMEOUT_BIN="$dummy_timeout" # --- Export dummy timeout bin ---
-  export GW_PKILL_BIN="$dummy_pkill"     # --- Export dummy pkill bin ---
+  export GW_PKILL_BIN="$dummy_pkill"      # --- Export dummy pkill bin ---
 
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function

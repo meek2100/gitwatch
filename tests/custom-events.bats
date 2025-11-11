@@ -32,7 +32,7 @@ create_watcher_wrapper() {
   echo "$dummy_path"
 }
 
-@test "watcher_args_custom_events_linux: -e flag passes custom events to inotifywait" {
+@test "watcher_args_custom_events_linux_e_flag_passes_custom_events_to_inotifywait" {
   if [ "$RUNNER_OS" != "Linux" ];
   then
     skip "Test skipped: only runs on Linux runners."
@@ -73,7 +73,7 @@ create_watcher_wrapper() {
   cd /tmp
 }
 
-@test "watcher_args_custom_events_macos: -e flag passes custom events to fswatch" {
+@test "watcher_args_custom_events_macos_e_flag_passes_custom_events_to_fswatch" {
   if [ "$RUNNER_OS" != "macOS" ];
   then
     skip "Test skipped: only runs on macOS runners."
@@ -114,7 +114,7 @@ create_watcher_wrapper() {
   cd /tmp
 }
 
-@test "watcher_behavior_custom_events: -e create only commits on file creation" {
+@test "watcher_behavior_custom_events_e_create_only_commits_on_file_creation" {
   # This test is behavior-based and does not need the wrapper
   unset GW_INW_BIN
 

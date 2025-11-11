@@ -87,7 +87,7 @@ setup() {
   # Ensure TIMEOUT has a default value if not set by script (it should be): "${TIMEOUT:=60}"
 }
 
-@test "commitmsg_unit: Default message with date" {
+@test "commitmsg_unit_default_message_with_date" {
   export DATE_FMT="+%Y" # Use just year for predictable test
   # shellcheck disable=SC2030,SC2031 # Modifying global variable in subshell to be read by sourced function
   export COMMITMSG="Commit: %d"
@@ -101,7 +101,7 @@ setup() {
   assert_output "Commit: $(date +%Y)"
 }
 
-@test "commitmsg_unit: Custom message with no date" {
+@test "commitmsg_unit_custom_message_with_no_date" {
   # shellcheck disable=SC2030,SC2031 # Modifying global variable in subshell to be read by sourced function
   export COMMITMSG="Static message"
   DATE_FMT="" # Re-init
@@ -113,14 +113,13 @@ setup() {
   assert_output "Static message"
 }
 
-@test "commitmsg_unit: -l flag (color) uses diff-lines" {
+@test "commitmsg_unit_l_flag_color_uses_diff_lines" {
   # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   LISTCHANGES=10 # Enable diff
   # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   LISTCHANGES_COLOR="--color=always"
 
   run
-
   generate_commit_message
   assert_success
   # Expects the concatenated output from the 3-line mock
@@ -129,7 +128,7 @@ file.txt:2: +added line 2
   file.txt:3: +added line 3"
 }
 
-@test "commitmsg_unit: -L flag (no color) uses diff-lines" {
+@test "commitmsg_unit_L_flag_no_color_uses_diff_lines" {
   # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   LISTCHANGES=10 # Enable diff
   # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
@@ -144,7 +143,7 @@ line 2 (no color)
   file.txt:3: +added line 3 (no color)"
 }
 
-@test "commitmsg_unit: -l flag truncates long diff" {
+@test "commitmsg_unit_l_flag_truncates_long_diff" {
   # To force truncation, the actual line count (3) must be greater than the limit (2).
   # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   LISTCHANGES=2 # Set limit to 2 lines (less than actual 3 lines)
@@ -158,7 +157,7 @@ Summary:
   file.txt | 10 ++++++++++"
 }
 
-@test "commitmsg_unit: -c custom command overrides others" {
+@test "commitmsg_unit_c_custom_command_overrides_others" {
   # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   LISTCHANGES=10 # Set this to prove it gets ignored
   COMMITMSG="Ignored: %d"
@@ -172,9 +171,8 @@ Summary:
   refute_output --partial "file.txt:1: +added line"
 }
 
-@test "commitmsg_unit: -C flag pipes files to custom command" {
-  # shellcheck disable=SC2034
-  # Global variable is intentionally set
+@test "commitmsg_unit_C_flag_pipes_files_to_custom_command" {
+  # shellcheck disable=SC2034 # Global variable is intentionally set
   COMMITCMD="wc -l" # Command that reads from stdin
   # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   PASSDIFFS=1
@@ -184,7 +182,7 @@ Summary:
   assert_output --partial "2" # wc -l should see 2 lines from mock_git
 }
 
-@test "commitmsg_unit: -c command failure uses fallback" {
+@test "commitmsg_unit_c_command_failure_uses_fallback" {
   # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
   COMMITCMD="command_that_fails_zz"
   # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function
@@ -198,7 +196,7 @@ Summary:
   assert_stderr --partial "ERROR: Custom commit command 'command_that_fails_zz' failed"
 }
 
-@test "commitmsg_unit: -c command timeout uses fallback" {
+@test "commitmsg_unit_c_command_timeout_uses_fallback" {
   # Override global TIMEOUT for this test
   export TIMEOUT=1
   # shellcheck disable=SC2034 # Global variable is intentionally set before calling sourced function

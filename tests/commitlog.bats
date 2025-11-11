@@ -8,7 +8,7 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-@test "commit_log_messages_working: -l flag includes diffstat in commit message" {
+@test "commit_log_messages_working_l_flag_includes_diffstat_in_commit_message" {
   # Start gitwatch directly in the background
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -l 10 "$testdir/local/$TEST_SUBDIR_NAME" &
@@ -41,7 +41,7 @@ load 'bats-custom/load'
   assert_output --partial "line2"     # Added line should be present
 }
 
-@test "commit_log_truncation: -l flag truncates long diffs and uses summary" {
+@test "commit_log_truncation_l_flag_truncates_long_diffs_and_uses_summary" {
   local max_lines=5
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -88,7 +88,7 @@ load 'bats-custom/load'
 }
 
 # --- NEW TEST ---
-@test "commit_log_mode_change: -l flag logs file mode changes" {
+@test "commit_log_mode_change_l_flag_logs_file_mode_changes" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
@@ -125,7 +125,7 @@ load 'bats-custom/load'
 }
 
 # --- NEW TEST ---
-@test "commit_log_no_color_L: -L flag includes plain diffstat" {
+@test "commit_log_no_color_L_L_flag_includes_plain_diffstat" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -164,7 +164,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "commit_log_unlimited: -l 0 flag includes full long diff" {
+@test "commit_log_unlimited_l_0_flag_includes_full_long_diff" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -207,7 +207,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "commit_log_env_var_override: GW_LOG_LINE_LENGTH overrides default" {
+@test "commit_log_env_var_override_gw_log_line_length_overrides_default" {
   # 1. Set a short, custom line length
   # shellcheck disable=SC2030,SC2031 # Exporting for child process (gitwatch.sh)
   export GW_LOG_LINE_LENGTH=10
@@ -249,7 +249,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "commit_log_unlimited_with_env_var: -l 0 and GW_LOG_LINE_LENGTH truncates lines but not line count" {
+@test "commit_log_unlimited_with_env_var_l_0_and_gw_log_line_length_truncates_lines_but_not_line_count" {
   # 1. Set a short, custom line length
   # shellcheck disable=SC2030,SC2031 # Exporting for child process (gitwatch.sh)
   export GW_LOG_LINE_LENGTH=10
@@ -300,7 +300,7 @@ load 'bats-custom/load'
 }
 
 # --- NEW TEST FOR BINARY FILES ---
-@test "commit_log_binary: -l flag logs binary file changes" {
+@test "commit_log_binary_l_flag_logs_binary_file_changes" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
