@@ -8,7 +8,7 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-@test "add_failure: 'git add' failure is handled gracefully and push is skipped" {
+@test "add_failure_git_add_failure_is_handled_gracefully_and_push_is_skipped" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
