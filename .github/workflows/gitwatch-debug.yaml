@@ -79,13 +79,6 @@ jobs:
             exit 1
           fi
 
-      - name: Display gitwatch.sh content before testing
-        shell: bash
-        run: |
-          echo "--- Displaying gitwatch.sh from $(pwd) ---"
-          cat gitwatch.sh
-          echo "--- End of gitwatch.sh ---"
-
       - name: Verify script content before test
         shell: bash
         run: |
@@ -94,6 +87,15 @@ jobs:
           echo "--- Verifying debounce logic (PID File Method) ---"
           grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
           echo "--- End of verification ---"
+
+      # --- NEW STEP: Archives the script instead of printing it ---
+      - name: Archive gitwatch.sh script for debugging
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gitwatch-script-debug-${{ matrix.os }}
+          path: gitwatch.sh
+          retention-days: 7
 
       - name: Run BATS tests (from UI input)
         id: bats_run
@@ -114,55 +116,69 @@ jobs:
           echo "Current directory for BATS tests: $(pwd)"
           echo "Running BATS tests and writing to ${BATS_TAP_FILE}"
 
-          # Ensure the TAP file is empty to start
-          > "${BATS_TAP_FILE}"
+          # Get the number of available processor cores
+          NPROC=1
+          if [ "$RUNNER_OS" == "Linux" ];
+          then
+            NPROC=$(nproc)
+          elif [ "$RUNNER_OS" == "macOS" ];
+          then
+            NPROC=$(sysctl -n hw.ncpu)
+          fi
 
-          FINAL_EXIT_CODE=0
-          TEST_FILES_GLOB=${{ github.event.inputs.test_files }}
-          echo "Expanding glob: $TEST_FILES_GLOB"
+          echo "Running BATS tests in parallel using $NPROC cores..."
 
-          # Loop through each test file matching the glob
-          for test_file in $TEST_FILES_GLOB; do
-            if [ -f "$test_file" ]; then # Make sure it's a file
-                echo "---"
-                echo "Running test: $test_file"
+          # Get the test file glob from the workflow input
+          TEST_FILES_TO_RUN=${{ github.event.inputs.test_files }}
+          echo "Test files glob: $TEST_FILES_TO_RUN"
 
-                # 1. Manually echo the file header to the TAP file
-                echo "# file: tests/$test_file" >> "${BATS_TAP_FILE}"
+          if [ "$RUNNER_OS" == "Linux" ];
+          then
+            # Run with kcov on Linux
+            echo "Running with kcov for code coverage..."
+            mkdir -p ../coverage
+            cd .. # kcov must run from the repository root
 
-                # 2. Run bats on the single file and append its TAP output
-                # We pipe to 'tee -a' so we see live output AND append to the file
-                bats --tap "$test_file" | tee -a "${BATS_TAP_FILE}"
-                local_exit_code=${PIPESTATUS[0]}
+            # kcov runs bats, which outputs TAP, which is tee'd to the file
+            # We add --jobs "$NPROC" here for parallel kcov
+            # We use `find` to pass the correct test paths to bats
+            kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats --jobs "$NPROC" --tap $(find tests -name "$TEST_FILES_TO_RUN") | tee "${BATS_TAP_FILE}"
+          else
+            # Use 'bats --jobs' for parallel execution on macOS
+            # This runs from within the 'tests' directory
+            bats --jobs "$NPROC" --tap $TEST_FILES_TO_RUN | tee "${BATS_TAP_FILE}"
+          fi
 
-                # 3. Update final exit code if this one failed
-                if [ $local_exit_code -ne 0 ]; then
-                    echo "Test $test_file failed with code $local_exit_code"
-                    FINAL_EXIT_CODE=$local_exit_code # Store the non-zero code
-                fi
-                echo "---"
-            else
-                echo "Warning: No file found for pattern '$test_file'"
-            fi
-          done
-
-          echo "BATS final exit code: ${FINAL_EXIT_CODE}"
-          echo "bats_exit_code_internal=${FINAL_EXIT_CODE}" >> $GITHUB_OUTPUT
+          # Capture the exit code of 'bats' (or 'kcov')
+          BATS_EXIT_CODE=${PIPESTATUS[0]}
+          echo "BATS raw exit code: ${BATS_EXIT_CODE}"
+          echo "bats_exit_code_internal=${BATS_EXIT_CODE}" >> $GITHUB_OUTPUT
 
           echo "===================================================================="
           echo "Finished running tests. Verifying ${BATS_TAP_FILE} content..."
-          cat "${BATS_TAP_FILE}"
+          if [ -f "${BATS_TAP_FILE}" ]; then
+            cat "${BATS_TAP_FILE}"
+          else
+            echo "ERROR: BATS_TAP_FILE not found at ${BATS_TAP_FILE}"
+          fi
           echo "--- End of verification ---"
           echo "===================================================================="
 
-          exit $FINAL_EXIT_CODE
+          exit $BATS_EXIT_CODE
 
       - name: No Tests Specified
         if: github.event.inputs.test_files == ''
         run: |
           echo "No test files specified in 'test_files' input. Skipping BATS run."
 
-      # --- MODIFIED STEP: 'awk' script now builds a 4-column table ---
+      - name: Upload coverage report (Linux)
+        if: matrix.os == 'ubuntu-latest' && github.event.inputs.test_files != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-linux-debug
+          path: coverage/
+          retention-days: 7
+
       - name: Generate Test Summary
         if: always() && github.event.inputs.test_files != ''
         shell: bash
@@ -264,7 +280,6 @@ jobs:
             echo ":white_check_mark: **Overall Status: All Tests Passed**" >> $GITHUB_STEP_SUMMARY
           fi
 
-      # --- THIS STEP IS UNCHANGED ---
       - name: Upload BATS TAP Artifact
         uses: actions/upload-artifact@v4
         if: always() && github.event.inputs.test_files != ''
