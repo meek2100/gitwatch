@@ -161,7 +161,7 @@ jobs:
           path: coverage/
           retention-days: 7
 
-      # --- MODIFIED STEP: Simplified table, prepends number to test name ---
+      # --- MODIFIED STEP: Simplified table, prepends number to test name, platform-safe awk ---
       - name: Generate Test Summary
         if: always() # This step will always run
         shell: bash
@@ -204,12 +204,27 @@ jobs:
           # Use POSIX-compatible regex match and field splitting
           /^(ok|not ok) [0-9]+ / {
             status_word = $1
-            test_number = $2
+            test_number = 0
+            test_name_full = ""
 
-            # Rebuild the full test name line from $3 onwards
-            test_name_full = $3
-            for (i = 4; i <= NF; i++) {
-              test_name_full = test_name_full " " $i
+            if (status_word == "not") {
+                # Line is "not ok 1 test_name..."
+                status_word = "not ok"
+                test_number = $3
+                # Rebuild full name from $4 onwards
+                test_name_full = $4
+                for (i = 5; i <= NF; i++) {
+                  test_name_full = test_name_full " " $i
+                }
+            } else {
+                # Line is "ok 2 test_name..."
+                status_word = "ok"
+                test_number = $2
+                # Rebuild full name from $3 onwards
+                test_name_full = $3
+                for (i = 4; i <= NF; i++) {
+                  test_name_full = test_name_full " " $i
+                }
             }
 
             file_name = current_file
