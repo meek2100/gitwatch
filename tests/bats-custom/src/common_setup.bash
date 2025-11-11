@@ -62,26 +62,28 @@ _common_teardown() {
   # Dump debug info *before* we clean up
   debug_on_failure
 
-  # 1. Terminate the gitwatch process if it's running
+  # --- MODIFIED: Quieter process cleanup ---
+  # 1. Terminate the gitwatch process *only if* it's still running
   # shellcheck disable=SC2154 # GITWATCH_PID is set by BATS
-
-
-  if [ -n "${GITWATCH_PID:-}" ] && kill -0 "$GITWATCH_PID" &>/dev/null;
-  then
+  if [ -n "${GITWATCH_PID:-}" ] && kill -0 "$GITWATCH_PID" &>/dev/null; then
+    # Process is still running, attempt graceful shutdown
     verbose_echo "# Attempting to terminate gitwatch process PID: $GITWATCH_PID"
+
     # Send SIGTERM first to allow graceful cleanup (e.g., trap)
     kill -s TERM "$GITWATCH_PID" &>/dev/null
+
     # Wait for up to 2 seconds (20 attempts of 0.1s each)
     wait_for_process_to_die "$GITWATCH_PID" 20 0.1
 
     # If it's still alive, kill it forcefully
-    if kill -0 "$GITWATCH_PID" &>/dev/null;
-    then
+    if kill -0 "$GITWATCH_PID" &>/dev/null; then
       verbose_echo "# Process $GITWATCH_PID did not exit gracefully, sending SIGKILL."
       kill -9 "$GITWATCH_PID" &>/dev/null || true
+    else
+      verbose_echo "# Process $GITWATCH_PID terminated gracefully."
     fi
   else
-    verbose_echo "# GITWATCH_PID variable not set or process already gone."
+    verbose_echo "# Process $GITWATCH_PID already gone (as expected in some tests)."
   fi
   unset GITWATCH_PID # Clear the PID
 
