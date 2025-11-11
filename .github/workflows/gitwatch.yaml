@@ -161,7 +161,7 @@ jobs:
           path: coverage/
           retention-days: 7
 
-      # --- MODIFIED STEP: Added 'todo' count ---
+      # --- MODIFIED STEP: Correctly counts passed, failed, skipped, and todo ---
       - name: Generate Test Summary
         if: always() # This step will always run
         shell: bash
@@ -184,7 +184,7 @@ jobs:
             passed = 0
             failed = 0
             skipped = 0
-            todo = 0 # <-- NEW
+            todo = 0
             current_file = "N/A"
           }
 
@@ -205,62 +205,38 @@ jobs:
             test_result = ""
             status = ""
             icon = ""
+            test_name_part = test_name_full # Default
 
-            # Check for # skip or # todo
-            skip_pos = index(test_name_full, "# skip")
-            if (skip_pos == 0) {
-              skip_pos = index(test_name_full, "# SKIP")
-            }
+            # Check for # todo FIRST, as it takes precedence
             todo_pos = index(test_name_full, "# todo")
             if (todo_pos == 0) {
               todo_pos = index(test_name_full, "# TODO")
             }
 
-            if (status_word == "ok" && skip_pos > 0) {
+            # Check for # skip SECOND
+            skip_pos = index(test_name_full, "# skip")
+            if (skip_pos == 0) {
+              skip_pos = index(test_name_full, "# SKIP")
+            }
+
+            if (todo_pos > 0) {
+                # --- IS TODO (can be ok or not ok) ---
+                todo++
+                status = "Todo"
+                icon = "🔵"
+                test_name_part = substr(test_name_full, 1, todo_pos - 1)
+                test_result = substr(test_name_full, todo_pos)
+            } else if (status_word == "ok" && skip_pos > 0) {
                 # --- IS SKIPPED ---
                 skipped++
                 status = "Skipped"
                 icon = "🟡"
                 test_name_part = substr(test_name_full, 1, skip_pos - 1)
                 test_result = substr(test_name_full, skip_pos)
-                split_pos_inner = index(test_name_part, ": ")
-                if (split_pos_inner > 0) {
-                    test_name = substr(test_name_part, 1, split_pos_inner - 1)
-                    result_part = substr(test_name_part, split_pos_inner + 2)
-                    if (result_part ~ /[^ ]/) {
-                      test_result = result_part " " test_result
-                    }
-                } else {
-                    test_name = test_name_part
-                }
-            } else if (status_word == "ok" && todo_pos > 0) {
-                # --- IS TODO ---
-                todo++
-                status = "Todo"
-                icon = "🔵"
-                test_name_part = substr(test_name_full, 1, todo_pos - 1)
-                test_result = substr(test_name_full, todo_pos)
-                split_pos_inner = index(test_name_part, ": ")
-                if (split_pos_inner > 0) {
-                    test_name = substr(test_name_part, 1, split_pos_inner - 1)
-                    result_part = substr(test_name_part, split_pos_inner + 2)
-                    if (result_part ~ /[^ ]/) {
-                      test_result = result_part " " test_result
-                    }
-                } else {
-                    test_name = test_name_part
-                }
             } else {
                 # --- IS PASS/FAIL ---
-                split_pos = index(test_name_full, ": ")
-                if (split_pos > 0) {
-                    test_name = substr(test_name_full, 1, split_pos - 1)
-                    test_result = substr(test_name_full, split_pos + 2)
-                } else {
-                    test_name = test_name_full
-                    test_result = "(No result text)"
-                }
-
+                test_name_part = test_name_full
+                test_result = "(No result text)" # Default
                 if (status_word == "ok") {
                     status = "Passed"
                     icon = "✅"
@@ -272,6 +248,24 @@ jobs:
                 }
             }
 
+            # Common parsing for name/result from the part *before* the directive
+            split_pos_inner = index(test_name_part, ": ")
+            if (split_pos_inner > 0) {
+                test_name = substr(test_name_part, 1, split_pos_inner - 1)
+                result_part = substr(test_name_part, split_pos_inner + 2)
+
+                if (test_result == "(No result text)") { # Pass/Fail case
+                    test_result = result_part
+                } else if (result_part ~ /[^ ]/) { # Skip/Todo case, append if not just whitespace
+                    test_result = result_part " " test_result
+                }
+            } else {
+                # Handle no-colon case
+                test_name = test_name_part
+                gsub(/^ */, "", test_name) # trim leading space
+                gsub(/ *$/, "", test_name) # trim trailing space
+            }
+
             gsub(/\|/, "\\|", file_name)
             gsub(/\|/, "\\|", test_name)
             gsub(/\|/, "\\|", test_result)
@@ -281,7 +275,6 @@ jobs:
           END {
             print ""
             print "---"
-            # --- NEW: Added todo to summary ---
             print "**Summary:** " passed " passed, " failed " failed, " skipped " skipped, " todo " todo."
           }
           EOF
