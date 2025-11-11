@@ -65,6 +65,7 @@ _common_teardown() {
   # 1. Terminate the gitwatch process if it's running
   # shellcheck disable=SC2154 # GITWATCH_PID is set by BATS
 
+
   if [ -n "${GITWATCH_PID:-}" ] && kill -0 "$GITWATCH_PID" &>/dev/null;
   then
     verbose_echo "# Attempting to terminate gitwatch process PID: $GITWATCH_PID"
@@ -123,11 +124,11 @@ _common_teardown() {
 #   $1 - create_remote (0 or 1): If 1, creates a bare upstream repo.
 _common_setup() {
   # This tells the TAP output which file is being run, even in parallel.
-  echo "# file: $BATS_TEST_FILENAME"
+  echo "# file: $BATS_TEST_FILENAME" >&3
 
   local create_remote="$1" # 0 or 1
 
-  # 1. Use a unique, descriptive name for the test directory
+  # 1: Use a unique, descriptive name for the test directory
   local test_name_safe
   # shellcheck disable=SC2154 # BATS_TEST_NAME is set by BATS
   test_name_safe=$(echo "$BATS_TEST_NAME" | tr -c 'a-zA-Z0-9' '_')
@@ -138,13 +139,13 @@ _common_setup() {
   # shellcheck disable=SC2034 # TEST_SUBDIR_NAME is used by tests
   TEST_SUBDIR_NAME="repo-to-watch"
 
-  # 2. Define standard directory structures
+  # 2: Define standard directory structures
   local local_repo_dir="$testdir/local"
   local remote_repo_dir="$testdir/remote"
   mkdir -p "$local_repo_dir"
   mkdir -p "$remote_repo_dir"
 
-  # 3. Initialize the local repositories
+  # 3: Initialize the local repositories
   git init "$local_repo_dir/$TEST_SUBDIR_NAME"
   cd "$local_repo_dir/$TEST_SUBDIR_NAME" || return 1
   git config user.email "test@example.com"
@@ -158,7 +159,7 @@ _common_setup() {
   initial_hash=$(git log -1 --format=%H)
   verbose_echo "# Setup: Initial commit hash: $initial_hash"
 
-  # 4. Create the bare remote repo if requested
+  # 4: Create the bare remote repo if requested
   if [ "$create_remote" -eq 1 ];
   then
     git init --bare "$remote_repo_dir/upstream.git"
