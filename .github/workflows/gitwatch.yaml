@@ -87,17 +87,18 @@ jobs:
           cat gitwatch.sh
           echo "--- End of gitwatch.sh ---"
 
+      # --- THIS STEP WAS FIXED ---
       - name: Verify script content before test
         shell: bash
         run: |
           echo "--- Verifying gitwatch.sh content ---"
           # Verify the git write-tree check
-          grep -C 3 'if \[ "$staged_tree_hash" = "$head_tree_hash" \];'
-          gitwatch.sh
+          # 'gitwatch.sh' is now on the same line as grep
+          grep -C 3 'if \[ "$staged_tree_hash" = "$head_tree_hash" \];' gitwatch.sh
           echo "--- Verifying debounce logic (PID File Method) ---"
           # Verify the start of the new debounce logic block using the PID file
-          grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];'
-          gitwatch.sh
+          # 'gitwatch.sh' is now on the same line as grep
+          grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
           echo "--- End of verification ---"
 
       - name: Run tests (and coverage on Linux)
@@ -137,9 +138,7 @@ jobs:
             # kcov runs bats, which outputs TAP, which is tee'd to the file
             kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats --tap $(find tests -name "*.bats") | tee "${BATS_TAP_FILE}"
           else
-            # --- KEY CHANGE ---
             # Use 'bats --jobs' for parallel execution
-            # This correctly handles parallel runs AND produces a clean TAP report
             bats --jobs "$NPROC" --tap $(find . -name "*.bats") | tee "${BATS_TAP_FILE}"
           fi
 
@@ -172,7 +171,6 @@ jobs:
             exit 0
           fi
 
-          # This 'awk' script is the robust one from our previous fix
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
             print "### BATS Test Results"
