@@ -88,7 +88,6 @@ jobs:
           grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
           echo "--- End of verification ---"
 
-      # --- NEW STEP: Archives the script instead of printing it ---
       - name: Archive gitwatch.sh script for debugging
         uses: actions/upload-artifact@v4
         if: always()
@@ -97,6 +96,7 @@ jobs:
           path: gitwatch.sh
           retention-days: 7
 
+      # --- MODIFIED STEP: Removed '--jobs' for sequential logging ---
       - name: Run BATS tests (from UI input)
         id: bats_run
         shell: bash
@@ -116,21 +116,10 @@ jobs:
           echo "Current directory for BATS tests: $(pwd)"
           echo "Running BATS tests and writing to ${BATS_TAP_FILE}"
 
-          # Get the number of available processor cores
-          NPROC=1
-          if [ "$RUNNER_OS" == "Linux" ];
-          then
-            NPROC=$(nproc)
-          elif [ "$RUNNER_OS" == "macOS" ];
-          then
-            NPROC=$(sysctl -n hw.ncpu)
-          fi
-
-          echo "Running BATS tests in parallel using $NPROC cores..."
-
           # Get the test file glob from the workflow input
           TEST_FILES_TO_RUN=${{ github.event.inputs.test_files }}
           echo "Test files glob: $TEST_FILES_TO_RUN"
+          echo "Running tests sequentially for clear debug logging..."
 
           if [ "$RUNNER_OS" == "Linux" ];
           then
@@ -140,13 +129,13 @@ jobs:
             cd .. # kcov must run from the repository root
 
             # kcov runs bats, which outputs TAP, which is tee'd to the file
-            # We add --jobs "$NPROC" here for parallel kcov
             # We use `find` to pass the correct test paths to bats
-            kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats --jobs "$NPROC" --tap $(find tests -name "$TEST_FILES_TO_RUN") | tee "${BATS_TAP_FILE}"
+            # REMOVED: --jobs (it requires 'parallel' command)
+            kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats --tap $(find tests -name "$TEST_FILES_TO_RUN") | tee "${BATS_TAP_FILE}"
           else
-            # Use 'bats --jobs' for parallel execution on macOS
-            # This runs from within the 'tests' directory
-            bats --jobs "$NPROC" --tap $TEST_FILES_TO_RUN | tee "${BATS_TAP_FILE}"
+            # Run sequentially on macOS for stable, clean logs
+            # REMOVED: --jobs (it requires 'parallel' command)
+            bats --tap $TEST_FILES_TO_RUN | tee "${BATS_TAP_FILE}"
           fi
 
           # Capture the exit code of 'bats' (or 'kcov')
