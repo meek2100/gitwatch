@@ -73,20 +73,11 @@ jobs:
             sudo apt-get update
             sudo apt-get -y install inotify-tools util-linux
           elif [ "$RUNNER_OS" == "macOS" ]; then
-            brew install fswatch flock coreutils bash
+            brew install fswatch flock coreutils bash docker
           else
             echo "Unsupported OS: $RUNNER_OS"
             exit 1
           fi
-
-      # --- START NEW STEP: Setup Docker for macOS tests ---
-      - name: Setup Docker on macOS (for docker.bats)
-        if: matrix.os == 'macOS-latest'
-        uses: douglascamata/setup-docker-macos-action@v1
-        with:
-          # Use minimal options to enable the Docker daemon via Colima/Lima
-          colima-network-address: "false"
-      # --- END NEW STEP ---
 
       - name: Verify script content before test
         shell: bash
