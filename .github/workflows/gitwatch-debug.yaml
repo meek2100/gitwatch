@@ -162,7 +162,7 @@ jobs:
           path: coverage/
           retention-days: 7
 
-      # --- MODIFIED STEP: Replaced gawk-specific match() with POSIX-compatible parsing ---
+      # --- MODIFIED STEP: Simplified table, prepends number to test name ---
       - name: Generate Test Summary
         if: always() && github.event.inputs.test_files != ''
         shell: bash
@@ -180,8 +180,8 @@ jobs:
           BEGIN {
             print "### BATS Test Results"
             print ""
-            print "| Number | Test | Result | File | Status |"
-            print "| --- | --- | --- | --- | --- |"
+            print "| Test | Result | File | Status |"
+            print "| --- | --- | --- | --- |"
             passed = 0
             failed = 0
             skipped = 0
@@ -269,7 +269,9 @@ jobs:
             gsub(/\|/, "\\|", file_name)
             gsub(/\|/, "\\|", test_name)
             gsub(/\|/, "\\|", test_result)
-            print "| " test_number " | " test_name " | " icon " " test_result " | " file_name " | " status " |"
+
+            # --- MODIFIED LINE: Prepends test_number to test_name ---
+            print "| " test_number " " test_name " | " icon " " test_result " | " file_name " | " status " |"
           }
 
           # Calculate and print the final summary
