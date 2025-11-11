@@ -162,7 +162,7 @@ jobs:
           path: coverage/
           retention-days: 7
 
-      # --- MODIFIED STEP: Added 'skipped' count ---
+      # --- MODIFIED STEP: Added 'todo' count ---
       - name: Generate Test Summary
         if: always() && github.event.inputs.test_files != ''
         shell: bash
@@ -184,7 +184,8 @@ jobs:
             print "| --- | --- | --- | --- |"
             passed = 0
             failed = 0
-            skipped = 0 # <-- NEW
+            skipped = 0
+            todo = 0 # <-- NEW
             current_file = "N/A"
           }
 
@@ -206,29 +207,26 @@ jobs:
             status = ""
             icon = ""
 
-            # --- NEW: Check for skipped tests ---
-            is_skipped = 0
+            # Check for # skip or # todo
             skip_pos = index(test_name_full, "# skip")
             if (skip_pos == 0) {
               skip_pos = index(test_name_full, "# SKIP")
             }
+            todo_pos = index(test_name_full, "# todo")
+            if (todo_pos == 0) {
+              todo_pos = index(test_name_full, "# TODO")
+            }
 
             if (status_word == "ok" && skip_pos > 0) {
-                is_skipped = 1
+                # --- IS SKIPPED ---
                 skipped++
                 status = "Skipped"
                 icon = "🟡"
-
-                # Get the part before the skip reason
                 test_name_part = substr(test_name_full, 1, skip_pos - 1)
-                # Get the skip reason itself
                 test_result = substr(test_name_full, skip_pos)
-
-                # Try to parse name from the part before #skip
                 split_pos_inner = index(test_name_part, ": ")
                 if (split_pos_inner > 0) {
                     test_name = substr(test_name_part, 1, split_pos_inner - 1)
-                    # If there's a result before the skip, append it
                     result_part = substr(test_name_part, split_pos_inner + 2)
                     if (result_part ~ /[^ ]/) {
                       test_result = result_part " " test_result
@@ -236,9 +234,25 @@ jobs:
                 } else {
                     test_name = test_name_part
                 }
-
+            } else if (status_word == "ok" && todo_pos > 0) {
+                # --- IS TODO ---
+                todo++
+                status = "Todo"
+                icon = "🔵"
+                test_name_part = substr(test_name_full, 1, todo_pos - 1)
+                test_result = substr(test_name_full, todo_pos)
+                split_pos_inner = index(test_name_part, ": ")
+                if (split_pos_inner > 0) {
+                    test_name = substr(test_name_part, 1, split_pos_inner - 1)
+                    result_part = substr(test_name_part, split_pos_inner + 2)
+                    if (result_part ~ /[^ ]/) {
+                      test_result = result_part " " test_result
+                    }
+                } else {
+                    test_name = test_name_part
+                }
             } else {
-                # --- Original logic for pass/fail ---
+                # --- IS PASS/FAIL ---
                 split_pos = index(test_name_full, ": ")
                 if (split_pos > 0) {
                     test_name = substr(test_name_full, 1, split_pos - 1)
@@ -268,8 +282,8 @@ jobs:
           END {
             print ""
             print "---"
-            # --- NEW: Added skipped to summary ---
-            print "**Summary:** " passed " passed, " failed " failed, " skipped " skipped."
+            # --- NEW: Added todo to summary ---
+            print "**Summary:** " passed " passed, " failed " failed, " skipped " skipped, " todo " todo."
           }
           EOF
           )
