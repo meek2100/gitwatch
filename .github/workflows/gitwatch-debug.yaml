@@ -172,7 +172,7 @@ jobs:
             exit 0
           fi
 
-          # This 'awk' script now splits the line at " | " and correctly parses the TAP line
+          # This 'awk' script now splits the line at " | "
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
             # Set the Field Separator to be " | "
@@ -191,30 +191,31 @@ jobs:
             file_name = $1
             tap_line = $2
 
+            # Split the tap_line ("ok 1 ...") by spaces
+            n = split(tap_line, tap_parts, " ")
+
             status_icon = "❓"
             status_text = "Unknown"
-            test_name = tap_line # Default
+            test_name = tap_line # Default to full line if parsing fails
 
-            if (index(tap_line, "ok ") == 1) {
-                # Line starts with "ok "
-                status_icon = "✅"
-                status_text = "Passed"
-                passed++
-                # Find start of name (after "ok 1 ")
-                name_start = index(tap_line, " ") + 1 # Find first space
-                name_start = index(tap_line, " ", name_start) + 1 # Find second space
-                test_name = substr(tap_line, name_start)
-
-            } else if (index(tap_line, "not ok ") == 1) {
-                # Line starts with "not ok "
-                status_icon = "❌"
-                status_text = "Failed"
-                failed++
-                # Find start of name (after "not ok 1 ")
-                name_start = index(tap_line, " ") + 1 # Find first space (after "not")
-                name_start = index(tap_line, " ", name_start) + 1 # Find second space (after "ok")
-                name_start = index(tap_line, " ", name_start) + 1 # Find third space (after "1")
-                test_name = substr(tap_line, name_start)
+            if (tap_parts[1] == "ok") {
+              status_icon = "✅"
+              status_text = "Passed"
+              passed++
+              # Rebuild the test name from the 3rd part to the end
+              test_name = ""
+              for (i = 3; i <= n; i++) {
+                test_name = test_name (i == 3 ? "" : " ") tap_parts[i]
+              }
+            } else if (tap_parts[1] == "not" && tap_parts[2] == "ok") {
+              status_icon = "❌"
+              status_text = "Failed"
+              failed++
+              # Rebuild the test name from the 4th part to the end
+              test_name = ""
+              for (i = 4; i <= n; i++) {
+                test_name = test_name (i == 4 ? "" : " ") tap_parts[i]
+              }
             }
 
             # Sanitize for markdown table
