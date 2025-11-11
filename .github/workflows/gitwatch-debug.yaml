@@ -162,6 +162,7 @@ jobs:
           path: coverage/
           retention-days: 7
 
+      # --- MODIFIED STEP: Uses match() for robust parsing and counts 'not run' ---
       - name: Generate Test Summary
         if: always() && github.event.inputs.test_files != ''
         shell: bash
@@ -188,6 +189,7 @@ jobs:
             current_file = "N/A"
           }
 
+          # Capture the total planned tests
           /^1\.\.[0-9]+/ {
             split($0, a, "..")
             planned_tests = a[2]
@@ -200,11 +202,11 @@ jobs:
             next
           }
 
-          /^(ok|not ok) [0-9]+ / {
-            status_word = $1
-            test_number = $2
-            name_start = index($0, test_number " ") + length(test_number) + 1
-            test_name_full = substr($0, name_start)
+          # Use match() for robust parsing of the test line
+          match($0, /^(ok|not ok) ([0-9]+) (.*)/, arr) {
+            status_word = arr[1]
+            test_number = arr[2]
+            test_name_full = arr[3]
 
             file_name = current_file
             test_name = ""
@@ -265,6 +267,7 @@ jobs:
             print "| " test_number " | " test_name " | " icon " " test_result " | " file_name " | " status " |"
           }
 
+          # Calculate and print the final summary
           END {
             total_run = passed + failed + skipped
             not_run = 0
