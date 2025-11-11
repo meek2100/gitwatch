@@ -180,8 +180,8 @@ jobs:
           BEGIN {
             print "### BATS Test Results"
             print ""
-            print "| Test | Result | File | Status |"
-            print "| --- | --- | --- | --- |"
+            print "| Test | File | Status |"
+            print "| --- | --- | --- |"
             passed = 0
             failed = 0
             skipped = 0
@@ -229,11 +229,8 @@ jobs:
             }
 
             file_name = current_file
-            test_name = ""
-            test_result = ""
             status = ""
             icon = ""
-            test_name_part = test_name_full # Default
 
             # Check for # skip
             skip_pos = index(test_name_full, "# skip")
@@ -246,12 +243,10 @@ jobs:
                 skipped++
                 status = "Skipped"
                 icon = "🟡"
-                test_name_part = substr(test_name_full, 1, skip_pos - 1)
-                test_result = substr(test_name_full, skip_pos)
+                # Get the test name *before* the skip directive
+                test_name_full = substr(test_name_full, 1, skip_pos - 1)
             } else {
                 # --- IS PASS/FAIL ---
-                test_name_part = test_name_full
-                test_result = "(No result text)" # Default
                 if (status_word == "ok") {
                     status = "Passed"
                     icon = "✅"
@@ -263,31 +258,14 @@ jobs:
                 }
             }
 
-            # Common parsing for name/result from the part *before* the directive
-            split_pos_inner = index(test_name_part, ": ")
-            if (split_pos_inner > 0) {
-                test_name = substr(test_name_part, 1, split_pos_inner - 1)
-                result_part = substr(test_name_part, split_pos_inner + 2)
-
-                if (test_result == "(No result text)") { # Pass/Fail case
-                    test_result = result_part
-                } else if (result_part ~ /[^ ]/) { # Skip/Todo case, append if not just whitespace
-                    test_result = result_part " " test_result
-                }
-            } else {
-                # Handle no-colon case
-                test_name = test_name_part
-                gsub(/^ */, "", test_name) # trim leading space
-                gsub(/ *$/, "", test_name) # trim trailing space
-            }
+            # Clean up the full test name (which might have trailing spaces if it was a skip)
+            gsub(/^ */, "", test_name_full)
+            gsub(/ *$/, "", test_name_full)
 
             gsub(/\|/, "\\|", file_name)
-            gsub(/\|/, "\\|", test_name)
-            gsub(/\|/, "\\|", test_result)
+            gsub(/\|/, "\\|", test_name_full)
 
-            # --- MODIFIED LINE: Prepends test_number to test_name ---
-            # --- FIX: Use test_name_full for the name to match the old logic ---
-            print "| " test_number " " test_name_full " | " icon " " test_result " | " file_name " | " status " |"
+            print "| " test_number " " test_name_full " | " file_name " | " icon " " status " |"
           }
 
           # Calculate and print the final summary
