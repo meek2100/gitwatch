@@ -14,7 +14,7 @@ setup() {
   setup_with_spaces
 }
 
-@test "spaces_in_target_dir: Handles paths with spaces correctly" {
+@test "spaces_in_target_dir_handles_paths_with_spaces_correctly" {
   # Start gitwatch directly in the background - paths need careful quoting
   # BATS_TEST_DIRNAME should handle spaces if the script itself is in such a path
   # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash

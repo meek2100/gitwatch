@@ -8,7 +8,7 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-@test "special_chars_quotes_dollar_non_ascii: Handles filenames with quotes, dollars, and non-ascii" {
+@test "special_chars_quotes_dollar_non_ascii_handles_filenames_with_quotes_dollars_and_non_ascii" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
@@ -53,7 +53,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "special_chars_newlines: Handles filenames with newlines" {
+@test "special_chars_newlines_handles_filenames_with_newlines" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 

@@ -10,7 +10,7 @@ load 'bats-custom/load'
 
 # This test verifies that the 'trap' logic for INT/TERM signals
 # correctly cleans up the main lockfile and the timer PID file.
-@test "signal_handling: SIGTERM cleans up lockfile and timer PID file" {
+@test "signal_handling_sigterm_cleans_up_lockfile_and_timer_pid_file" {
   # Skip if 'flock' is not available, as this test relies on flock-based locking.
   if ! command -v flock &>/dev/null; then
     skip "Test skipped: 'flock' command not found."
@@ -61,14 +61,16 @@ load 'bats-custom/load'
   # 6. Wait for the process to exit
   local max_wait=5
   local wait_count=0
-  while kill -0 "$test_pid" 2>/dev/null && [ "$wait_count" -lt "$max_wait" ]; do
+  while kill -0 "$test_pid" 2>/dev/null && [ "$wait_count" -lt "$max_wait" ];
+  do
     verbose_echo "# DEBUG: Waiting for gitwatch PID $test_pid to exit..."
     sleep 0.5
     wait_count=$((wait_count + 1))
   done
 
   # 7. Assert the process is truly gone
-  if kill -0 "$test_pid" 2>/dev/null; then
+  if kill -0 "$test_pid" 2>/dev/null;
+  then
     fail "gitwatch process (PID $test_pid) failed to exit after SIGTERM."
   fi
 
@@ -79,7 +81,6 @@ load 'bats-custom/load'
   # 9. Assert the log shows the signal was received
   run cat "$output_file"
   assert_output --partial "Signal TERM received, shutting down."
-
   # 10. Unset GITWATCH_PID so teardown doesn't try to kill it again
   unset GITWATCH_PID
   cd /tmp

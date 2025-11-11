@@ -8,7 +8,7 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-@test "skip_if_merging_M: -M flag prevents commit during a merge conflict" {
+@test "skip_if_merging_M_m_flag_prevents_commit_during_a_merge_conflict" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -89,7 +89,7 @@ load 'bats-custom/load'
 }
 
 # --- NEW TEST ---
-@test "skip_if_merging_DEFAULT: Commit fails (and is logged) during merge conflict *without* -M flag" {
+@test "skip_if_merging_default_commit_fails_and_is_logged_during_merge_conflict_without_m_flag" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -168,7 +168,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "skip_if_merging_M_rebase: -M flag prevents commit during a rebase conflict" {
+@test "skip_if_merging_M_rebase_m_flag_prevents_commit_during_a_rebase_conflict" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -247,7 +247,7 @@ load 'bats-custom/load'
 }
 
 # --- NEW TEST: CHERRY_PICK_HEAD ---
-@test "skip_if_merging_M_cherry_pick: -M flag prevents commit during a cherry-pick" {
+@test "skip_if_merging_M_cherry_pick_m_flag_prevents_commit_during_a_cherry_pick" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -292,7 +292,7 @@ load 'bats-custom/load'
 }
 
 # --- NEW TEST: REVERT_HEAD ---
-@test "skip_if_merging_M_revert: -M flag prevents commit during a revert" {
+@test "skip_if_merging_M_revert_m_flag_prevents_commit_during_a_revert" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -336,7 +336,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "skip_if_merging_M_rebase_head: -M flag prevents commit when REBASE_HEAD exists" {
+@test "skip_if_merging_M_rebase_head_m_flag_prevents_commit_when_rebase_head_exists" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
