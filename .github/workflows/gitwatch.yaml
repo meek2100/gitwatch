@@ -60,7 +60,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-brew-
 
-      # --- MODIFIED STEP: Added 'parallel' ---
       - name: Install gitwatch OS dependencies
         shell: bash
         run: |
@@ -128,11 +127,8 @@ jobs:
             # Run with kcov on Linux
             echo "Running with kcov for code coverage..."
             mkdir -p ../coverage
-            cd ..
-
-            # kcov runs bats, which outputs TAP, which is tee'd to the file
-            # We add --jobs "$NPROC" here for parallel kcov
-            kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats --jobs "$NPROC" --tap $(find tests -name "*.bats") | tee "${BATS_TAP_FILE}"
+            # --- FIX: Run kcov from /tests dir with relative paths ---
+            kcov --include-path=../ --bash-parser=../gitwatch.sh ../coverage/ bats --jobs "$NPROC" --tap $(find . -name "*.bats") | tee "${BATS_TAP_FILE}"
           else
             # Use 'bats --jobs' for parallel execution
             bats --jobs "$NPROC" --tap $(find . -name "*.bats") | tee "${BATS_TAP_FILE}"
@@ -176,53 +172,42 @@ jobs:
             exit 0
           fi
 
-          # This 'awk' script now splits the full test name into "Test Name" and "Result"
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
             print "### BATS Test Results"
             print ""
-            # New 4-column header
             print "| File | Test | Result | Status |"
             print "| --- | --- | --- | --- |"
             passed = 0
             failed = 0
-            current_file = "N/A" # Holds the filename
+            current_file = "N/A"
           }
 
-          # Capture the filename (thanks to our helper script fix)
           /^# file: / {
             current_file = $3
-            # Strip the 'tests/' prefix for a cleaner name
-            sub(/^tests\//, "", current_file)
+            # --- FIX: Use regex to strip all path components (like basename) ---
+            sub(/.*\//, "", current_file)
             next
           }
 
-          # Match test result lines
           /^(ok|not ok) [0-9]+ / {
             status_word = $1
             test_number = $2
-
-            # Find the start of the full test name
             name_start = index($0, test_number " ") + length(test_number) + 1
             test_name_full = substr($0, name_start)
-
-            # --- New 4-column logic ---
             file_name = current_file
             test_name = ""
             test_result = ""
             status = ""
             icon = ""
-
-            # Split the full name into test_name and test_result
             split_pos = index(test_name_full, ": ")
             if (split_pos > 0) {
                 test_name = substr(test_name_full, 1, split_pos - 1)
                 test_result = substr(test_name_full, split_pos + 2)
             } else {
-                test_name = test_name_full # Use the whole string as the "name"
-                test_result = "(No result text)" # No separate result
+                test_name = test_name_full
+                test_result = "(No result text)"
             }
-
             if (status_word == "ok") {
                 status = "Passed"
                 icon = "✅"
@@ -232,15 +217,10 @@ jobs:
                 icon = "❌"
                 failed++
             }
-
-            # Sanitize all fields for markdown
             gsub(/\|/, "\\|", file_name)
             gsub(/\|/, "\\|", test_name)
             gsub(/\|/, "\\|", test_result)
-
-            # Print the new 4-column format
             print "| " file_name " | " test_name " | " icon " " test_result " | " status " |"
-            # --- End new logic ---
           }
 
           END {
