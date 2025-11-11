@@ -37,8 +37,10 @@ load 'bats-custom/load'
   run cat "$output_file"
   assert_output --partial "ERROR: 'git add' failed." \
     "Should log the git add failure"
-  # 'git add' error message
-  assert_output --partial "error: open(\"unreadable_file.txt\"): Permission denied"
+
+  # --- MODIFIED LINE ---
+  # Use a regex to match both Linux ("error: open...") and macOS ("fatal: unable to stat...")
+  assert_output --regexp "(error|fatal):.*unreadable_file\.txt.*Permission denied"
 
   # 5. Assert: No commit should have been made
   run git log -1 --format=%H
