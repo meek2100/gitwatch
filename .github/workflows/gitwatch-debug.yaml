@@ -95,7 +95,6 @@ jobs:
           grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
           echo "--- End of verification ---"
 
-      # --- MODIFIED STEP: Loops through files to get names ---
       - name: Run BATS tests (from UI input)
         id: bats_run
         shell: bash
@@ -159,7 +158,7 @@ jobs:
         run: |
           echo "No test files specified in 'test_files' input. Skipping BATS run."
 
-      # --- MODIFIED STEP: New 'awk' script for parsing "File | TAP Line" ---
+      # --- MODIFIED STEP: Corrected 'awk' script ---
       - name: Generate Test Summary
         if: always() && github.event.inputs.test_files != ''
         shell: bash
@@ -187,44 +186,43 @@ jobs:
             failed = 0
           }
 
-          # Check if we have our 2 fields
+          # Check if we have our 2 fields ("file" and "tap-line")
           NF == 2 {
             file_name = $1
             tap_line = $2
 
-            status_word = "unknown"
-            test_name = "N/A"
+            # Split the tap_line ("ok 1 ...") by spaces
+            n = split(tap_line, tap_parts, " ")
 
-            # Check if line starts with "ok" or "not ok"
-            if (index(tap_line, "ok ") == 1) {
-                status_word = "ok"
-                # Find the test number (field 2)
-                space1_pos = index(tap_line, " ")
-                space2_pos = index(tap_line, " ", space1_pos + 1)
-                name_start = space2_pos + 1
-                test_name = substr(tap_line, name_start)
+            status_icon = "❓"
+            status_text = "Unknown"
+            test_name = tap_line # Default to full line if parsing fails
 
-            } else if (index(tap_line, "not ok ") == 1) {
-                status_word = "not ok"
-                # Find the test number (field 3)
-                space1_pos = index(tap_line, " ") # after "not"
-                space2_pos = index(tap_line, " ", space1_pos + 1) # after "ok"
-                space3_pos = index(tap_line, " ", space2_pos + 1) # after number
-                name_start = space3_pos + 1
-                test_name = substr(tap_line, name_start)
+            if (tap_parts[1] == "ok") {
+              status_icon = "✅"
+              status_text = "Passed"
+              passed++
+              # Rebuild the test name from the 3rd part to the end
+              test_name = ""
+              for (i = 3; i <= n; i++) {
+                test_name = test_name (i == 3 ? "" : " ") tap_parts[i]
+              }
+            } else if (tap_parts[1] == "not" && tap_parts[2] == "ok") {
+              status_icon = "❌"
+              status_text = "Failed"
+              failed++
+              # Rebuild the test name from the 4th part to the end
+              test_name = ""
+              for (i = 4; i <= n; i++) {
+                test_name = test_name (i == 4 ? "" : " ") tap_parts[i]
+              }
             }
 
             # Sanitize for markdown table
             gsub(/\|/, "\\|", file_name)
             gsub(/\|/, "\\|", test_name)
 
-            if (status_word == "ok") {
-              print "| " file_name " | ✅ " test_name " | Passed |"
-              passed++
-            } else if (status_word == "not ok") {
-              print "| " file_name " | ❌ " test_name " | Failed |"
-              failed++
-            }
+            print "| " file_name " | " status_icon " " test_name " | " status_text " |"
           }
 
           END {
