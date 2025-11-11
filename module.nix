@@ -6,6 +6,7 @@
 }:
 let
   gitwatch = pkgs.callPackage ./gitwatch.nix { };
+<<<<<<< HEAD
   getvar =
     flag: var: cfg:
     if cfg."${var}" != null && cfg."${var}" != "" && cfg."${var}" != false then
@@ -15,10 +16,13 @@ let
   getflag =
     flag: var: cfg:
     if cfg."${var}" then "${flag}" else "";
+=======
+>>>>>>> master
   mkSystemdService =
     name: cfg:
     lib.nameValuePair "gitwatch-${name}" (
       let
+<<<<<<< HEAD
         branchArg = getvar "-b" "branch" cfg;
         remoteArg = getvar "-r" "remote" cfg;
         messageArg = getvar "-m" "message" cfg;
@@ -110,6 +114,11 @@ let
                 git clone ${cloneBranchArg} "${lib.strings.escapeShellArg cfg.remote}" "${lib.strings.escapeShellArg cfg.path}"
               fi
             '';
+=======
+        getvar = flag: var: if cfg."${var}" != null then "${flag} ${cfg."${var}"}" else "";
+        branch = getvar "-b" "branch";
+        fetcher = if cfg.remote == null then "true" else '''';
+>>>>>>> master
       in
       {
         inherit (cfg) enable;
@@ -117,6 +126,7 @@ let
         after = [ "network-online.target" ];
         wantedBy = [ "multi-user.target" ];
         description = "gitwatch for ${name}";
+<<<<<<< HEAD
         path =
           with pkgs;
           [
@@ -129,6 +139,13 @@ let
           ]
           ++ lib.optionals pkgs.stdenv.isLinux [ inotify-tools ]
           ++ lib.optionals pkgs.stdenv.isDarwin [ fswatch ];
+=======
+        path = with pkgs; [
+          gitwatch
+          git
+          openssh
+        ];
+>>>>>>> master
         script = ''
           ${fetcher}
           ${logLineLengthEnv} gitwatch ${allArgs}
@@ -140,9 +157,15 @@ in
 {
   options.services.gitwatch = lib.mkOption {
     description = ''
+<<<<<<< HEAD
       A set of git repositories to watch for.
       See
       [gitwatch](https://github.com/gitwatch/gitwatch) for more.
+=======
+           A set of git repositories to watch for.
+      See
+           [gitwatch](https://github.com/gitwatch/gitwatch) for more.
+>>>>>>> master
     '';
     default = { };
     example = {
@@ -188,16 +211,25 @@ in
             default = "root";
           };
           remote = lib.mkOption {
+<<<<<<< HEAD
             description = "Optional url of remote repository (-r).";
+=======
+            description = "Optional url of remote repository";
+>>>>>>> master
             type = nullOr str;
             default = null;
           };
           message = lib.mkOption {
+<<<<<<< HEAD
             description = "Optional message to use in as commit message (-m).";
+=======
+            description = "Optional message to use in as commit message.";
+>>>>>>> master
             type = nullOr str;
             default = null;
           };
           branch = lib.mkOption {
+<<<<<<< HEAD
             description = "Optional branch in remote repository (-b).";
             type = nullOr str;
             default = null;
@@ -311,6 +343,9 @@ in
           };
           customCommand = lib.mkOption {
             description = "Command to be run to generate a commit message (-c).";
+=======
+            description = "Optional branch in remote repository";
+>>>>>>> master
             type = nullOr str;
             default = null;
           };

@@ -40,12 +40,9 @@ result-*
 # BATS test artifacts (e.g., mktemp output.XXXXX)
 *.XXXXX
 
-<<<<<<< .merge_file_5P0yDu
 # Code coverage reports
 coverage/
 
-=======
->>>>>>> .merge_file_fgP5ZF
 # Docker-compose test volume
 watched-repo/
 
