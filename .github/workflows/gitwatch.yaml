@@ -68,7 +68,7 @@ jobs:
             sudo apt-get -y install inotify-tools util-linux parallel
           elif [ "$RUNNER_OS" == "macOS" ];
           then
-            brew install fswatch flock coreutils bash parallel docker
+            brew install fswatch flock coreutils bash parallel docker docker-buildx
           else
             echo "Unsupported OS: $RUNNER_OS"
             exit 1

@@ -73,7 +73,7 @@ jobs:
             sudo apt-get update
             sudo apt-get -y install inotify-tools util-linux
           elif [ "$RUNNER_OS" == "macOS" ]; then
-            brew install fswatch flock coreutils bash docker
+            brew install fswatch flock coreutils bash docker docker-buildx
           else
             echo "Unsupported OS: $RUNNER_OS"
             exit 1
