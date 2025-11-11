@@ -95,7 +95,6 @@ jobs:
           grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
           echo "--- End of verification ---"
 
-      # --- MODIFIED STEP: Loops through files to get names ---
       - name: Run BATS tests (from UI input)
         id: bats_run
         shell: bash
@@ -109,42 +108,16 @@ jobs:
 
           cd tests
           echo "Current directory for BATS tests: $(pwd)"
-          echo "Running BATS tests sequentially and writing to ${BATS_TAP_FILE}"
+          echo "Running BATS tests and writing to ${BATS_TAP_FILE}"
 
-          # Clear the log file
-          > "${BATS_TAP_FILE}"
+          bats --tap ${{ github.event.inputs.test_files }} | tee "${BATS_TAP_FILE}"
 
-          OVERALL_EXIT_CODE=0
+          # Capture the exit code of 'bats'
+          BATS_EXIT_CODE=${PIPESTATUS[0]}
+          echo "BATS raw exit code: ${BATS_EXIT_CODE}"
 
-          # Loop through each file provided by the input glob
-          for file in ${{ github.event.inputs.test_files }}; do
-            echo "--- Running test file: $file ---"
-
-            # Run bats on the single file, pipe to awk, and append to the main log
-            # This awk script prepends the filename to the test lines
-            bats --tap "$file" | awk -v filename="$file" '
-              /^(ok|not ok) [0-9]+ / {
-                # Prepend the filename and a custom delimiter
-                print filename " | " $0
-              }
-              # Pass through other lines (like 1..N)
-              !/^(ok|not ok) [0-9]+ / {
-                print
-              }
-            ' >> "${BATS_TAP_FILE}"
-
-            # Capture the exit code of 'bats' (the first command in the pipe)
-            BATS_SINGLE_EXIT_CODE=${PIPESTATUS[0]}
-            echo "Exit code for $file: $BATS_SINGLE_EXIT_CODE"
-
-            # If this run failed, update the overall exit code
-            if [ "$BATS_SINGLE_EXIT_CODE" -ne 0 ]; then
-              OVERALL_EXIT_CODE=1
-            fi
-          done
-
-          echo "BATS raw exit code (overall): ${OVERALL_EXIT_CODE}"
-          echo "bats_exit_code_internal=${OVERALL_EXIT_CODE}" >> $GITHUB_OUTPUT
+          # Save this exit code as an output for the next step
+          echo "bats_exit_code_internal=${BATS_EXIT_CODE}" >> $GITHUB_OUTPUT
 
           echo "===================================================================="
           echo "Finished running tests. Verifying ${BATS_TAP_FILE} content..."
@@ -152,14 +125,14 @@ jobs:
           echo "--- End of verification ---"
           echo "===================================================================="
 
-          exit $OVERALL_EXIT_CODE
+          exit $BATS_EXIT_CODE
 
       - name: No Tests Specified
         if: github.event.inputs.test_files == ''
         run: |
           echo "No test files specified in 'test_files' input. Skipping BATS run."
 
-      # --- MODIFIED STEP: New 'awk' script for parsing "File | TAP Line" ---
+      # --- MODIFIED STEP: New 'awk' script for 3 columns ---
       - name: Generate Test Summary
         if: always() && github.event.inputs.test_files != ''
         shell: bash
@@ -173,45 +146,35 @@ jobs:
             exit 0
           fi
 
-          # This 'awk' script now splits the line at " | "
+          # This 'awk' script now splits the test name into File and Test
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
-            # Set the Field Separator to be " | "
-            FS = " \\| "
-
             print "### BATS Test Results"
             print ""
+            # Add a new "File" column
             print "| File | Test | Status |"
             print "| --- | --- | --- |"
             passed = 0
             failed = 0
           }
 
-          # Check if we have our 2 fields
-          NF == 2 {
-            file_name = $1
-            tap_line = $2
+          # Match lines like "ok 1 Test Name" or "not ok 2 Test Name"
+          /^(ok|not ok) [0-9]+ / {
+            status_word = $1
+            test_number = $2
 
-            status_word = "unknown"
-            test_name = "N/A"
+            # Find the start of the full test name
+            name_start = index($0, test_number " ") + length(test_number) + 1
+            test_name_full = substr($0, name_start)
 
-            # Check if line starts with "ok" or "not ok"
-            if (index(tap_line, "ok ") == 1) {
-                status_word = "ok"
-                # Find the test number (field 2)
-                space1_pos = index(tap_line, " ")
-                space2_pos = index(tap_line, " ", space1_pos + 1)
-                name_start = space2_pos + 1
-                test_name = substr(tap_line, name_start)
+            file_name = "N/A"
+            test_name = test_name_full
 
-            } else if (index(tap_line, "not ok ") == 1) {
-                status_word = "not ok"
-                # Find the test number (field 3)
-                space1_pos = index(tap_line, " ") # after "not"
-                space2_pos = index(tap_line, " ", space1_pos + 1) # after "ok"
-                space3_pos = index(tap_line, " ", space2_pos + 1) # after number
-                name_start = space3_pos + 1
-                test_name = substr(tap_line, name_start)
+            # Split the full name into file and test, using ": " as the delimiter
+            split_pos = index(test_name_full, ": ")
+            if (split_pos > 0) {
+              file_name = substr(test_name_full, 1, split_pos - 1)
+              test_name = substr(test_name_full, split_pos + 2)
             }
 
             # Sanitize for markdown table
@@ -221,7 +184,7 @@ jobs:
             if (status_word == "ok") {
               print "| " file_name " | ✅ " test_name " | Passed |"
               passed++
-            } else if (status_word == "not ok") {
+            } else {
               print "| " file_name " | ❌ " test_name " | Failed |"
               failed++
             }
