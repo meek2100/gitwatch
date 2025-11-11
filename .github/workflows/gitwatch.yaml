@@ -76,25 +76,22 @@ jobs:
             exit 1
           fi
 
-      - name: Clean Colima State
+      # --- FIX: Revert to robust manual Colima startup to bypass action's M-series check ---
+      - name: Start Robust Colima Docker Daemon
         if: matrix.os == 'macOS-latest'
-        run: colima delete -f || true
         shell: bash
+        run: |
+          # Force delete old state to ensure a clean start, ignoring errors if it's not running
+          echo "Forcing clean Colima state..."
+          colima delete -f || true
 
-      - name: Setup Docker (using external action and QEMU override)
-        if: matrix.os == 'macOS-latest'
-        uses: douglascamata/setup-docker-macos-action@v1.0.1
-        id: setup-docker
-        with:
-          # Use QEMU instead of the potentially unstable native vz driver, set resource limits explicitly
-          colima-additional-options: "--vm-type qemu --cpu 2 --memory 4 --disk 60"
-          lima: v1.2.1
-          colima: v0.9.1
+          # Start with QEMU driver and explicit resources for stability on M-series runners
+          echo "Starting Colima VM with QEMU (bypassing M-series nested virtualization check)..."
+          colima start --runtime docker --vm-type qemu --cpu 2 --memory 4 --disk 60
 
-      - name: Ensure Docker Buildx is Ready
-        if: matrix.os == 'macOS-latest'
-        run: docker buildx install
-        shell: bash
+          # Verify connection and ensure buildx is ready
+          docker ps -a
+          docker buildx install
 
       - name: Verify script content before test
         shell: bash
