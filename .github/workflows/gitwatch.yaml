@@ -80,8 +80,10 @@ jobs:
         if: matrix.os == 'macOS-latest'
         shell: bash
         run: |
-          # Start Colima with the Docker runtime and wait for the daemon to be ready.
-          colima start --runtime docker
+          # FIX: Force clean state and start with the QEMU driver for better CI stability.
+          echo "Setting up QEMU-based Colima VM (deleting old state first)..."
+          colima delete -f || true
+          colima start --runtime docker --vm-type qemu --cpu 2 --memory 4 --disk 60
           # Check status to ensure connectivity.
           docker ps -a
           # Ensure buildx is ready for the Docker image build in the test.
