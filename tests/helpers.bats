@@ -20,7 +20,7 @@ teardown() {
   rm -f "$MOCK_OUTPUT_FILE"
 }
 
-@test "helpers_wait_for_change_success: Succeeds when output changes" {
+@test "helpers_wait_for_change_success_succeeds_when_output_changes" {
   # Run the helper in the background
   wait_for_git_change 5 0.1 cat "$MOCK_OUTPUT_FILE" &
   local wait_pid=$!
@@ -33,13 +33,13 @@ teardown() {
   assert_success "Helper function failed to detect change"
 }
 
-@test "helpers_wait_for_change_timeout: Fails (times out) when output does not change" {
+@test "helpers_wait_for_change_timeout_fails_times_out_when_output_does_not_change" {
   # Run the helper and expect it to fail (timeout)
   run wait_for_git_change 1 0.1 cat "$MOCK_OUTPUT_FILE"
   assert_failure "Helper function succeeded when it should have timed out"
 }
 
-@test "helpers_wait_for_target_success: Succeeds when output matches target" {
+@test "helpers_wait_for_target_success_succeeds_when_output_matches_target" {
   local target_state="target_state_achieved"
   # Run the helper in the background
   wait_for_git_change 5 0.1 --target "$target_state" cat "$MOCK_OUTPUT_FILE" &
@@ -56,7 +56,7 @@ teardown() {
   assert_success "Helper function failed to detect target match"
 }
 
-@test "helpers_wait_for_target_timeout: Fails (times out) if target is never matched" {
+@test "helpers_wait_for_target_timeout_fails_times_out_if_target_is_never_matched" {
   local target_state="target_state_never_achieved"
   # Run the helper in the background
   wait_for_git_change 1 0.1 --target "$target_state" cat "$MOCK_OUTPUT_FILE" &
@@ -71,7 +71,7 @@ teardown() {
 }
 
 
-@test "helpers_wait_for_change_initial_fail: Handles initial command failure" {
+@test "helpers_wait_for_change_initial_fail_handles_initial_command_failure" {
   # Run the helper with a command that fails, but still check for file change
   rm -f "$MOCK_OUTPUT_FILE" # Ensure file doesn't exist
 
@@ -86,7 +86,7 @@ teardown() {
   assert_success "Helper function failed to detect change after initial error"
 }
 
-@test "helpers_wait_for_target_initial_fail: Continues if initial command fails" {
+@test "helpers_wait_for_target_initial_fail_continues_if_initial_command_fails" {
   local target_state="target_state_achieved"
   rm -f "$MOCK_OUTPUT_FILE" # Ensure file doesn't exist
 

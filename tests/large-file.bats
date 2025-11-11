@@ -8,7 +8,7 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-@test "large_file_gate: Skips commit if untracked file is >= 50MB" {
+@test "large_file_gate_skips_commit_if_untracked_file_is_gte_50mb" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -49,7 +49,6 @@ load 'bats-custom/load'
   # 7. Assert: The gitwatch process is *still running*
   run kill -0 "$GITWATCH_PID"
   assert_success "Gitwatch process crashed, but it should have continued."
-
   # 8. Cleanup
   cd /tmp
 }

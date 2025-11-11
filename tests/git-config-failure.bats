@@ -21,7 +21,8 @@ create_failing_mock_git_config() {
 # Mock Git script
 echo "# MOCK_GIT: Received command: \$@" >&2
 
-if [ "\$1" = "config" ]; then
+if [ "\$1" = "config" ];
+  then
   echo "# MOCK_GIT: Simulating 'git config' failure" >&2
   exit 128
 else
@@ -35,7 +36,7 @@ EOF
 }
 
 
-@test "git_config_failure: Warns but continues if git config fails" {
+@test "git_config_failure_warns_but_continues_if_git_config_fails" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")

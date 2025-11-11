@@ -8,7 +8,7 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-@test "hook_failure_commit: Git pre-commit hook failure is handled gracefully and push is skipped" {
+@test "hook_failure_commit_git_pre_commit_hook_failure_is_handled_gracefully_and_push_is_skipped" {
   local output_file
   local git_dir_path
   local initial_commit_hash
@@ -77,7 +77,6 @@ load 'bats-custom/load'
   run rm -f "$hook_file"
   assert_success "Failed to remove the hook file"
   verbose_echo "# DEBUG: Hook removed. Ready for success test."
-
   # --- SECOND CHANGE (Success Expected - Proves Recovery) ---
   echo "line2" >> file2.txt
 
@@ -98,7 +97,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "hook_failure_push: Git pre-push hook failure is handled gracefully" {
+@test "hook_failure_push_git_pre_push_hook_failure_is_handled_gracefully" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")

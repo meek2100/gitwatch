@@ -26,7 +26,7 @@ run_conversion() {
 }
 
 
-@test "glob_conversion: Glob to regex conversion works correctly (including correction)" {
+@test "glob_conversion_glob_to_regex_conversion_works_correctly_including_correction" {
   # Case 1: Simple glob
   run run_conversion "*.log"
   assert_output ".*\.log" "Simple glob conversion failed: *.log -> .*\.log"
