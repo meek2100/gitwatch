@@ -106,46 +106,17 @@ jobs:
         run: |
           set -o pipefail
 
-          # Configure git for tests that require it
-          git config --global user.email "test@email.com"
-          git config --global user.name "test user"
-
           cd tests
           echo "Current directory for BATS tests: $(pwd)"
           echo "Running BATS tests and writing to ${BATS_TAP_FILE}"
 
-          # Get the number of available processor cores
-          NPROC=1
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            NPROC=$(nproc)
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-            NPROC=$(sysctl -n hw.ncpu)
-          fi
+          bats --tap ${{ github.event.inputs.test_files }} | tee "${BATS_TAP_FILE}"
 
-          echo "Running BATS tests in parallel using $NPROC cores..."
-
-          # Get the test file glob from the workflow input
-          TEST_FILES_TO_RUN=${{ github.event.inputs.test_files }}
-          echo "Test files glob: $TEST_FILES_TO_RUN"
-
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            # Run with kcov on Linux
-            echo "Running with kcov for code coverage..."
-            mkdir -p ../coverage
-            cd .. # kcov must run from the repository root
-
-            # kcov runs bats, which outputs TAP, which is tee'd to the file
-            # We use `find` to pass the correct test paths to bats
-            kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats --tap $(find tests -name "$TEST_FILES_TO_RUN") | tee "${BATS_TAP_FILE}"
-          else
-            # Use 'bats --jobs' for parallel execution on macOS
-            # This runs from within the 'tests' directory
-            bats --jobs "$NPROC" --tap $TEST_FILES_TO_RUN | tee "${BATS_TAP_FILE}"
-          fi
-
-          # Capture the exit code of 'bats' (or 'kcov')
+          # Capture the exit code of 'bats'
           BATS_EXIT_CODE=${PIPESTATUS[0]}
           echo "BATS raw exit code: ${BATS_EXIT_CODE}"
+
+          # Save this exit code as an output for the next step
           echo "bats_exit_code_internal=${BATS_EXIT_CODE}" >> $GITHUB_OUTPUT
 
           echo "===================================================================="
@@ -175,26 +146,16 @@ jobs:
             exit 0
           fi
 
-          # This 'awk' script now captures the '# file:' line to populate the 'File' column.
+          # This 'awk' script now splits the test name into File and Test
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
             print "### BATS Test Results"
             print ""
-            # Add the new "File" column
+            # Add a new "File" column
             print "| File | Test | Status |"
             print "| --- | --- | --- |"
             passed = 0
             failed = 0
-            current_file = "N/A" # Holds the filename
-          }
-
-          # NEW: Capture the filename when it appears
-          # Matches lines like "# file: tests/add-failure.bats"
-          /^# file: / {
-            current_file = $3
-            # Strip the 'tests/' prefix for a cleaner name
-            sub(/^tests\//, "", current_file)
-            next # Skip to the next line
           }
 
           # Match lines like "ok 1 Test Name" or "not ok 2 Test Name"
@@ -206,13 +167,13 @@ jobs:
             name_start = index($0, test_number " ") + length(test_number) + 1
             test_name_full = substr($0, name_start)
 
-            # Use the filename we captured
-            file_name = current_file
+            file_name = "N/A"
             test_name = test_name_full
 
-            # Also, strip the 'filename:' prefix from the test name itself for clarity
+            # Split the full name into file and test, using ": " as the delimiter
             split_pos = index(test_name_full, ": ")
             if (split_pos > 0) {
+              file_name = substr(test_name_full, 1, split_pos - 1)
               test_name = substr(test_name_full, split_pos + 2)
             }
 
