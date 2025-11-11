@@ -23,7 +23,8 @@ create_failing_mock_git_commit() {
 # Mock Git script
 echo "# MOCK_GIT: Received command: \$@" >&2
 
-if [ "\$1" = "commit" ]; then
+if [ "\$1" = "commit" ];
+  then
   if [ -f "$state_file" ]; then
     # State file exists, so SUCCEED
     echo "# MOCK_GIT: 'commit' SUCCEEDING (state file exists)." >&2
@@ -44,7 +45,7 @@ EOF
   echo "$dummy_path"
 }
 
-@test "git_command_failure: Retries on generic 'git commit' failure" {
+@test "git_command_failure_retries_on_generic_git_commit_failure" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -103,7 +104,6 @@ EOF
   run cat "$output_file"
   assert_output --partial "MOCK_GIT: 'commit' SUCCEEDING"
   assert_output --partial "Git operation succeeded. Resetting failure count."
-
   # 11. Cleanup
   unset GW_GIT_BIN
   unset GW_MAX_FAIL_COUNT

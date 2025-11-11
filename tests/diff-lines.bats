@@ -16,7 +16,7 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
 # --- Test Cases ---
 # These tests will now call the *actual* functions loaded from gitwatch.sh
 
-@test "diff_lines_1_addition: Handles a simple file addition" {
+@test "diff_lines_1_addition_handles_a_simple_file_addition" {
   local DIFF_INPUT="
   --- /dev/null
   +++ b/new_file.txt
@@ -32,7 +32,7 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
   assert_output --regexp "new_file.txt:3: \+line 3"
 }
 
-@test "diff_lines_2_deletion: Handles a simple file deletion" {
+@test "diff_lines_2_deletion_handles_a_simple_file_deletion" {
   local DIFF_INPUT="
   --- a/old_file.txt
   +++ /dev/null
@@ -47,7 +47,7 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
   assert_output "old_file.txt:?: File deleted."
 }
 
-@test "diff_lines_3_modification: Handles modification with context lines" {
+@test "diff_lines_3_modification_handles_modification_with_context_lines" {
   local DIFF_INPUT="
   --- a/config.yaml
   +++ b/config.yaml
@@ -72,7 +72,7 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
   assert_output --regexp "config.yaml:13:  context line 2"
 }
 
-@test "diff_lines_4_color_codes: Preserves color in content but strips from paths" {
+@test "diff_lines_4_color_codes_preserves_color_in_content_but_strips_from_paths" {
   local ESC=$'\033'
   # Mock Git diff output with ANSI colors
   local DIFF_INPUT="
@@ -89,7 +89,7 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
   assert_output --regexp "file_with_color.txt:1: \+${ESC}\[32madded line${ESC}\[0m"
 }
 
-@test "diff_lines_5_renamed: Handles file rename (with content change)" {
+@test "diff_lines_5_renamed_handles_file_rename_with_content_change" {
   # Note: A rename with content change is parsed as a delete + add
   local DIFF_INPUT="
 diff --git a/old_name.txt b/new_name.txt
@@ -108,7 +108,7 @@ diff --git a/old_name.txt b/new_name.txt
   assert_output --regexp "new_name.txt:1: \+Updated content"
 }
 
-@test "diff_lines_6_trim_spaces: Handles paths with leading/trailing spaces correctly (if diff allows it)" {
+@test "diff_lines_6_trim_spaces_handles_paths_with_leading_trailing_spaces_correctly" {
   # Although diff usually normalizes this, testing robustness
   local DIFF_INPUT="
 --- a/  path with spaces.txt
@@ -122,7 +122,7 @@ diff --git a/old_name.txt b/new_name.txt
   assert_output --regexp "path with spaces.txt:1: \+content"
 }
 
-@test "diff_lines_7_mode_change: Handles a file mode change" {
+@test "diff_lines_7_mode_change_handles_a_file_mode_change" {
   local DIFF_INPUT="
 diff --git a/script.sh b/script.sh
 old mode 100644
@@ -133,7 +133,7 @@ new mode 100755
   assert_output "script.sh:?: Mode changed to 100755"
 }
 
-@test "diff_lines_8_mode_and_content_change: Handles mode and content change" {
+@test "diff_lines_8_mode_and_content_change_handles_mode_and_content_change" {
   local DIFF_INPUT="
 diff --git a/script.sh b/script.sh
 old mode 100644
@@ -151,7 +151,7 @@ new mode 100755
   assert_output --regexp "script.sh:1: \+new content"
 }
 
-@test "diff_lines_9_path_with_color: Strips color codes from paths" {
+@test "diff_lines_9_path_with_color_strips_color_codes_from_paths" {
   local ESC=$'\033'
   # Mock Git diff output with ANSI colors in the path
   local DIFF_INPUT="
@@ -167,7 +167,7 @@ new mode 100755
   refute_output --regexp "${ESC}" "Path should not contain color codes"
 }
 
-@test "diff_lines_10_binary_file: Handles binary file diff" {
+@test "diff_lines_10_binary_file_handles_binary_file_diff" {
   local DIFF_INPUT="
 diff --git a/logo.png b/logo.png
 Binary files a/logo.png and b/logo.png differ
@@ -177,7 +177,7 @@ Binary files a/logo.png and b/logo.png differ
   assert_output "logo.png:?: Binary file changed."
 }
 
-@test "diff_lines_11_rename_and_mode_change: Handles rename and mode change" {
+@test "diff_lines_11_rename_and_mode_change_handles_rename_and_mode_change" {
   local DIFF_INPUT="
 diff --git a/old_script.sh b/new_script.sh
 similarity index 100%
@@ -192,7 +192,7 @@ new mode 100755
   assert_output "new_script.sh:?: Mode changed to 100755"
 }
 
-@test "diff_lines_12_rename_and_binary: Handles rename of a binary file" {
+@test "diff_lines_12_rename_and_binary_handles_rename_of_a_binary_file" {
   local DIFF_INPUT="
 diff --git a/old_logo.png b/new_logo.png
 similarity index 90%

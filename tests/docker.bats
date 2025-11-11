@@ -27,7 +27,8 @@ setup_file() {
   run docker build --build-arg "BASE_IMAGE=$base_image" -t "$DOCKER_IMAGE_NAME" "$repo_root"
   # --- END MODIFICATION ---
 
-  if [ "$status" -ne 0 ]; then
+  if [ "$status" -ne 0 ];
+  then
     echo "# DEBUG: Docker image build failed"
     echo "$output"
   fi
@@ -40,7 +41,8 @@ setup_file() {
 FROM ${DOCKER_IMAGE_NAME}
 HEALTHCHECK --interval=3s --timeout=2s --start-period=5s --retries=2 \
   CMD test -f /tmp/gitwatch.status && \
-      find /tmp -maxdepth 1 -name gitwatch.status -mmin -1 | grep -q . || \
+      find /tmp -maxdepth 1 -name gitwatch.status -mmin -1 |
+      grep -q . || \
       exit 1
 EOF
 
@@ -55,7 +57,8 @@ EOF
 
 teardown_file() {
   # Clean up the Docker images
-  docker rmi "$DOCKER_IMAGE_NAME" 2>/dev/null || true
+  docker rmi "$DOCKER_IMAGE_NAME" 2>/dev/null ||
+  true
   docker rmi "$DOCKER_HEALTHCHECK_IMAGE_NAME" 2>/dev/null || true
 }
 
@@ -87,7 +90,8 @@ teardown() {
   # Stop and remove all containers with the test prefix
   docker ps -a --filter "name=${DOCKER_CONTAINER_NAME_PREFIX}-" --format "{{.ID}}" | xargs -r docker rm -f
   # Clean up the host directory
-  if [ -d "$TEST_REPO_HOST_DIR" ]; then
+  if [ -d "$TEST_REPO_HOST_DIR" ];
+  then
     # We must 'sudo' this because the container might have changed permissions
     sudo rm -rf "$TEST_REPO_HOST_DIR"
     verbose_echo "# DEBUG: Cleaned up host repo volume: $TEST_REPO_HOST_DIR"
@@ -107,7 +111,8 @@ create_failing_mock_git() {
 # Mock Git script
 echo "# MOCK_GIT: Received command: \$@" >&2
 
-if [ "\$1" = "push" ]; then
+if [ "\$1" = "push" ];
+  then
   echo "# MOCK_GIT: Push command FAILING" >&2
   exit 1 # Always fail the push
 else
@@ -127,11 +132,13 @@ wait_for_health_status() {
   local delay=2
   local attempt=1
 
-  while (( attempt <= max_attempts )); do
+  while (( attempt <= max_attempts ));
+  do
     run docker inspect --format '{{.State.Health.Status}}' "$container_name"
     assert_success "Docker inspect failed"
 
-    if [ "$output" = "$expected_status" ]; then
+    if [ "$output" = "$expected_status" ];
+    then
       verbose_echo "# Health status is '$output' as expected."
       return 0
     fi
@@ -174,7 +181,7 @@ get_container_logs() {
   verbose_echo "# DEBUG: --- End logs for '$container_name' ---"
 }
 
-@test "docker_puid_gid: Entrypoint correctly switches user" {
+@test "docker_puid_gid_entrypoint_correctly_switches_user" {
   local container_name="${DOCKER_CONTAINER_NAME_PREFIX}-1"
   run_container "$container_name" "$DOCKER_IMAGE_NAME" \
     -e PUID="$RUNNER_UID" \
@@ -191,7 +198,7 @@ get_container_logs() {
   assert_success "docker exec 'touch' command failed"
 }
 
-@test "docker_env_vars: Entrypoint correctly passes flags" {
+@test "docker_env_vars_entrypoint_correctly_passes_flags" {
   local container_name="${DOCKER_CONTAINER_NAME_PREFIX}-2"
   run_container "$container_name" "$DOCKER_IMAGE_NAME" \
     -e VERBOSE=true \
@@ -209,7 +216,7 @@ get_container_logs() {
   assert_output --partial " -X \*.log\,tmp/ "
 }
 
-@test "docker_env_vars: COMMIT_CMD overrides default message" {
+@test "docker_env_vars_commit_cmd_overrides_default_message" {
   local container_name="${DOCKER_CONTAINER_NAME_PREFIX}-3"
   local custom_message="Custom Docker Commit"
 
@@ -230,7 +237,7 @@ get_container_logs() {
   assert_output "$custom_message"
 }
 
-@test "docker_env_vars_advanced: Entrypoint correctly handles QUIET and DISABLE_LOCKING" {
+@test "docker_env_vars_advanced_entrypoint_correctly_handles_quiet_and_disable_locking" {
   local container_name="${DOCKER_CONTAINER_NAME_PREFIX}-4"
 
   run_container "$container_name" "$DOCKER_IMAGE_NAME" \
@@ -271,7 +278,7 @@ get_container_logs() {
   assert_output --partial "quiet_file.txt"
 }
 
-@test "docker_env_vars_log_line_length: GW_LOG_LINE_LENGTH is respected" {
+@test "docker_env_vars_log_line_length_gw_log_line_length_is_respected" {
   local container_name="${DOCKER_CONTAINER_NAME_PREFIX}-5"
   local long_line="This is a very long line that should be truncated"
   local truncated_line="This is a " # First 10 chars
@@ -307,7 +314,7 @@ get_container_logs() {
 }
 
 # --- NEW TEST ---
-@test "docker_healthcheck: Container becomes unhealthy on cool-down and recovers" {
+@test "docker_healthcheck_container_becomes_unhealthy_on_cool_down_and_recovers" {
   local container_name="${DOCKER_CONTAINER_NAME_PREFIX}-health"
   local real_git_path
   real_git_path=$(command -v git)

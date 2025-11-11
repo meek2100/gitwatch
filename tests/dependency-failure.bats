@@ -8,7 +8,7 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-@test "dependency_failure_syslog: -S flag exits with code 2 if 'logger' command is missing" {
+@test "dependency_failure_syslog_S_flag_exits_with_code_2_if_logger_command_is_missing" {
   # This test temporarily manipulates the PATH environment variable to simulate a missing 'logger' command.
   local path_backup="$PATH"
 
@@ -32,13 +32,12 @@ load 'bats-custom/load'
   assert_failure "Gitwatch should exit with non-zero status on missing dependency"
   assert_exit_code 2 "Gitwatch should exit with code 2 (Missing required command)"
   assert_output --partial "Error: Required command 'logger' not found (for -S syslog option)."
-
   # 5. Cleanup
   export PATH="$path_backup" # Restore PATH
   cd /tmp
 }
 
-@test "dependency_failure_timeout: Exits with code 2 if 'timeout' command is missing" {
+@test "dependency_failure_timeout_exits_with_code_2_if_timeout_command_is_missing" {
   # shellcheck disable=SC2031 # PATH modification is intentional for mocking
   local path_backup="$PATH"
 
@@ -63,7 +62,6 @@ load 'bats-custom/load'
   assert_failure "Gitwatch should exit with non-zero status on missing dependency"
   assert_exit_code 2 "Gitwatch should exit with code 2 (Missing required command)"
   assert_output --partial "Error: Required command 'timeout' not found."
-
   # 5. Cleanup
   export PATH="$path_backup" # Restore PATH
   cd /tmp
@@ -71,7 +69,7 @@ load 'bats-custom/load'
 
 # --- END OLD TESTS ---
 
-@test "dependency_failure_git: Exits with code 2 if 'git' command is missing" {
+@test "dependency_failure_git_exits_with_code_2_if_git_command_is_missing" {
   # shellcheck disable=SC2031 # PATH modification is intentional for mocking
   local path_backup="$PATH"
   # 1. Hide 'git'
@@ -91,19 +89,19 @@ load 'bats-custom/load'
   assert_failure
   assert_exit_code 2
   assert_output --partial "Error: Required command 'git' not found."
-
   # 4. Cleanup
   export PATH="$path_backup"
   cd /tmp
 }
 
-@test "dependency_failure_watcher: Exits with code 2 if watcher (inotifywait/fswatch) is missing" {
+@test "dependency_failure_watcher_exits_with_code_2_if_watcher_inotifywait_fswatch_is_missing" {
   # shellcheck disable=SC2031 # PATH modification is intentional for mocking
   local path_backup="$PATH"
   local watcher_name=""
   local watcher_hint=""
 
-  if [ "$RUNNER_OS" == "Linux" ]; then
+  if [ "$RUNNER_OS" == "Linux" ];
+  then
     watcher_name="inotifywait"
     watcher_hint="inotify-tools"
   else
@@ -135,7 +133,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "dependency_failure_flock: Exits with code 2 if 'flock' command is missing (and -n is not used)" {
+@test "dependency_failure_flock_exits_with_code_2_if_flock_command_is_missing_and_n_is_not_used" {
   # shellcheck disable=SC2031 # PATH modification is intentional for mocking
   local path_backup="$PATH"
   local output_file
@@ -162,14 +160,15 @@ load 'bats-custom/load'
   # 4. Assert: Log output shows the ERROR message
   assert_output --partial "Error: Required command 'flock' not found"
   assert_output --partial "Install 'flock' or re-run with the -n flag"
-  refute_output --partial "Proceeding without file locking." # This is the old warning
+  refute_output --partial "Proceeding without file locking."
+  # This is the old warning
 
   # 5. Cleanup
   export PATH="$path_backup"
   cd /tmp
 }
 
-@test "dependency_failure_flock_with_n_flag: Bypasses check and runs successfully with -n" {
+@test "dependency_failure_flock_with_n_flag_bypasses_check_and_runs_successfully_with_n" {
   # shellcheck disable=SC2031 # PATH modification is intentional for mocking
   local path_backup="$PATH"
   local output_file
@@ -206,7 +205,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "dependency_failure_non_gnu_timeout: Exits with code 2 if 'timeout' is not GNU coreutils" {
+@test "dependency_failure_non_gnu_timeout_exits_with_code_2_if_timeout_is_not_gnu_coreutils" {
   # shellcheck disable=SC2031 # PATH modification is intentional for mocking
   local path_backup="$PATH"
   local output_file
@@ -245,7 +244,7 @@ EOF
   cd /tmp
 }
 
-@test "dependency_failure_non_gnu_timeout_with_override: Succeeds with GW_TIMEOUT_BIN" {
+@test "dependency_failure_non_gnu_timeout_with_override_succeeds_with_gw_timeout_bin" {
   # shellcheck disable=SC2031 # PATH modification is intentional for mocking
   local path_backup="$PATH"
   local output_file
@@ -301,7 +300,7 @@ EOF
   cd /tmp
 }
 
-@test "dependency_failure_pkill: Exits with code 2 if 'pkill' command is missing" {
+@test "dependency_failure_pkill_exits_with_code_2_if_pkill_command_is_missing" {
   # shellcheck disable=SC2031 # PATH modification is intentional for mocking
   local path_backup="$PATH"
   # 1. Hide 'pkill'

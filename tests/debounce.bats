@@ -10,7 +10,7 @@ load 'bats-custom/load'
 
 # Note: This test relies heavily on verbose logging (-v)
 
-@test "debounce_logic: Rapid changes trigger only one commit attempt" {
+@test "debounce_logic_rapid_changes_trigger_only_one_commit_attempt" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -44,7 +44,6 @@ load 'bats-custom/load'
     sleep "$change_interval"
   done
   verbose_echo "# DEBUG: Finished creating changes."
-
   # Wait long enough for the *final* commit attempt to finish
   # Wait = (Last change sleep) + script's sleep time + buffer for git commands
   local wait_buffer=3 # Generous buffer
