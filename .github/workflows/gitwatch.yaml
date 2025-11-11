@@ -101,11 +101,15 @@ jobs:
           echo "--- End of verification ---"
 
       - name: Run tests (and coverage on Linux)
+        id: bats_run
+        continue-on-error: true
         shell: bash
-        # Set BATS_LIB_PATH to include action-installed libraries and our custom module
         env:
           BATS_LIB_PATH: "${{ steps.setup.outputs.bats-lib-path }}:${{ github.workspace }}/tests"
+          BATS_TAP_FILE: "${{ github.workspace }}/bats_results.tap"
         run: |
+          set -o pipefail
+
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
 
@@ -128,26 +132,24 @@ jobs:
             # Run with kcov on Linux
             echo "Running with kcov for code coverage..."
             mkdir -p ../coverage
-            # We must run kcov from the root of the repo to get correct paths
             cd ..
 
-            # kcov manages its own parallel execution, but we point it to the bats files
-            # Note: kcov + BATS can be complex.
-            This command runs all tests under one kcov instance.
-            # We use `find` to pass all test files to `bats` at once.
-            kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats $(find tests -name "*.bats")
+            # kcov runs bats, which outputs TAP, which is tee'd to the file
+            kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats --tap $(find tests -name "*.bats") | tee "${BATS_TAP_FILE}"
           else
-            # Run normally on macOS
-            # Use find and xargs to pipe test files to bats
-            # -n1: one file at a time per bats process
-            # -P $NPROC: run up to $NPROC processes in parallel
-
-            # We add --tap to get a standard output format, which is good for parallel runs
-            find .
-            -name "*.bats" -print0 | xargs -0 -n1 -P "$NPROC" bats --tap
+            # --- KEY CHANGE ---
+            # Use 'bats --jobs' for parallel execution
+            # This correctly handles parallel runs AND produces a clean TAP report
+            bats --jobs "$NPROC" --tap $(find . -name "*.bats") | tee "${BATS_TAP_FILE}"
           fi
 
+          # Capture the exit code of 'bats' (or 'kcov')
+          BATS_EXIT_CODE=${PIPESTATUS[0]}
+          echo "BATS raw exit code: ${BATS_EXIT_CODE}"
+          echo "bats_exit_code_internal=${BATS_EXIT_CODE}" >> $GITHUB_OUTPUT
+
           echo "Finished running tests"
+          exit $BATS_EXIT_CODE
 
       - name: Upload coverage report (Linux)
         if: matrix.os == 'ubuntu-latest'
@@ -156,3 +158,69 @@ jobs:
           name: coverage-report-linux
           path: coverage/
           retention-days: 7
+
+      - name: Generate Test Summary
+        if: always() # This step will always run
+        shell: bash
+        env:
+          BATS_TAP_FILE: "${{ github.workspace }}/bats_results.tap"
+        run: |
+          echo "--- Reading summary from ${BATS_TAP_FILE} ---"
+
+          if [ ! -f "${BATS_TAP_FILE}" ]; then
+            echo "BATS results file (${BATS_TAP_FILE}) not found." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          # This 'awk' script is the robust one from our previous fix
+          AWK_SCRIPT=$(cat << 'EOF'
+          BEGIN {
+            print "### BATS Test Results"
+            print ""
+            print "| Test | Status |"
+            print "| --- | --- |"
+            passed = 0
+            failed = 0
+          }
+
+          /^(ok|not ok) [0-9]+ / {
+            status_word = $1
+            test_number = $2
+
+            # Find the start of the test name, which is after the number and space
+            name_start = index($0, test_number " ") + length(test_number) + 1
+            test_name = substr($0, name_start)
+
+            # Sanitize for markdown table
+            gsub(/\|/, "\\|", test_name)
+
+            if (status_word == "ok") {
+              print "| ✅ " test_name " | Passed |"
+              passed++
+            } else {
+              print "| ❌ " test_name " | Failed |"
+              failed++
+            }
+          }
+
+          END {
+            print ""
+            print "---"
+            print "**Summary:** " passed " passed, " failed " failed."
+          }
+          EOF
+          )
+
+          AWK_OUTPUT=$(awk "$AWK_SCRIPT" "${BATS_TAP_FILE}")
+
+          echo "$AWK_OUTPUT" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Debug: BATS_EXIT_CODE from previous step was: '${{ steps.bats_run.outputs.bats_exit_code_internal }}'"
+
+          if [ "${{ steps.bats_run.outputs.bats_exit_code_internal }}" != "0" ]; then
+            echo ":red_circle: **Overall Status: Tests Failed**" >> $GITHUB_STEP_SUMMARY
+            exit 1 # Fail this summary step
+          else
+            echo ":white_check_mark: **Overall Status: All Tests Passed**" >> $GITHUB_STEP_SUMMARY
+          fi
