@@ -16,7 +16,7 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
 
 # This test simulates missing hash commands to ensure the lockfile logic
 # correctly falls back to using a basic path-based string for the lockfile name in /tmp.
-@test "lockfile_nohash: Falls back to /tmp lockfile with path-based name when hash commands are missing" {
+@test "lockfile_nohash_falls_back_to_tmp_lockfile_with_path_based_name_when_hash_commands_are_missing" {
   # Skip if 'flock' is not available, as this test relies on flock-based locking.
   if ! command -v flock &>/dev/null; then
     skip "Test skipped: 'flock' command not found, which is required for gitwatch lock logic."
@@ -63,12 +63,10 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
     fail "Test setup failed: Cannot reliably hide 'sha256sum'/'md5sum' to test fallback logic."
   fi
   verbose_echo "# DEBUG: Successfully hid hash commands via PATH manipulation."
-
   # 4. Start gitwatch, which should fall back because of unwritable .git AND missing hash tools
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" "$target_path" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
-
   # 5. Wait for initialization and check log
   sleep 2
 
@@ -77,7 +75,6 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
   assert_output --partial "Warning: Cannot write lockfile to $GIT_DIR_PATH. Falling back to temporary directory." \
     "Did not log the expected fallback warning"
   assert_output --partial "Warning: Neither 'sha256sum' nor 'md5sum' found."
-
   # --- MODIFIED: Call the _get_path_hash function from the sourced script ---
   # 6a. Calculate the expected path-based "hash" name *using the script's own logic*
   local target_abs_path
@@ -109,7 +106,7 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
 }
 
 # (At the end of the file tests/lockfile-nohash.bats)
-@test "lockfile_nohash_writable_git: Falls back to path-based name inside .git when hash commands are missing" {
+@test "lockfile_nohash_writable_git_falls_back_to_path_based_name_inside_git_when_hash_commands_are_missing" {
   # Skip if 'flock' is not available
   if ! command -v flock &>/dev/null; then
     skip "Test skipped: 'flock' command not found."
@@ -155,7 +152,6 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
   refute_output --partial "Falling back to temporary directory."
   # SHOULD warn about missing hash tools
   assert_output --partial "Warning: Neither 'sha256sum' nor 'md5sum' found."
-
   # --- MODIFIED: Call the _get_path_hash function from the sourced script ---
   # 6. Calculate the expected path-based "hash" name *using the script's own logic*
   local target_abs_path

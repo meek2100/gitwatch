@@ -15,7 +15,7 @@ setup() {
   setup_with_remote
 }
 
-@test "lfs: Detects and commits Git LFS pointer files" {
+@test "lfs_detects_and_commits_git_lfs_pointer_files" {
   # This test requires git-lfs to be installed on the runner
   if ! command -v git-lfs &>/dev/null; then
     skip "Test skipped: 'git-lfs' command not found."

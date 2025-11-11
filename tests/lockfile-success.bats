@@ -10,10 +10,12 @@ load 'bats-custom/load'
 
 # This test must manage PIDs manually for the second test case
 teardown() {
-  if [ -n "${GITWATCH_PID_1:-}" ] && kill -0 "$GITWATCH_PID_1" &>/dev/null; then
+  if [ -n "${GITWATCH_PID_1:-}" ] && kill -0 "$GITWATCH_PID_1" &>/dev/null;
+  then
     kill -9 "$GITWATCH_PID_1" &>/dev/null || true
   fi
-  if [ -n "${GITWATCH_PID_2:-}" ] && kill -0 "$GITWATCH_PID_2" &>/dev/null; then
+  if [ -n "${GITWATCH_PID_2:-}" ] && kill -0 "$GITWATCH_PID_2" &>/dev/null;
+  then
     kill -9 "$GITWATCH_PID_2" &>/dev/null || true
   fi
   unset GITWATCH_PID_1
@@ -22,7 +24,7 @@ teardown() {
   _common_teardown
 }
 
-@test "lockfile_success: flock prevents a second instance *on the same target* from starting" {
+@test "lockfile_success_flock_prevents_a_second_instance_on_the_same_target_from_starting" {
   # Skip if 'flock' is not available, as this test relies on it.
   if ! command -v flock &>/dev/null; then
     skip "Test skipped: 'flock' command not found, which is required for this test."
@@ -50,7 +52,6 @@ teardown() {
   assert_failure "Second instance should have failed to start due to lock."
   # MODIFIED: Exit code 69 is the correct code for "already running"
   assert_exit_code 69 "Second instance should exit with code 69 (already running)."
-
   # 5. Assert that the error message confirms the lock was busy
   assert_output --partial "Error: gitwatch is already running on this repository/target"
 
@@ -60,7 +61,7 @@ teardown() {
   cd /tmp
 }
 
-@test "lockfile_per_target_success: Allows a second instance *on a different target* to run" {
+@test "lockfile_per_target_success_allows_a_second_instance_on_a_different_target_to_run" {
   # Skip if 'flock' is not available
   if ! command -v flock &>/dev/null; then
     skip "Test skipped: 'flock' command not found."
@@ -88,7 +89,6 @@ teardown() {
   # 3. Assert both processes are still running
   run kill -0 "$GITWATCH_PID_1"
   assert_success "Instance 1 (PID $GITWATCH_PID_1) on dir1 died unexpectedly."
-
   run kill -0 "$GITWATCH_PID_2"
   assert_success "Instance 2 (PID $GITWATCH_PID_2) on dir2 died unexpectedly (or failed to start)."
 

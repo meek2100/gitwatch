@@ -12,11 +12,13 @@ load 'bats-custom/load'
 # teardown only knows about one $GITWATCH_PID
 teardown() {
   verbose_echo "# Manual teardown for lockfile-race"
-  if [ -n "${GITWATCH_PID_A:-}" ] && kill -0 "$GITWATCH_PID_A" &>/dev/null; then
+  if [ -n "${GITWATCH_PID_A:-}" ] && kill -0 "$GITWATCH_PID_A" &>/dev/null;
+  then
     verbose_echo "# Killing PID A: $GITWATCH_PID_A"
     kill -9 "$GITWATCH_PID_A" &>/dev/null || true
   fi
-  if [ -n "${GITWATCH_PID_B:-}" ] && kill -0 "$GITWATCH_PID_B" &>/dev/null; then
+  if [ -n "${GITWATCH_PID_B:-}" ] && kill -0 "$GITWATCH_PID_B" &>/dev/null;
+  then
     verbose_echo "# Killing PID B: $GITWATCH_PID_B"
     kill -9 "$GITWATCH_PID_B" &>/dev/null || true
   fi
@@ -26,7 +28,7 @@ teardown() {
   _common_teardown
 }
 
-@test "lockfile_race_n: -n flag allows concurrent runs (race condition)" {
+@test "lockfile_race_n_n_flag_allows_concurrent_runs_race_condition" {
   # Skip if 'flock' *is not* available, as the -n flag is only
   # relevant on systems that support locking.
   if ! command -v flock &>/dev/null; then
@@ -55,7 +57,6 @@ teardown() {
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -n -s "$test_sleep_time" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file_B" 2>&1 &
   # shellcheck disable=SC2034 # Used by manual teardown
   GITWATCH_PID_B=$!
-
   # 3. Wait for both instances to initialize
   sleep 1
   cd "$testdir/local/$TEST_SUBDIR_NAME"
