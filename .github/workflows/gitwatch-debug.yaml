@@ -36,7 +36,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        uses: actions/checkout@v5
         with:
           persist-credentials: false
           ref: ${{ github.event.inputs.branch }}
@@ -89,7 +89,7 @@ jobs:
           echo "--- End of verification ---"
 
       - name: Archive gitwatch.sh script for debugging
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: gitwatch-script-debug-${{ matrix.os }}
@@ -156,7 +156,7 @@ jobs:
 
       - name: Upload coverage report (Linux)
         if: matrix.os == 'ubuntu-latest' && github.event.inputs.test_files != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-report-linux-debug
           path: coverage/
@@ -298,7 +298,7 @@ jobs:
           fi
 
       - name: Upload BATS TAP Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always() && github.event.inputs.test_files != ''
         with:
           name: bats-results-tap-${{ matrix.os }}
