@@ -95,6 +95,7 @@ jobs:
           path: gitwatch.sh
           retention-days: 7
 
+      # --- MODIFIED STEP: Fixed kcov pathing and removed bad flag ---
       - name: Run tests (and coverage on Linux)
         id: bats_run
         continue-on-error: true
@@ -126,12 +127,14 @@ jobs:
             echo "Running with kcov for code coverage..."
             mkdir -p ./coverage
             # CWD is repo root
+            echo "Current directory for kcov: $(pwd)"
 
-            # --- FIX: Removed bad --bash-parser flag ---
+            # --- FIX: Removed bad --bash-parser flag and use root find ---
             kcov --include-path=./ --exclude-path=tests/ coverage/ bats --jobs "$NPROC" --tap $(find tests -name "*.bats") | tee "${BATS_TAP_FILE}"
           else
             # On macOS, cd into tests/ to run
             cd tests
+            echo "Current directory for BATS tests: $(pwd)"
             bats --jobs "$NPROC" --tap $(find . -name "*.bats") | tee "${BATS_TAP_FILE}"
           fi
 
