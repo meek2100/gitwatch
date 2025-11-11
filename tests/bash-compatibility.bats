@@ -10,7 +10,7 @@ load 'bats-custom/load'
 
 # This test ensures that the Bash version check correctly falls back to integer seconds
 # when running in an environment that simulates an older Bash 3.x shell.
-@test "bash_compatibility: Older Bash version (3.x) correctly uses READ_TIMEOUT=1" {
+@test "bash_compat_old_bash: Older Bash version (3.x) correctly uses READ_TIMEOUT=1" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -25,13 +25,14 @@ load 'bats-custom/load'
   env "$mock_env" "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
-
   # 3. Wait for the log file to contain the line we need
   # FIX: Replaced 'sleep 1' with a robust poll to avoid race conditions.
   local attempt=0
   local max_attempts=20 # 2 seconds total (20 * 0.1s)
-  while [ $attempt -lt $max_attempts ]; do
-    if grep -q "Using read timeout:" "$output_file"; then
+  while [ $attempt -lt $max_attempts ];
+  do
+    if grep -q "Using read timeout:" "$output_file";
+    then
       break
     fi
     sleep 0.1
@@ -49,7 +50,7 @@ load 'bats-custom/load'
 
 # This test ensures that the Bash version check correctly uses fractional seconds
 # when running in an environment that simulates a modern Bash 4.x shell.
-@test "bash_compatibility: Modern Bash version (4.x) correctly uses READ_TIMEOUT=0.1" {
+@test "bash_compat_modern_bash: Modern Bash version (4.x) correctly uses READ_TIMEOUT=0.1" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -63,13 +64,14 @@ load 'bats-custom/load'
   env "$mock_env" "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
-
   # 3. Wait for the log file to contain the line we need
   # FIX: Replaced 'sleep 1' with a robust poll to avoid race conditions.
   local attempt=0
   local max_attempts=20 # 2 seconds total (20 * 0.1s)
-  while [ $attempt -lt $max_attempts ]; do
-    if grep -q "Using read timeout:" "$output_file"; then
+  while [ $attempt -lt $max_attempts ];
+  do
+    if grep -q "Using read timeout:" "$output_file";
+    then
       break
     fi
     sleep 0.1
@@ -86,7 +88,7 @@ load 'bats-custom/load'
 }
 
 # --- NEW TEST ---
-@test "bash_compatibility: Environment variable GW_READ_TIMEOUT overrides default" {
+@test "bash_compat_env_override: Environment variable GW_READ_TIMEOUT overrides default" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -102,13 +104,14 @@ load 'bats-custom/load'
   env "$mock_env_timeout" "$mock_env_bash" "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
-
   # 3. Wait for the log file to contain the line we need
   # FIX: Replaced 'sleep 1' with a robust poll to avoid race conditions.
   local attempt=0
   local max_attempts=20 # 2 seconds total (20 * 0.1s)
-  while [ $attempt -lt $max_attempts ]; do
-    if grep -q "Using read timeout:" "$output_file"; then
+  while [ $attempt -lt $max_attempts ];
+  do
+    if grep -q "Using read timeout:" "$output_file";
+    then
       break
     fi
     sleep 0.1

@@ -8,7 +8,7 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-@test "quiet_mode_q: -q flag suppresses verbose and standard output" {
+@test "quiet_mode_suppresses_output: -q flag suppresses verbose and standard output" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -40,7 +40,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "quiet_mode_q: -q flag suppresses startup warnings" {
+@test "quiet_mode_suppresses_warnings: -q flag suppresses startup warnings" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -69,7 +69,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "quiet_mode_q: -q flag suppresses critical error output" {
+@test "quiet_mode_suppresses_errors: -q flag suppresses critical error output" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")

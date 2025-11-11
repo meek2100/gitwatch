@@ -8,7 +8,7 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-@test "symlinks: Modifying a file via a symlink triggers commit" {
+@test "symlinks_modify_via_symlink: Modifying a file via a symlink triggers commit" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
@@ -44,7 +44,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "symlinks: Changing a symlink's target triggers commit" {
+@test "symlinks_change_target: Changing a symlink's target triggers commit" {
 
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -81,7 +81,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "symlinks: Adding a new symlink triggers commit" {
+@test "symlinks_add_new: Adding a new symlink triggers commit" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
@@ -116,7 +116,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "symlinks: Ignores modifications to files outside the repo (via symlink)" {
+@test "symlinks_ignore_external: Ignores modifications to files outside the repo (via symlink)" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
@@ -150,7 +150,6 @@ load 'bats-custom/load'
   run git log -1 --format=%H
   assert_success
   assert_equal "$initial_hash" "$output" "Commit occurred on external file modify, but should not have."
-
   # 7. Cleanup external file
   rm -f "$external_file"
   cd /tmp
