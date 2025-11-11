@@ -10,7 +10,8 @@
 # _cleanup_remotedirs: Safely removes directories used for remote repo tests
 _cleanup_remotedirs() {
   # shellcheck disable=SC2154 # BATS_TEST_TMPDIR is set by BATS
-  if [ -d "$BATS_TEST_TMPDIR/remotedirs" ]; then
+  if [ -d "$BATS_TEST_TMPDIR/remotedirs" ];
+  then
     verbose_echo "Cleaning up remote test directories..."
     rm -rf "$BATS_TEST_TMPDIR/remotedirs"
   fi
@@ -20,7 +21,8 @@ _cleanup_remotedirs() {
 debug_on_failure() {
   # This function is called by teardown if the test failed ($BATS_TEST_STATUS -ne 0)
   # shellcheck disable=SC2154 # BATS_TEST_STATUS is set by BATS
-  if [ "$BATS_TEST_STATUS" -ne 0 ]; then
+  if [ "$BATS_TEST_STATUS" -ne 0 ];
+  then
     # shellcheck disable=SC2154 # BATS_TEST_NAME is set by BATS
     verbose_echo "--- DEBUG: Test '$BATS_TEST_NAME' FAILED! ---" >&3
 
@@ -30,7 +32,8 @@ debug_on_failure() {
     # shellcheck disable=SC2154 # testdir is set by BATS
     log_file=$(find "$testdir" -name "output.*" 2>/dev/null | head -n 1)
 
-    if [ -n "$log_file" ] && [ -f "$log_file" ]; then
+    if [ -n "$log_file" ] && [ -f "$log_file" ];
+    then
       verbose_echo "--- Log File Content ($log_file) ---" >&3
       # Dump log to descriptor 3
       cat "$log_file" >&3
@@ -42,7 +45,8 @@ debug_on_failure() {
     # Dump git status from the test repo
     # shellcheck disable=SC2154 # testdir/TEST_SUBDIR_NAME are set by BATS
     local repo_path="$testdir/local/$TEST_SUBDIR_NAME"
-    if [ -d "$repo_path/.git" ]; then
+    if [ -d "$repo_path/.git" ];
+    then
       verbose_echo "--- Git Status ($repo_path) ---" >&3
       (cd "$repo_path" && git status) >&3
       verbose_echo "--- End Git Status ---" >&3
@@ -60,7 +64,9 @@ _common_teardown() {
 
   # 1. Terminate the gitwatch process if it's running
   # shellcheck disable=SC2154 # GITWATCH_PID is set by BATS
-  if [ -n "${GITWATCH_PID:-}" ] && kill -0 "$GITWATCH_PID" &>/dev/null; then
+
+  if [ -n "${GITWATCH_PID:-}" ] && kill -0 "$GITWATCH_PID" &>/dev/null;
+  then
     verbose_echo "# Attempting to terminate gitwatch process PID: $GITWATCH_PID"
     # Send SIGTERM first to allow graceful cleanup (e.g., trap)
     kill -s TERM "$GITWATCH_PID" &>/dev/null
@@ -68,7 +74,8 @@ _common_teardown() {
     wait_for_process_to_die "$GITWATCH_PID" 20 0.1
 
     # If it's still alive, kill it forcefully
-    if kill -0 "$GITWATCH_PID" &>/dev/null; then
+    if kill -0 "$GITWATCH_PID" &>/dev/null;
+    then
       verbose_echo "# Process $GITWATCH_PID did not exit gracefully, sending SIGKILL."
       kill -9 "$GITWATCH_PID" &>/dev/null || true
     fi
@@ -86,21 +93,24 @@ _common_teardown() {
 
   # 3. Cleanup for Dependency Mocks
   # shellcheck disable=SC2154 # BATS_DUMMY_BIN_DIR is set by BATS
-  if [ -n "${BATS_DUMMY_BIN_DIR:-}" ]; then
+  if [ -n "${BATS_DUMMY_BIN_DIR:-}" ];
+  then
     verbose_echo "# Removing dummy bin directory: $BATS_DUMMY_BIN_DIR"
     rm -rf "$BATS_DUMMY_BIN_DIR"
   fi
 
   # 4. Remove test directory (ensure quoting handles spaces)
   # shellcheck disable=SC2154 # testdir is set by BATS
-  if [ -n "$testdir" ] && [ -d "$testdir" ]; then
+  if [ -n "$testdir" ] && [ -d "$testdir" ];
+  then
     verbose_echo "# Removing test directory: $testdir"
     rm -rf "$testdir"
   fi
 
   # 5. Handle special cleanup cases
   # shellcheck disable=SC2154 # BATS_TEST_DESCRIPTION is set by BATS
-  if [[ "$BATS_TEST_DESCRIPTION" == *"remotedirs"* ]]; then
+  if [[ "$BATS_TEST_DESCRIPTION" == *"remotedirs"* ]];
+  then
     _cleanup_remotedirs
   fi
 
@@ -112,6 +122,9 @@ _common_teardown() {
 # Arguments:
 #   $1 - create_remote (0 or 1): If 1, creates a bare upstream repo.
 _common_setup() {
+  # This tells the TAP output which file is being run, even in parallel.
+  echo "# file: $BATS_TEST_FILENAME"
+
   local create_remote="$1" # 0 or 1
 
   # 1. Use a unique, descriptive name for the test directory
@@ -146,7 +159,8 @@ _common_setup() {
   verbose_echo "# Setup: Initial commit hash: $initial_hash"
 
   # 4. Create the bare remote repo if requested
-  if [ "$create_remote" -eq 1 ]; then
+  if [ "$create_remote" -eq 1 ];
+  then
     git init --bare "$remote_repo_dir/upstream.git"
     # Set the 'origin' remote to the bare repo
     git remote add origin "$remote_repo_dir/upstream.git"
