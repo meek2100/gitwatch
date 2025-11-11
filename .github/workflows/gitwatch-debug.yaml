@@ -225,3 +225,12 @@ jobs:
           else
             echo ":white_check_mark: **Overall Status: All Tests Passed**" >> $GITHUB_STEP_SUMMARY
           fi
+
+      # --- NEW STEP: Upload TAP log artifact for debugging ---
+      - name: Upload BATS TAP Artifact
+        uses: actions/upload-artifact@v4
+        if: always() && github.event.inputs.test_files != ''
+        with:
+          name: bats-results-tap-${{ matrix.os }}
+          path: ${{ github.workspace }}/bats_results.tap
+          retention-days: 7
