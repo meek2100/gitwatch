@@ -126,8 +126,14 @@ jobs:
             # Run with kcov on Linux
             echo "Running with kcov for code coverage..."
             mkdir -p ../coverage
-            # --- FIX: Run kcov from /tests dir with relative paths ---
-            kcov --include-path=../ --bash-parser=../gitwatch.sh ../coverage/ bats --tap $TEST_FILES_TO_RUN | tee "${BATS_TAP_FILE}"
+
+            # --- FIX: cd to root, then run kcov with root paths ---
+            cd .. # kcov must run from the repository root
+            echo "Current directory for kcov: $(pwd)"
+
+            # kcov runs bats, which outputs TAP, which is tee'd to the file
+            # Use 'find' to get correct test paths from root
+            kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats --tap $(find tests -name "$TEST_FILES_TO_RUN") | tee "${BATS_TAP_FILE}"
           else
             # Run sequentially on macOS for stable, clean logs
             bats --tap $TEST_FILES_TO_RUN | tee "${BATS_TAP_FILE}"
@@ -163,7 +169,7 @@ jobs:
           path: coverage/
           retention-days: 7
 
-      # --- MODIFIED STEP: Fixed awk script ---
+      # --- THIS STEP IS UNCHANGED (and should be correct) ---
       - name: Generate Test Summary
         if: always() && github.event.inputs.test_files != ''
         shell: bash
