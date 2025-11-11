@@ -96,7 +96,6 @@ jobs:
           path: gitwatch.sh
           retention-days: 7
 
-      # --- MODIFIED STEP: Fixed kcov pathing ---
       - name: Run BATS tests (from UI input)
         id: bats_run
         shell: bash
@@ -112,30 +111,25 @@ jobs:
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
 
-          cd tests
-          echo "Current directory for BATS tests: $(pwd)"
-          echo "Running BATS tests and writing to ${BATS_TAP_FILE}"
-
           # Get the test file glob from the workflow input
           TEST_FILES_TO_RUN=${{ github.event.inputs.test_files }}
           echo "Test files glob: $TEST_FILES_TO_RUN"
-          echo "Running tests sequentially for clear debug logging..."
 
           if [ "$RUNNER_OS" == "Linux" ];
           then
             # Run with kcov on Linux
             echo "Running with kcov for code coverage..."
-            mkdir -p ../coverage
-
-            # --- FIX: cd to root, then run kcov with root paths ---
-            cd .. # kcov must run from the repository root
+            mkdir -p ./coverage
+            # CWD is repo root
             echo "Current directory for kcov: $(pwd)"
 
-            # kcov runs bats, which outputs TAP, which is tee'd to the file
-            # Use 'find' to get correct test paths from root
-            kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats --tap $(find tests -name "$TEST_FILES_TO_RUN") | tee "${BATS_TAP_FILE}"
+            # --- FIX: Removed bad --bash-parser flag ---
+            kcov --include-path=./ --exclude-path=tests/ coverage/ bats --tap $(find tests -name "$TEST_FILES_TO_RUN") | tee "${BATS_TAP_FILE}"
           else
             # Run sequentially on macOS for stable, clean logs
+            cd tests
+            echo "Current directory for BATS tests: $(pwd)"
+            echo "Running tests sequentially for clear debug logging..."
             bats --tap $TEST_FILES_TO_RUN | tee "${BATS_TAP_FILE}"
           fi
 
@@ -169,7 +163,6 @@ jobs:
           path: coverage/
           retention-days: 7
 
-      # --- THIS STEP IS UNCHANGED (and should be correct) ---
       - name: Generate Test Summary
         if: always() && github.event.inputs.test_files != ''
         shell: bash
@@ -196,7 +189,7 @@ jobs:
 
           /^# file: / {
             current_file = $3
-            # --- FIX: Use regex to strip all path components (like basename) ---
+            # FIX: Use regex to strip all path components (like basename)
             sub(/.*\//, "", current_file)
             next
           }

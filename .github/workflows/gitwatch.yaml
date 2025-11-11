@@ -108,8 +108,6 @@ jobs:
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
 
-          cd tests
-
           # Get the number of available processor cores
           NPROC=1
           if [ "$RUNNER_OS" == "Linux" ];
@@ -126,11 +124,14 @@ jobs:
           then
             # Run with kcov on Linux
             echo "Running with kcov for code coverage..."
-            mkdir -p ../coverage
-            # --- FIX: Run kcov from /tests dir with relative paths ---
-            kcov --include-path=../ --bash-parser=../gitwatch.sh ../coverage/ bats --jobs "$NPROC" --tap $(find . -name "*.bats") | tee "${BATS_TAP_FILE}"
+            mkdir -p ./coverage
+            # CWD is repo root
+
+            # --- FIX: Removed bad --bash-parser flag ---
+            kcov --include-path=./ --exclude-path=tests/ coverage/ bats --jobs "$NPROC" --tap $(find tests -name "*.bats") | tee "${BATS_TAP_FILE}"
           else
-            # Use 'bats --jobs' for parallel execution
+            # On macOS, cd into tests/ to run
+            cd tests
             bats --jobs "$NPROC" --tap $(find . -name "*.bats") | tee "${BATS_TAP_FILE}"
           fi
 
@@ -185,7 +186,7 @@ jobs:
 
           /^# file: / {
             current_file = $3
-            # --- FIX: Use regex to strip all path components (like basename) ---
+            # FIX: Use regex to strip all path components (like basename)
             sub(/.*\//, "", current_file)
             next
           }
