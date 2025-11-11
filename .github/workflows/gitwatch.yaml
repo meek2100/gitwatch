@@ -204,11 +204,18 @@ jobs:
             next
           }
 
+          # --- FIX START: Extract the filename ---
+          # BATS outputs filename here: # file: /path/to/test/tests/docker.bats
           /^# file: / {
+            # $3 holds the full path (e.g., /path/to/test/tests/docker.bats)
             current_file = $3
+            # Use sub to extract ONLY the filename (e.g., docker.bats)
+            # Find the last slash / and remove everything up to and including it.
+            # This is correct because test files are typically named *.bats
             sub(/.*\//, "", current_file)
             next
           }
+          # --- FIX END ---
 
           # Use POSIX-compatible regex match and field splitting
           /^(ok|not ok) [0-9]+ / {
@@ -236,7 +243,9 @@ jobs:
                 }
             }
 
+            # --- FIX: Use the retained variable current_file ---
             file_name = current_file
+            # --- END FIX ---
             status = ""
             icon = ""
 
