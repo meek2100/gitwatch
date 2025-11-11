@@ -73,12 +73,21 @@ jobs:
             sudo apt-get update
             sudo apt-get -y install inotify-tools util-linux
           elif [ "$RUNNER_OS" == "macOS" ]; then
-            brew install fswatch flock coreutils bash docker docker-buildx
+            # --- FIX: Install Colima and Docker CLI via Homebrew ---
+            brew install fswatch flock coreutils bash colima docker docker-buildx
           else
             echo "Unsupported OS: $RUNNER_OS"
             exit 1
           fi
 
+      # --- NEW CRITICAL STEP: Start the Docker Daemon (Colima) for macOS ---
+      - name: Start Colima Daemon
+        if: matrix.os == 'macOS-latest'
+        shell: bash
+        run: |
+          # Start Colima with the Docker runtime. This sets up the DOCKER_HOST env var automatically.
+          colima start --runtime docker --cpu 2 --memory 4
+      # --- END NEW CRITICAL STEP ---
       - name: Verify script content before test
         shell: bash
         run: |

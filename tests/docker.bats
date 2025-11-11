@@ -17,7 +17,7 @@ export RUNNER_GID=""
 # ---------------------
 
 setup_file() {
-  # --- FIX 1: Skip if Docker is not available (Addresses macOS failure) ---
+  # --- FIX 1: Skip if Docker is not available ---
   if ! command -v docker &>/dev/null; then
     skip "Test skipped: 'docker' command not found, which is required for Docker E2E tests."
   fi
@@ -27,7 +27,7 @@ setup_file() {
   # shellcheck disable=SC2154 # BATS_TEST_DIRNAME is set by BATS
   local repo_root="${BATS_TEST_DIRNAME}/.."
 
-  # --- FIX 2: Ensure a consistently safe and existing writable temp location (Addresses Linux failure) ---
+  # --- FIX 2: Ensure a consistently safe and existing writable temp location ---
   # Fallback to /tmp if BATS_TEST_TMPDIR is somehow empty/unset in setup_file context
   local temp_dir="${BATS_TEST_TMPDIR:-/tmp}"
   local healthcheck_file="$temp_dir/Dockerfile.healthcheck"
@@ -48,13 +48,13 @@ setup_file() {
   verbose_echo "# DEBUG: Building fast-healthcheck image..."
   # Create a temporary Dockerfile that uses a fast interval
   # Write to the determined safe location
+
+  # --- FIX 3 (CRITICAL): Single-line, escaped CMD for Dockerfile HEALTHCHECK ---
+  # This fixes the 'unknown instruction: grep' Dockerfile parse error.
   cat > "$healthcheck_file" << EOF
 FROM ${DOCKER_IMAGE_NAME}
 HEALTHCHECK --interval=3s --timeout=2s --start-period=5s --retries=2 \
-  CMD test -f /tmp/gitwatch.status && \
-      find /tmp -maxdepth 1 -name gitwatch.status -mmin -1 |
-      grep -q . || \
-      exit 1
+  CMD /bin/sh -c "test -f /tmp/gitwatch.status && find /tmp -maxdepth 1 -name gitwatch.status -mmin -1 | grep -q . || exit 1"
 EOF
 
   run docker build -t "$DOCKER_HEALTHCHECK_IMAGE_NAME" -f "$healthcheck_file" .
@@ -70,7 +70,7 @@ teardown_file() {
   # Clean up the Docker images
   docker rmi "$DOCKER_IMAGE_NAME" 2>/dev/null || true
   docker rmi "$DOCKER_HEALTHCHECK_IMAGE_NAME" 2>/dev/null || true
-  # --- FIX 3: Clean up the temporary Dockerfile using the safe path logic ---
+  # --- FIX 4: Clean up the temporary Dockerfile using the safe path logic ---
   local temp_dir="${BATS_TEST_TMPDIR:-/tmp}"
   rm -f "$temp_dir/Dockerfile.healthcheck" 2>/dev/null || true
 }
