@@ -8,7 +8,7 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-@test "case_insensitive_rename: Handles file rename (e.g., file.txt -> FILE.txt)" {
+@test "case_insensitive_rename_handles_file_rename_eg_file_txt_to_file_txt" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 

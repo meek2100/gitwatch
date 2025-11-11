@@ -10,7 +10,7 @@ load 'bats-custom/load'
 
 # This test ensures that the Bash version check correctly falls back to integer seconds
 # when running in an environment that simulates an older Bash 3.x shell.
-@test "bash_compat_old_bash: Older Bash version (3.x) correctly uses READ_TIMEOUT=1" {
+@test "bash_compat_old_bash_older_bash_3x_correctly_uses_read_timeout_1" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -50,7 +50,7 @@ load 'bats-custom/load'
 
 # This test ensures that the Bash version check correctly uses fractional seconds
 # when running in an environment that simulates a modern Bash 4.x shell.
-@test "bash_compat_modern_bash: Modern Bash version (4.x) correctly uses READ_TIMEOUT=0.1" {
+@test "bash_compat_modern_bash_modern_bash_4x_correctly_uses_read_timeout_0_1" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -88,7 +88,7 @@ load 'bats-custom/load'
 }
 
 # --- NEW TEST ---
-@test "bash_compat_env_override: Environment variable GW_READ_TIMEOUT overrides default" {
+@test "bash_compat_env_override_environment_variable_gw_read_timeout_overrides_default" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")

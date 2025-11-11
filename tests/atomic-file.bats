@@ -8,7 +8,7 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-@test "atomic_file_watch: Watching a single file only commits that file" {
+@test "atomic_file_watch_watching_a_single_file_only_commits_that_file" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")

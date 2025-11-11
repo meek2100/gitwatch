@@ -30,7 +30,8 @@ create_failing_mock_git() {
 echo "# MOCK_GIT: Received command: \$@" >&2
 
 if [ "\$1" = "push" ]; then
-  if [ -f "$state_file" ]; then
+  if [ -f "$state_file" ];
+  then
     echo "# MOCK_GIT: Push command SUCCEEDING (state file exists)." >&2
     exec $real_path "\$@"
   else
@@ -49,7 +50,7 @@ EOF
 
 # --- TESTS ---
 
-@test "backoff: Enters cool-down and recovers" {
+@test "backoff_enters_cool_down_and_recovers" {
   # 1. Setup: Override backoff constants for a fast test
   export GW_MAX_FAIL_COUNT=3
   export GW_COOL_DOWN_SECONDS=4
@@ -77,9 +78,12 @@ EOF
 
   # 3. Trigger 3 failures (GW_MAX_FAIL_COUNT)
   verbose_echo "# DEBUG: Triggering 3 failures..."
-  echo "change 1" >> file.txt; sleep 2 # Wait for commit/push to fail
-  echo "change 2" >> file.txt; sleep 2 # Wait for commit/push to fail
-  echo "change 3" >> file.txt; sleep 2 # Wait for commit/push to fail
+  echo "change 1" >> file.txt;
+  sleep 2 # Wait for commit/push to fail
+  echo "change 2" >> file.txt;
+  sleep 2 # Wait for commit/push to fail
+  echo "change 3" >> file.txt;
+  sleep 2 # Wait for commit/push to fail
 
   # 4. Assert: Check log for 3 failures and entry into cool-down
   run cat "$output_file"
@@ -87,7 +91,6 @@ EOF
   assert_output --partial "Incrementing failure count to 2/3"
   assert_output --partial "Incrementing failure count to 3/3"
   assert_output --partial "Max failures reached. Entering cool-down period for 4 seconds."
-
   # 5. Trigger a 4th change *during* the cool-down
   verbose_echo "# DEBUG: Triggering change during cool-down..."
   echo "change 4 (SKIPPED)" >> file.txt
@@ -96,7 +99,6 @@ EOF
   # 6. Assert: Check log for the "Skipping trigger" message
   run cat "$output_file"
   assert_output --partial "In cool-down mode. Skipping trigger."
-
   # 7. Wait for cool-down to end (4s) + buffer (2s)
   verbose_echo "# DEBUG: Waiting for cool-down to expire..."
   sleep 5
@@ -120,7 +122,6 @@ EOF
   # 11. Assert: Check log for success and reset
   run cat "$output_file"
   assert_output --partial "Git operation succeeded. Resetting failure count."
-
   # 12. Cleanup
   unset GW_GIT_BIN
   unset GW_MAX_FAIL_COUNT
