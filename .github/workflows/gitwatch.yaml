@@ -1,14 +1,21 @@
 ---
-name: Gitwatch QA
+name: Gitwatch QA (Sequential Debug)
 
 on:
-  push:
-    branches: [master]
-  pull_request:
-    branches: [master]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+    inputs:
+      branch:
+        description: "The branch, tag, or SHA to checkout"
+        required: true
+        default: "master"
+      test_files:
+        description: "Space-separated list/glob of test files (e.g., 'commitcmd.bats' or '*.bats'). Runs inside the 'tests/' directory."
+        required: false
+        default: "*.bats" # Default runs all tests
+      timeout_in_minutes:
+        description: "Job timeout in minutes (default: 3, max: 2160)"
+        required: true
+        default: "3"
 
 permissions: {}
 
@@ -19,21 +26,20 @@ jobs:
     if: "!contains(github.event.head_commit.message, '#noaction')"
     permissions:
       contents: read
-      # Allow writing artifacts
       actions: write
     strategy:
-      # Fail-fast is false so you can see failures on both OSs
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macOS-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: ${{ fromJSON(github.event.inputs.timeout_in_minutes) }}
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
           persist-credentials: false
+          ref: ${{ github.event.inputs.branch }}
 
       - name: Reusable Setup (Checkout, BATS, Version)
         uses: ./.github/actions/setup
@@ -65,10 +71,9 @@ jobs:
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
             sudo apt-get update
-            sudo apt-get -y install inotify-tools util-linux parallel
-          elif [ "$RUNNER_OS" == "macOS" ];
-          then
-            brew install fswatch flock coreutils bash parallel
+            sudo apt-get -y install inotify-tools util-linux
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            brew install fswatch flock coreutils bash
           else
             echo "Unsupported OS: $RUNNER_OS"
             exit 1
@@ -78,12 +83,8 @@ jobs:
         shell: bash
         run: |
           echo "--- Verifying gitwatch.sh content ---"
-          # Verify the git write-tree check
-          # 'gitwatch.sh' is now on the same line as grep
           grep -C 3 'if \[ "$staged_tree_hash" = "$head_tree_hash" \];' gitwatch.sh
           echo "--- Verifying debounce logic (PID File Method) ---"
-          # Verify the start of the new debounce logic block using the PID file
-          # 'gitwatch.sh' is now on the same line as grep
           grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
           echo "--- End of verification ---"
 
@@ -91,34 +92,28 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: gitwatch-script-${{ matrix.os }}
+          name: gitwatch-script-debug-${{ matrix.os }}
           path: gitwatch.sh
           retention-days: 7
 
-      - name: Run tests (and coverage on Linux)
+      - name: Run BATS tests (from UI input)
         id: bats_run
-        continue-on-error: true
         shell: bash
         env:
           BATS_LIB_PATH: "${{ steps.setup.outputs.bats-lib-path }}:${{ github.workspace }}/tests"
           BATS_TAP_FILE: "${{ github.workspace }}/bats_results.tap"
+        if: github.event.inputs.test_files != ''
+        continue-on-error: true # <-- IMPORTANT
         run: |
           set -o pipefail
 
+          # Configure git for tests that require it
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
 
-          # Get the number of available processor cores
-          NPROC=1
-          if [ "$RUNNER_OS" == "Linux" ];
-          then
-            NPROC=$(nproc)
-          elif [ "$RUNNER_OS" == "macOS" ];
-          then
-            NPROC=$(sysctl -n hw.ncpu)
-          fi
-
-          echo "Running BATS tests in parallel using $NPROC cores..."
+          # Get the test file glob from the workflow input
+          TEST_FILES_TO_RUN=${{ github.event.inputs.test_files }}
+          echo "Test files glob: $TEST_FILES_TO_RUN"
 
           if [ "$RUNNER_OS" == "Linux" ];
           then
@@ -128,12 +123,13 @@ jobs:
             # CWD is repo root
             echo "Current directory for kcov: $(pwd)"
 
-            kcov --include-path=./ --exclude-path=tests/ coverage/ bats --jobs "$NPROC" --tap $(find tests -name "*.bats") | tee "${BATS_TAP_FILE}"
+            kcov --include-path=./ --exclude-path=tests/ coverage/ bats --tap $(find tests -name "$TEST_FILES_TO_RUN") | tee "${BATS_TAP_FILE}"
           else
-            # On macOS, cd into tests/ to run
+            # Run sequentially on macOS for stable, clean logs
             cd tests
             echo "Current directory for BATS tests: $(pwd)"
-            bats --jobs "$NPROC" --tap $(find . -name "*.bats") | tee "${BATS_TAP_FILE}"
+            echo "Running tests sequentially for clear debug logging..."
+            bats --tap $TEST_FILES_TO_RUN | tee "${BATS_TAP_FILE}"
           fi
 
           # Capture the exit code of 'bats' (or 'kcov')
@@ -153,17 +149,22 @@ jobs:
 
           exit $BATS_EXIT_CODE
 
+      - name: No Tests Specified
+        if: github.event.inputs.test_files == ''
+        run: |
+          echo "No test files specified in 'test_files' input. Skipping BATS run."
+
       - name: Upload coverage report (Linux)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' && github.event.inputs.test_files != ''
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report-linux
+          name: coverage-report-linux-debug
           path: coverage/
           retention-days: 7
 
       # --- MODIFIED STEP: Correctly counts passed, failed, skipped, and todo ---
       - name: Generate Test Summary
-        if: always() # This step will always run
+        if: always() && github.event.inputs.test_files != ''
         shell: bash
         env:
           BATS_TAP_FILE: "${{ github.workspace }}/bats_results.tap"
@@ -269,7 +270,8 @@ jobs:
             gsub(/\|/, "\\|", file_name)
             gsub(/\|/, "\\|", test_name)
             gsub(/\|/, "\\|", test_result)
-            print "| " file_name " | " test_name " | " icon " " test_result " | " status " |"
+            # --- MODIFIED LINE: Added test_number ---
+            print "| " file_name " | " test_number " " test_name " | " icon " " test_result " | " status " |"
           }
 
           END {
@@ -296,7 +298,7 @@ jobs:
 
       - name: Upload BATS TAP Artifact
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && github.event.inputs.test_files != ''
         with:
           name: bats-results-tap-${{ matrix.os }}
           path: ${{ github.workspace }}/bats_results.tap

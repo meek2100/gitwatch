@@ -180,8 +180,9 @@ jobs:
           BEGIN {
             print "### BATS Test Results"
             print ""
-            print "| File | Test | Result | Status |"
-            print "| --- | --- | --- | --- |"
+            # --- MODIFIED HEADER ---
+            print "| Number | Test | Result | File | Status |"
+            print "| --- | --- | --- | --- | --- |"
             passed = 0
             failed = 0
             skipped = 0
@@ -270,7 +271,8 @@ jobs:
             gsub(/\|/, "\\|", file_name)
             gsub(/\|/, "\\|", test_name)
             gsub(/\|/, "\\|", test_result)
-            print "| " file_name " | " test_name " | " icon " " test_result " | " status " |"
+            # --- MODIFIED LINE: Reordered columns ---
+            print "| " test_number " | " test_name " | " icon " " test_result " | " file_name " | " status " |"
           }
 
           END {
