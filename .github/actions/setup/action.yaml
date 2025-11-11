@@ -30,7 +30,7 @@ runs:
     - name: Setup Bats and Bats libraries
       if: ${{ inputs.setup-bats == 'true' }}
       id: setup-bats # This ID provides the 'lib-path' output
-      uses: bats-core/bats-action@v3
+      uses: bats-core/bats-action@3.0.1
       with:
         # Install to ${{ github.workspace }} (which is in $HOME)
         # to enable caching, as recommended by the action's README.
