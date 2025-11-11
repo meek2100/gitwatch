@@ -87,7 +87,6 @@ jobs:
           cat gitwatch.sh
           echo "--- End of gitwatch.sh ---"
 
-      # --- THIS STEP WAS FIXED ---
       - name: Verify script content before test
         shell: bash
         run: |
@@ -136,7 +135,8 @@ jobs:
             cd ..
 
             # kcov runs bats, which outputs TAP, which is tee'd to the file
-            kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats --tap $(find tests -name "*.bats") | tee "${BATS_TAP_FILE}"
+            # We add --jobs "$NPROC" here for parallel kcov
+            kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats --jobs "$NPROC" --tap $(find tests -name "*.bats") | tee "${BATS_TAP_FILE}"
           else
             # Use 'bats --jobs' for parallel execution
             bats --jobs "$NPROC" --tap $(find . -name "*.bats") | tee "${BATS_TAP_FILE}"
@@ -147,7 +147,16 @@ jobs:
           echo "BATS raw exit code: ${BATS_EXIT_CODE}"
           echo "bats_exit_code_internal=${BATS_EXIT_CODE}" >> $GITHUB_OUTPUT
 
-          echo "Finished running tests"
+          echo "===================================================================="
+          echo "Finished running tests. Verifying ${BATS_TAP_FILE} content..."
+          if [ -f "${BATS_TAP_FILE}" ]; then
+            cat "${BATS_TAP_FILE}"
+          else
+            echo "ERROR: BATS_TAP_FILE not found at ${BATS_TAP_FILE}"
+          fi
+          echo "--- End of verification ---"
+          echo "===================================================================="
+
           exit $BATS_EXIT_CODE
 
       - name: Upload coverage report (Linux)
@@ -171,34 +180,71 @@ jobs:
             exit 0
           fi
 
+          # This 'awk' script now splits the full test name into "Test Name" and "Result"
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
             print "### BATS Test Results"
             print ""
-            print "| Test | Status |"
-            print "| --- | --- |"
+            # New 4-column header
+            print "| File | Test | Result | Status |"
+            print "| --- | --- | --- | --- |"
             passed = 0
             failed = 0
+            current_file = "N/A" # Holds the filename
           }
 
+          # Capture the filename (thanks to our helper script fix)
+          /^# file: / {
+            current_file = $3
+            # Strip the 'tests/' prefix for a cleaner name
+            sub(/^tests\//, "", current_file)
+            next
+          }
+
+          # Match test result lines
           /^(ok|not ok) [0-9]+ / {
             status_word = $1
             test_number = $2
 
-            # Find the start of the test name, which is after the number and space
+            # Find the start of the full test name
             name_start = index($0, test_number " ") + length(test_number) + 1
-            test_name = substr($0, name_start)
+            test_name_full = substr($0, name_start)
 
-            # Sanitize for markdown table
-            gsub(/\|/, "\\|", test_name)
+            # --- New 4-column logic ---
+            file_name = current_file
+            test_name = ""
+            test_result = ""
+            status = ""
+            icon = ""
+
+            # Split the full name into test_name and test_result
+            split_pos = index(test_name_full, ": ")
+            if (split_pos > 0) {
+                test_name = substr(test_name_full, 1, split_pos - 1)
+                test_result = substr(test_name_full, split_pos + 2)
+            } else {
+                test_name = test_name_full # Use the whole string as the "name"
+                test_result = "(No result text)" # No separate result
+            }
 
             if (status_word == "ok") {
-              print "| ✅ " test_name " | Passed |"
-              passed++
+                status = "Passed"
+                icon = "✅"
+                passed++
             } else {
-              print "| ❌ " test_name " | Failed |"
-              failed++
+                status = "Failed"
+                icon = "❌"
+                failed++
             }
+
+            # Sanitize all fields for markdown
+            gsub(/\|/, "\\|", file_name)
+            gsub(/\|/, "\\|", test_name)
+            gsub(/\|/, "\\|", test_result)
+
+            # Print the new 4-column format
+            print "| " file_name " | " test_name " | " icon " " test_result " | " status " |"
+            # --- End new logic ---
           }
 
           END {
@@ -222,3 +268,11 @@ jobs:
           else
             echo ":white_check_mark: **Overall Status: All Tests Passed**" >> $GITHUB_STEP_SUMMARY
           fi
+
+      - name: Upload BATS TAP Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bats-results-tap-${{ matrix.os }}
+          path: ${{ github.workspace }}/bats_results.tap
+          retention-days: 7
