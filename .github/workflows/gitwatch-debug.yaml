@@ -95,6 +95,7 @@ jobs:
           grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
           echo "--- End of verification ---"
 
+      # --- MODIFIED STEP: Now loops through files to build a proper TAP file ---
       - name: Run BATS tests (from UI input)
         id: bats_run
         shell: bash
@@ -110,22 +111,44 @@ jobs:
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
 
-          # --- MODIFICATION ---
-          # Run from the repository root, not from inside /tests
+          cd tests
           echo "Current directory for BATS tests: $(pwd)"
           echo "Running BATS tests and writing to ${BATS_TAP_FILE}"
 
-          # Prepend 'tests/' to the user's file glob.
-          # This ensures bats prints the '# file: ...' line.
-          bats --tap tests/${{ github.event.inputs.test_files }} | tee "${BATS_TAP_FILE}"
-          # --- END MODIFICATION ---
+          # Ensure the TAP file is empty to start
+          > "${BATS_TAP_FILE}"
 
-          # Capture the exit code of 'bats'
-          BATS_EXIT_CODE=${PIPESTATUS[0]}
-          echo "BATS raw exit code: ${BATS_EXIT_CODE}"
+          FINAL_EXIT_CODE=0
+          TEST_FILES_GLOB=${{ github.event.inputs.test_files }}
+          echo "Expanding glob: $TEST_FILES_GLOB"
 
-          # Save this exit code as an output for the next step
-          echo "bats_exit_code_internal=${BATS_EXIT_CODE}" >> $GITHUB_OUTPUT
+          # Loop through each test file matching the glob
+          for test_file in $TEST_FILES_GLOB; do
+            if [ -f "$test_file" ]; then # Make sure it's a file
+                echo "---"
+                echo "Running test: $test_file"
+
+                # 1. Manually echo the file header to the TAP file
+                echo "# file: tests/$test_file" >> "${BATS_TAP_FILE}"
+
+                # 2. Run bats on the single file and append its TAP output
+                # We pipe to 'tee -a' so we see live output AND append to the file
+                bats --tap "$test_file" | tee -a "${BATS_TAP_FILE}"
+                local_exit_code=${PIPESTATUS[0]}
+
+                # 3. Update final exit code if this one failed
+                if [ $local_exit_code -ne 0 ]; then
+                    echo "Test $test_file failed with code $local_exit_code"
+                    FINAL_EXIT_CODE=$local_exit_code # Store the non-zero code
+                fi
+                echo "---"
+            else
+                echo "Warning: No file found for pattern '$test_file'"
+            fi
+          done
+
+          echo "BATS final exit code: ${FINAL_EXIT_CODE}"
+          echo "bats_exit_code_internal=${FINAL_EXIT_CODE}" >> $GITHUB_OUTPUT
 
           echo "===================================================================="
           echo "Finished running tests. Verifying ${BATS_TAP_FILE} content..."
@@ -133,14 +156,14 @@ jobs:
           echo "--- End of verification ---"
           echo "===================================================================="
 
-          exit $BATS_EXIT_CODE
+          exit $FINAL_EXIT_CODE
 
       - name: No Tests Specified
         if: github.event.inputs.test_files == ''
         run: |
           echo "No test files specified in 'test_files' input. Skipping BATS run."
 
-      # --- MODIFIED STEP: New 'awk' script for 3 columns ---
+      # --- THIS STEP IS UNCHANGED ---
       - name: Generate Test Summary
         if: always() && github.event.inputs.test_files != ''
         shell: bash
@@ -230,7 +253,7 @@ jobs:
             echo ":white_check_mark: **Overall Status: All Tests Passed**" >> $GITHUB_STEP_SUMMARY
           fi
 
-      # --- NEW STEP: Upload TAP log artifact for debugging ---
+      # --- THIS STEP IS UNCHANGED ---
       - name: Upload BATS TAP Artifact
         uses: actions/upload-artifact@v4
         if: always() && github.event.inputs.test_files != ''
