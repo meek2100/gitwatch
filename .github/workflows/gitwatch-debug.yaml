@@ -95,7 +95,6 @@ jobs:
           grep -C 3 'if \[ -f "$TIMER_PID_FILE" \];' gitwatch.sh
           echo "--- End of verification ---"
 
-      # --- MODIFIED STEP: Now loops through files to build a proper TAP file ---
       - name: Run BATS tests (from UI input)
         id: bats_run
         shell: bash
@@ -163,7 +162,7 @@ jobs:
         run: |
           echo "No test files specified in 'test_files' input. Skipping BATS run."
 
-      # --- THIS STEP IS UNCHANGED ---
+      # --- MODIFIED STEP: 'awk' script now builds a 4-column table ---
       - name: Generate Test Summary
         if: always() && github.event.inputs.test_files != ''
         shell: bash
@@ -177,29 +176,27 @@ jobs:
             exit 0
           fi
 
-          # This 'awk' script now captures the '# file:' line to populate the 'File' column.
+          # This 'awk' script now splits the full test name into "Test Name" and "Result"
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
             print "### BATS Test Results"
             print ""
-            # Add the new "File" column
-            print "| File | Test | Status |"
-            print "| --- | --- | --- |"
+            # New 4-column header
+            print "| File | Test | Result | Status |"
+            print "| --- | --- | --- | --- |"
             passed = 0
             failed = 0
             current_file = "N/A" # Holds the filename
           }
 
-          # NEW: Capture the filename when it appears
-          # Matches lines like "# file: tests/add-failure.bats"
+          # Capture the filename
           /^# file: / {
             current_file = $3
-            # Strip the 'tests/' prefix for a cleaner name
             sub(/^tests\//, "", current_file)
-            next # Skip to the next line
+            next
           }
 
-          # Match lines like "ok 1 Test Name" or "not ok 2 Test Name"
+          # Match test result lines
           /^(ok|not ok) [0-9]+ / {
             status_word = $1
             test_number = $2
@@ -208,27 +205,41 @@ jobs:
             name_start = index($0, test_number " ") + length(test_number) + 1
             test_name_full = substr($0, name_start)
 
-            # Use the filename we captured
+            # --- New 4-column logic ---
             file_name = current_file
-            test_name = test_name_full
+            test_name = ""
+            test_result = ""
+            status = ""
+            icon = ""
 
-            # Also, strip the 'filename:' prefix from the test name itself for clarity
+            # Split the full name into test_name and test_result
             split_pos = index(test_name_full, ": ")
             if (split_pos > 0) {
-              test_name = substr(test_name_full, split_pos + 2)
+                test_name = substr(test_name_full, 1, split_pos - 1)
+                test_result = substr(test_name_full, split_pos + 2)
+            } else {
+                test_name = test_name_full # Use the whole string as the "name"
+                test_result = "(No result text)" # No separate result
             }
-
-            # Sanitize for markdown table
-            gsub(/\|/, "\\|", file_name)
-            gsub(/\|/, "\\|", test_name)
 
             if (status_word == "ok") {
-              print "| " file_name " | ✅ " test_name " | Passed |"
-              passed++
+                status = "Passed"
+                icon = "✅"
+                passed++
             } else {
-              print "| " file_name " | ❌ " test_name " | Failed |"
-              failed++
+                status = "Failed"
+                icon = "❌"
+                failed++
             }
+
+            # Sanitize all fields for markdown
+            gsub(/\|/, "\\|", file_name)
+            gsub(/\|/, "\\|", test_name)
+            gsub(/\|/, "\\|", test_result)
+
+            # Print the new 4-column format
+            print "| " file_name " | " test_name " | " icon " " test_result " | " status " |"
+            # --- End new logic ---
           }
 
           END {
