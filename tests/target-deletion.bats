@@ -11,7 +11,7 @@ load 'bats-custom/load'
 # This test checks that gitwatch exits gracefully when the target it is watching
 # (either a file or a directory) is deleted, as the underlying watcher tool will
 # terminate in this scenario.
-@test "target_deletion_file: Commits deletion and exits gracefully" {
+@test "target_deletion_file_commits_deletion_and_exits_gracefully" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -73,7 +73,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "target_deletion_dir: Exits gracefully when the watched directory is deleted" {
+@test "target_deletion_dir_exits_gracefully_when_the_watched_directory_is_deleted" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -124,7 +124,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "watcher_process_failure: Exits gracefully when the watcher binary terminates unexpectedly" {
+@test "watcher_process_failure_exits_gracefully_when_the_watcher_binary_terminates_unexpectedly" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")

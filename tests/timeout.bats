@@ -27,7 +27,8 @@ wait_for_log_message() {
   local delay=1
   local attempt=1
 
-  while (( attempt <= max_attempts )); do
+  while (( attempt <= max_attempts ));
+  do
     verbose_echo "# DEBUG: Checking log '$file' for '$pattern' (Attempt $attempt/$max_attempts)..."
     if [ -f "$file" ] && grep -q "$pattern" "$file";
     then
@@ -60,7 +61,7 @@ create_mock_git_hang_on_cmd() {
 echo "# MOCK_GIT: Received command: \$@" >&2
 
 if [ "\$1" = "$hang_cmd" ];
-then
+  then
   echo "# MOCK_GIT: Hanging on '$hang_cmd', will sleep 600s..." >&2
   sleep 600
 else
@@ -89,7 +90,7 @@ get_stdbuf_cmd() {
 }
 
 
-@test "timeout_git_push: Ensures hung git push command is terminated and logged" {
+@test "timeout_git_push_ensures_hung_git_push_command_is_terminated_and_logged" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -136,7 +137,7 @@ get_stdbuf_cmd() {
   cd /tmp
 }
 
-@test "timeout_git_pull_rebase: Ensures hung git pull command is terminated and logged" {
+@test "timeout_git_pull_rebase_ensures_hung_git_pull_command_is_terminated_and_logged" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -183,7 +184,7 @@ get_stdbuf_cmd() {
   cd /tmp
 }
 
-@test "timeout_git_commit: Ensures hung git commit command is terminated and logged" {
+@test "timeout_git_commit_ensures_hung_git_commit_command_is_terminated_and_logged" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")

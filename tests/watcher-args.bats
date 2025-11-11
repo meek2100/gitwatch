@@ -31,7 +31,7 @@ create_watcher_wrapper() {
   echo "$dummy_path"
 }
 
-@test "watcher_args_linux: Verifies correct arguments for inotifywait" {
+@test "watcher_args_linux_verifies_correct_arguments_for_inotifywait" {
 
   if [ "$(uname)" != "Linux" ];
   then
@@ -78,7 +78,7 @@ create_watcher_wrapper() {
   cd /tmp
 }
 
-@test "watcher_args_macos: Verifies correct arguments for fswatch" {
+@test "watcher_args_macos_verifies_correct_arguments_for_fswatch" {
   if [ "$(uname)" != "Darwin" ];
   then
     skip "Test skipped: only runs on macOS runners."
