@@ -88,9 +88,7 @@ setup() {
 
   # *** CRITICAL FIX: Explicitly ensure host directory permissions ***
   # Set permissions to rwx for all (safe in test environment) before git init.
-  # This avoids the "cd: Permission denied" error in gitwatch.sh inside the container,
-  # as the PUID/PGID mapping relies on the correct host user having full access.
-  # This fixes tests 1, 3, 4, 5, 6.
+  # This fixes the "cd: Permission denied" FATAL error inside gitwatch.sh.
   run chmod 777 "$TEST_REPO_HOST_DIR"
   assert_success "Failed to set permissive permissions on host repo directory"
 
@@ -209,7 +207,7 @@ get_container_logs() {
     -e PGID="$RUNNER_GID"
 
   # 1. Assert: Check if the user can write to the volume as 'appuser'
-  #    This check confirms PUID/PGID mapping and correct permissions. (Fixes original assertion failure)
+  #    The original test asserted against unreliable symbolic names. This verifies *functionality*.
   run docker exec --user appuser "$container_name" touch /app/watched-repo/test-touch
   assert_success "docker exec 'touch' command failed (PUID/PGID mapping likely failed or permissions are wrong)"
 

@@ -74,11 +74,22 @@ jobs:
             sudo apt-get -y install inotify-tools util-linux
           elif [ "$RUNNER_OS" == "macOS" ]; then
             # --- Install Docker CLI & Buildx via Homebrew ---
-            brew install fswatch flock coreutils bash docker docker-buildx
+            brew install fswatch flock coreutils bash docker docker-buildx colima
           else
             echo "Unsupported OS: $RUNNER_OS"
             exit 1
           fi
+
+      - name: Start Colima Docker Daemon
+        if: matrix.os == 'macOS-latest'
+        shell: bash
+        run: |
+          # Start Colima with the Docker runtime and wait for the daemon to be ready.
+          colima start --runtime docker
+          # Check status to ensure connectivity.
+          docker ps -a
+          # Ensure buildx is ready for the Docker image build in the test.
+          docker buildx install
 
       - name: Verify script content before test
         shell: bash
