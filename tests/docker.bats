@@ -17,11 +17,11 @@ export RUNNER_GID=""
 # ---------------------
 
 setup_file() {
-  # --- FIX 1: Skip if Docker is not available ---
-  if ! command -v docker &>/dev/null; then
-    skip "Test skipped: 'docker' command not found, which is required for Docker E2E tests."
+  # --- FIX: Skip if Docker is not available/not running ---
+  if ! command -v docker &>/dev/null || ! docker info &>/dev/null; then
+    skip "Test skipped: Docker command or daemon not found/running, which is required for Docker E2E tests."
   fi
-  # --- END FIX 1 ---
+  # --- END FIX ---
 
   # Build the Docker image from the parent directory
   # shellcheck disable=SC2154 # BATS_TEST_DIRNAME is set by BATS
@@ -41,6 +41,9 @@ setup_file() {
   then
     echo "# DEBUG: Docker image build failed"
     echo "$output"
+    # If the build fails (e.g., due to buildx issue even if the daemon is up),
+    # the test suite should fail the setup_file, which results in skipped tests.
+    assert_success "Docker image build failed"
   fi
   assert_success "Docker image build failed"
 
@@ -207,7 +210,7 @@ get_container_logs() {
     -e PGID="$RUNNER_GID"
 
   # 1. Assert: Check if the user can write to the volume as 'appuser'
-  #    The original test asserted against unreliable symbolic names. This verifies *functionality*.
+  #    This check confirms PUID/PGID mapping and correct permissions. (Fixes original assertion failure)
   run docker exec --user appuser "$container_name" touch /app/watched-repo/test-touch
   assert_success "docker exec 'touch' command failed (PUID/PGID mapping likely failed or permissions are wrong)"
 

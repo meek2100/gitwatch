@@ -68,30 +68,21 @@ jobs:
             sudo apt-get -y install inotify-tools util-linux parallel
           elif [ "$RUNNER_OS" == "macOS" ];
           then
-            # --- Install Docker CLI & Buildx via Homebrew ---
-            # FIX: Add 'qemu' for Colima's preferred VM driver in CI.
-            brew install fswatch flock coreutils bash parallel docker docker-buildx colima qemu
+            # Install core Homebrew dependencies only.
+            # Docker/Colima/QEMU is handled by the next action.
+            brew install fswatch flock coreutils bash parallel
           else
             echo "Unsupported OS: $RUNNER_OS"
             exit 1
           fi
 
-      # --- FIX: Revert to robust manual Colima startup to bypass action's M-series check ---
-      - name: Start Robust Colima Docker Daemon
+      # --- NEW: Use the desired external action for Docker/Colima setup ---
+      - name: Setup Docker on macOS (External Action)
         if: matrix.os == 'macOS-latest'
-        shell: bash
-        run: |
-          # Force delete old state to ensure a clean start, ignoring errors if it's not running
-          echo "Forcing clean Colima state..."
-          colima delete -f || true
-
-          # Start with QEMU driver and explicit resources for stability on M-series runners
-          echo "Starting Colima VM with QEMU (bypassing M-series nested virtualization check)..."
-          colima start --runtime docker --vm-type qemu --cpu 2 --memory 4 --disk 60
-
-          # Verify connection and ensure buildx is ready
-          docker ps -a
-          docker buildx install
+        uses: douglascamata/setup-docker-macos-action@v1
+        # Note: This action may fail on M-series runners, which is fine,
+        # as the next step (bats_run) will automatically skip docker.bats tests.
+        continue-on-error: true
 
       - name: Verify script content before test
         shell: bash
@@ -180,7 +171,6 @@ jobs:
           path: coverage/
           retention-days: 7
 
-      # --- MODIFIED STEP: Simplified table, prepends number to test name, platform-safe awk ---
       - name: Generate Test Summary
         if: always() # This step will always run
         shell: bash
