@@ -17,15 +17,25 @@ export RUNNER_GID=""
 # ---------------------
 
 setup_file() {
+  # --- FIX 1: Skip if Docker is not available (Addresses macOS failure) ---
+  if ! command -v docker &>/dev/null; then
+    skip "Test skipped: 'docker' command not found, which is required for Docker E2E tests."
+  fi
+  # --- END FIX 1 ---
+
   # Build the Docker image from the parent directory
   # shellcheck disable=SC2154 # BATS_TEST_DIRNAME is set by BATS
   local repo_root="${BATS_TEST_DIRNAME}/.."
+
+  # --- FIX 2: Ensure a consistently safe and existing writable temp location (Addresses Linux failure) ---
+  # Fallback to /tmp if BATS_TEST_TMPDIR is somehow empty/unset in setup_file context
+  local temp_dir="${BATS_TEST_TMPDIR:-/tmp}"
+  local healthcheck_file="$temp_dir/Dockerfile.healthcheck"
 
   # --- MODIFIED: Read base image from env var ---
   local base_image="${TEST_BASE_IMAGE:-alpine:3.20}"
   verbose_echo "# DEBUG: Building image with base: $base_image"
   run docker build --build-arg "BASE_IMAGE=$base_image" -t "$DOCKER_IMAGE_NAME" "$repo_root"
-  # --- END MODIFICATION ---
 
   if [ "$status" -ne 0 ];
   then
@@ -37,7 +47,8 @@ setup_file() {
   # --- NEW: Build the fast-healthcheck image ---
   verbose_echo "# DEBUG: Building fast-healthcheck image..."
   # Create a temporary Dockerfile that uses a fast interval
-  cat > "${BATS_TEST_TMPDIR}/Dockerfile.healthcheck" << EOF
+  # Write to the determined safe location
+  cat > "$healthcheck_file" << EOF
 FROM ${DOCKER_IMAGE_NAME}
 HEALTHCHECK --interval=3s --timeout=2s --start-period=5s --retries=2 \
   CMD test -f /tmp/gitwatch.status && \
@@ -46,7 +57,7 @@ HEALTHCHECK --interval=3s --timeout=2s --start-period=5s --retries=2 \
       exit 1
 EOF
 
-  run docker build -t "$DOCKER_HEALTHCHECK_IMAGE_NAME" -f "${BATS_TEST_TMPDIR}/Dockerfile.healthcheck" .
+  run docker build -t "$DOCKER_HEALTHCHECK_IMAGE_NAME" -f "$healthcheck_file" .
   if [ "$status" -ne 0 ]; then
     echo "# DEBUG: Docker healthcheck image build failed"
     echo "$output"
@@ -57,9 +68,11 @@ EOF
 
 teardown_file() {
   # Clean up the Docker images
-  docker rmi "$DOCKER_IMAGE_NAME" 2>/dev/null ||
-  true
+  docker rmi "$DOCKER_IMAGE_NAME" 2>/dev/null || true
   docker rmi "$DOCKER_HEALTHCHECK_IMAGE_NAME" 2>/dev/null || true
+  # --- FIX 3: Clean up the temporary Dockerfile using the safe path logic ---
+  local temp_dir="${BATS_TEST_TMPDIR:-/tmp}"
+  rm -f "$temp_dir/Dockerfile.healthcheck" 2>/dev/null || true
 }
 
 setup() {
@@ -88,7 +101,8 @@ setup() {
 
 teardown() {
   # Stop and remove all containers with the test prefix
-  docker ps -a --filter "name=${DOCKER_CONTAINER_NAME_PREFIX}-" --format "{{.ID}}" | xargs -r docker rm -f
+  docker ps -a --filter "name=${DOCKER_CONTAINER_NAME_PREFIX}-" --format "{{.ID}}" |
+  xargs -r docker rm -f
   # Clean up the host directory
   if [ -d "$TEST_REPO_HOST_DIR" ];
   then
@@ -112,7 +126,7 @@ create_failing_mock_git() {
 echo "# MOCK_GIT: Received command: \$@" >&2
 
 if [ "\$1" = "push" ];
-  then
+then
   echo "# MOCK_GIT: Push command FAILING" >&2
   exit 1 # Always fail the push
 else
