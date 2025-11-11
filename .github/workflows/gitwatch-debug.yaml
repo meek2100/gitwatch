@@ -162,7 +162,6 @@ jobs:
           path: coverage/
           retention-days: 7
 
-      # --- MODIFIED STEP: Correctly counts passed, failed, skipped, and todo ---
       - name: Generate Test Summary
         if: always() && github.event.inputs.test_files != ''
         shell: bash
@@ -180,14 +179,19 @@ jobs:
           BEGIN {
             print "### BATS Test Results"
             print ""
-            # --- MODIFIED HEADER ---
             print "| Number | Test | Result | File | Status |"
             print "| --- | --- | --- | --- | --- |"
             passed = 0
             failed = 0
             skipped = 0
-            todo = 0
+            planned_tests = 0
             current_file = "N/A"
+          }
+
+          /^1\.\.[0-9]+/ {
+            split($0, a, "..")
+            planned_tests = a[2]
+            next
           }
 
           /^# file: / {
@@ -209,26 +213,13 @@ jobs:
             icon = ""
             test_name_part = test_name_full # Default
 
-            # Check for # todo FIRST, as it takes precedence
-            todo_pos = index(test_name_full, "# todo")
-            if (todo_pos == 0) {
-              todo_pos = index(test_name_full, "# TODO")
-            }
-
-            # Check for # skip SECOND
+            # Check for # skip
             skip_pos = index(test_name_full, "# skip")
             if (skip_pos == 0) {
               skip_pos = index(test_name_full, "# SKIP")
             }
 
-            if (todo_pos > 0) {
-                # --- IS TODO (can be ok or not ok) ---
-                todo++
-                status = "Todo"
-                icon = "🔵"
-                test_name_part = substr(test_name_full, 1, todo_pos - 1)
-                test_result = substr(test_name_full, todo_pos)
-            } else if (status_word == "ok" && skip_pos > 0) {
+            if (status_word == "ok" && skip_pos > 0) {
                 # --- IS SKIPPED ---
                 skipped++
                 status = "Skipped"
@@ -271,14 +262,19 @@ jobs:
             gsub(/\|/, "\\|", file_name)
             gsub(/\|/, "\\|", test_name)
             gsub(/\|/, "\\|", test_result)
-            # --- MODIFIED LINE: Reordered columns ---
             print "| " test_number " | " test_name " | " icon " " test_result " | " file_name " | " status " |"
           }
 
           END {
+            total_run = passed + failed + skipped
+            not_run = 0
+            if (planned_tests > total_run) {
+               not_run = planned_tests - total_run
+            }
+
             print ""
             print "---"
-            print "**Summary:** " passed " passed, " failed " failed, " skipped " skipped, " todo " todo."
+            print "**Summary:** " passed " passed, " failed " failed, " skipped " skipped, " not_run " not run."
           }
           EOF
           )
