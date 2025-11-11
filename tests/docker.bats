@@ -101,8 +101,7 @@ setup() {
 
 teardown() {
   # Stop and remove all containers with the test prefix
-  docker ps -a --filter "name=${DOCKER_CONTAINER_NAME_PREFIX}-" --format "{{.ID}}" |
-  xargs -r docker rm -f
+  docker ps -a --filter "name=${DOCKER_CONTAINER_NAME_PREFIX}-" --format "{{.ID}}" | xargs -r docker rm -f
   # Clean up the host directory
   if [ -d "$TEST_REPO_HOST_DIR" ];
   then
