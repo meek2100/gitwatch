@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 ARG BASE_IMAGE=alpine:3.20
 FROM ${BASE_IMAGE}
 
@@ -19,12 +18,6 @@ RUN apk add --no-cache \
         procps \
     && mkdir -p /app \
     && chown appuser:appgroup /app
-=======
-FROM alpine:3.20
-# hadolint ignore=DL3018
-RUN apk add --no-cache bash git inotify-tools openssh && \
-    mkdir -p /app
->>>>>>> master
 
 WORKDIR /app
 
@@ -33,7 +26,6 @@ COPY --chown=appuser:appgroup gitwatch.sh entrypoint.sh LICENSE ./
 
 RUN chmod +x /app/gitwatch.sh /app/entrypoint.sh
 
-<<<<<<< HEAD
 # Add an environment variable to signal gitwatch is running in a Docker environment
 ENV GITWATCH_DOCKER_ENV=true
 
@@ -49,6 +41,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
       find /tmp -maxdepth 1 -name gitwatch.status -mmin -1 | grep -q . || \
       exit 1
 
-=======
->>>>>>> master
 ENTRYPOINT ["/app/entrypoint.sh"]

@@ -6,7 +6,6 @@ repos:
     rev: "v3.6.2"
     hooks:
       - id: prettier
-<<<<<<< HEAD
         name: Format Code (Prettier)
         args:
           [
@@ -16,14 +15,10 @@ repos:
             "--ignore-path",
             ".config/.prettierignore",
           ]
-=======
-        types_or: [javascript, json, markdown, yaml, html, css]
->>>>>>> master
   - repo: https://github.com/executablebooks/mdformat
     rev: 1.0.0
     hooks:
       - id: mdformat
-<<<<<<< HEAD
         name: Format Markdown (mdformat)
         entry: mdformat
         language: python
@@ -41,24 +36,10 @@ repos:
       - id: markdownlint
         name: Lint Markdown
         args: ["--config", ".config/.markdownlint.yaml"]
-=======
-        name: Format Markdown
-        entry: mdformat
-        language: python
-        types: [markdown]
-        args: [--wrap, "75", --number]
-        additional_dependencies:
-          - mdformat-toc
-          - mdformat-beautysh
-          - mdformat-config
-          - mdformat-gfm
-          - setuptools
->>>>>>> master
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
       - id: no-commit-to-branch
-<<<<<<< HEAD
         name: Block Commit to Main
         args: [--branch, master]
       - id: check-yaml
@@ -96,45 +77,12 @@ repos:
       - id: yamllint
         name: Lint YAML
         args: ["--config-file", ".config/.yamllint.yaml"]
-=======
-        args: [--branch, main]
-      - id: check-yaml
-        exclude: ^(docker-compose\.yml|.*/release-drafter\.yml)$
-      - id: debug-statements
-      - id: end-of-file-fixer
-      - id: trailing-whitespace
-      - id: check-json
-      - id: mixed-line-ending
-        args: [--fix=lf]
-        types: [text]
-        exclude: \.md$
-      - id: check-merge-conflict
-      - id: check-executables-have-shebangs
-      - id: check-shebang-scripts-are-executable
-      - id: fix-byte-order-marker
-      - id: check-case-conflict
-      - id: check-added-large-files
-        args: ["--maxkb=500"]
-  - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.37.1
-    hooks:
-      - id: yamllint
-        args:
-          - "--no-warnings"
-          - "-d {extends: relaxed, rules: {line-length: {max: 90}}}"
->>>>>>> master
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:
       - id: codespell
-<<<<<<< HEAD
         name: Check Spelling (Codespell)
         args: ["--config", ".config/.codespellrc"]
-=======
-        args:
-          - "--ignore-words-list=hist,thist"
-          - "--skip=*.lock,*.json"
->>>>>>> master
   - repo: https://github.com/IamTheFij/docker-pre-commit
     rev: v3.0.1
     hooks:
@@ -160,30 +108,17 @@ repos:
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
-<<<<<<< HEAD
         name: Lint Shell Scripts (ShellCheck)
         files: \.(sh|bats|bash)$
         args: ["--rcfile", ".config/.shellcheckrc"]
-=======
-        files: ^[^\.].*\.sh$
-        args: [--shell, bash]
->>>>>>> master
   - repo: https://github.com/AleksaC/hadolint-py
     rev: v2.14.0
     hooks:
       - id: hadolint
         name: Lint Dockerfiles
-<<<<<<< HEAD
         args: ["--config", ".config/.hadolint.yaml"]
-=======
-        args: [--ignore, DL3018]
->>>>>>> master
   - repo: https://github.com/NixOS/nixfmt
     rev: v1.1.0
     hooks:
       - id: nixfmt
         name: Format Nix files
-<<<<<<< HEAD
-=======
-        types: [nix]
->>>>>>> master
