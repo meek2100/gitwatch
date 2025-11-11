@@ -30,7 +30,7 @@ teardown() {
 }
 
 
-@test "remote_git_dirs_working_with_commit_logging: -g flag works with external .git dir" {
+@test "remote_git_dirs_working_with_commit_logging_g_flag_works_with_external_git_dir" {
   local dotgittestdir
   dotgittestdir=$(mktemp -d)
   # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
@@ -79,7 +79,7 @@ teardown() {
   cd /tmp # Move out before teardown
 }
 
-@test "remote_git_dirs_working_with_commit_and_push: -g flag works with external .git dir and -r push" {
+@test "remote_git_dirs_working_with_commit_and_push_g_flag_works_with_external_git_dir_and_r_push" {
   local dotgittestdir
   dotgittestdir=$(mktemp -d)
   # Use the TEST_SUBDIR_NAME variable defined in bats-custom/startup-shutdown.bash
@@ -119,7 +119,7 @@ teardown() {
   cd /tmp # Move out before teardown
 }
 
-@test "remote_git_dirs_file_target: -g flag works with external .git dir and single file target" {
+@test "remote_git_dirs_file_target_g_flag_works_with_external_git_dir_and_single_file_target" {
   local target_file="single_watched_file.txt"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   local watched_file_path="$testdir/local/$TEST_SUBDIR_NAME/$target_file"
@@ -170,7 +170,7 @@ teardown() {
 }
 
 # --- NEW TEST: -g suspicious path warning ---
-@test "remote_git_dirs_g_warning: -g flag warns on suspicious relative path input" {
+@test "remote_git_dirs_g_warning_g_flag_warns_on_suspicious_relative_path_input" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")

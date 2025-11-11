@@ -8,7 +8,7 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-@test "pull_norebase_conflict: 'git push' failure (no -R) is handled gracefully" {
+@test "pull_norebase_conflict_git_push_failure_no_r_is_handled_gracefully" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -55,6 +55,7 @@ load 'bats-custom/load'
   # 5. Wait for the *local commit* to happen
   run wait_for_git_change 20 0.5 git log -1 --format=%H
   assert_success "Local commit timed out"
+
   local final_local_hash=$output
   assert_not_equal "$first_remote_hash" "$final_local_hash" "Local commit did not happen"
 

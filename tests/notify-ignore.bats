@@ -8,7 +8,7 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-@test "notify_ignore_raw_regex_x: -x ignores changes using raw regex" {
+@test "notify_ignore_raw_regex_x_x_ignores_changes_using_raw_regex" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -51,7 +51,7 @@ load 'bats-custom/load'
   refute_output --partial "test_subdir/file2.txt" # Should not contain log lines specific to file2.txt commit process
 }
 
-@test "notify_ignore_glob_X_combined: -X ignores files matching glob patterns and combines correctly with -x" {
+@test "notify_ignore_glob_X_combined_X_ignores_files_matching_glob_patterns_and_combines_correctly_with_x" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -112,7 +112,7 @@ load 'bats-custom/load'
   refute_output --partial "temp/file.txt"
 }
 
-@test "notify_ignore_gitignore: Ignores files matching .gitignore" {
+@test "notify_ignore_gitignore_ignores_files_matching_gitignore" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -162,7 +162,7 @@ load 'bats-custom/load'
 }
 
 # --- NEW TEST ---
-@test "notify_ignore_git_dir: -x ignores explicit watch on .git subdirectory" {
+@test "notify_ignore_git_dir_x_ignores_explicit_watch_on_git_subdirectory" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")

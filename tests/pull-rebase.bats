@@ -8,7 +8,7 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-@test "pulling_and_rebasing_correctly: Handles upstream changes with -R flag" {
+@test "pulling_and_rebasing_correctly_handles_upstream_changes_with_r_flag" {
   # Start gitwatch directly in the background with pull-rebase enabled
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -r origin -R "$testdir/local/$TEST_SUBDIR_NAME" &
@@ -42,6 +42,7 @@ load 'bats-custom/load'
   run git clone -q remote local2
 
   assert_success "Cloning for local2 failed"
+
   cd local2
   echo "line2" >> file2.txt
   git add file2.txt
@@ -97,7 +98,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "pull_rebase_on_fresh_repo: Handles upstream changes when local history is one commit behind remote" {
+@test "pull_rebase_on_fresh_repo_handles_upstream_changes_when_local_history_is_one_commit_behind_remote" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -128,6 +129,7 @@ load 'bats-custom/load'
 
   # 3. Go back to gitwatch repo (Local is now one commit behind remote)
   cd "$testdir/local/$TEST_SUBDIR_NAME"
+
   run git rev-parse origin/master
   assert_success
   assert_equal "$upstream_commit_hash" "$output" "Remote hash is incorrect after upstream push"
@@ -180,7 +182,7 @@ load 'bats-custom/load'
 }
 
 
-@test "pull_rebase_conflict: Handles merge conflict with -R flag gracefully" {
+@test "pull_rebase_conflict_handles_merge_conflict_with_r_flag_gracefully" {
   # Use a shorter sleep time to speed up the test
   local test_sleep_time=0.5
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -244,6 +246,7 @@ load 'bats-custom/load'
   # Wait an extra few seconds for the pull/rebase to attempt and fail
   sleep "$WAITTIME"
 
+
   # --- Assertions ---
 
   # 1. Verify push DID NOT happen
@@ -269,7 +272,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "pull_rebase_R_without_remote: -R flag without -r is ignored (no pull/push)" {
+@test "pull_rebase_R_without_remote_r_flag_without_r_is_ignored_no_pull_push" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -319,7 +322,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "pull_rebase_detached_head_push: Handles push correctly when in detached HEAD state with -b" {
+@test "pull_rebase_detached_head_push_handles_push_correctly_when_in_detached_head_state_with_b" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -380,7 +383,7 @@ load 'bats-custom/load'
   cd /tmp
 }
 
-@test "pull_rebase_detached_head: -R flag correctly pulls/rebases in detached HEAD state" {
+@test "pull_rebase_detached_head_R_flag_correctly_pulls_rebases_in_detached_head_state" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -437,6 +440,7 @@ load 'bats-custom/load'
   local final_remote_hash
   # shellcheck disable=SC2155 # Declared on previous line
   final_remote_hash=$(git rev-parse origin/master)
+
   assert_equal "$final_local_hash" "$final_remote_hash" "Local and remote hashes must match"
   assert_not_equal "$upstream_commit_hash" "$final_remote_hash" "Remote hash should have changed"
 
@@ -456,7 +460,7 @@ load 'bats-custom/load'
 }
 
 # --- NEW TEST: -b non-detached ---
-@test "push_different_branch: -b <branch> pushes current branch to target branch (non-detached)" {
+@test "push_different_branch_b_branch_pushes_current_branch_to_target_branch_non_detached" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -509,7 +513,7 @@ load 'bats-custom/load'
 }
 
 # --- NEW TEST: -R detached, no -b ---
-@test "pull_rebase_detached_head_no_b: -R without -b in detached HEAD logs warning and fails pull" {
+@test "pull_rebase_detached_head_no_b_R_without_b_in_detached_HEAD_logs_warning_and_fails_pull" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -571,7 +575,6 @@ load 'bats-custom/load'
   assert_output --partial "Warning: Cannot determine current branch for pull (detached HEAD?). Using explicit 'git pull --rebase 'origin' 'origin''."
   assert_output --partial "Executing pull command: git pull --rebase 'origin' 'origin'"
   assert_output --partial "ERROR: 'git pull' failed. Skipping push."
-
   # 8. Cleanup: Go back to master before teardown
   git checkout master &> /dev/null
   cd /tmp

@@ -49,7 +49,7 @@ create_mock_git_fail_commit() {
 #!/usr/bin/env bash
 echo "# MOCK_GIT: Received command: \$@" >&2
 if [ "\$1" = "commit" ];
-then
+  then
   echo "# MOCK_GIT: Simulating 'git commit' failure" >&2
   exit 1
 else
@@ -61,7 +61,7 @@ EOF
 }
 
 
-@test "logging_level_FATAL: -o FATAL only shows fatal errors" {
+@test "logging_level_fatal_o_fatal_only_shows_fatal_errors" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -80,7 +80,7 @@ EOF
   assert_output --partial "[FATAL] Error: Required command 'flock' not found"
 }
 
-@test "logging_level_ERROR: -o ERROR shows ERROR and FATAL" {
+@test "logging_level_error_o_error_shows_error_and_fatal" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -119,7 +119,7 @@ EOF
   cd /tmp
 }
 
-@test "logging_level_WARN: -o WARN shows WARN, ERROR, FATAL" {
+@test "logging_level_warn_o_warn_shows_warn_error_fatal" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -150,7 +150,7 @@ EOF
   cd /tmp
 }
 
-@test "logging_level_INFO: -o INFO (default) shows INFO, WARN, ERROR, FATAL" {
+@test "logging_level_info_o_info_default_shows_info_warn_error_fatal" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -172,7 +172,7 @@ EOF
   cd /tmp
 }
 
-@test "logging_level_DEBUG: -o DEBUG (or -v) shows DEBUG and up" {
+@test "logging_level_debug_o_debug_or_v_shows_debug_and_up" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
@@ -195,7 +195,7 @@ EOF
   cd /tmp
 }
 
-@test "logging_level_TRACE: -o TRACE (or 6) shows TRACE and up" {
+@test "logging_level_trace_o_trace_or_6_shows_trace_and_up" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
