@@ -11,7 +11,7 @@ on:
       test_files:
         description: "Space-separated list/glob of test files (e.g., 'commitcmd.bats' or '*.bats'). Runs inside the 'tests/' directory."
         required: false
-        default: "" # Default to running no tests
+        default: "*.bats"
       timeout_in_minutes:
         description: "Job timeout in minutes (default: 3, max: 2160)"
         required: true
@@ -132,7 +132,6 @@ jobs:
         run: |
           echo "No test files specified in 'test_files' input. Skipping BATS run."
 
-      # --- MODIFIED STEP: New, more robust 'awk' script ---
       - name: Generate Test Summary
         if: always() && github.event.inputs.test_files != ''
         shell: bash
@@ -146,7 +145,6 @@ jobs:
             exit 0
           fi
 
-          # This 'awk' script is more robust for parsing TAP.
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
             print "### BATS Test Results"
