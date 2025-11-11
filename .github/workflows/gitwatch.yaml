@@ -161,7 +161,7 @@ jobs:
           path: coverage/
           retention-days: 7
 
-      # --- MODIFIED STEP: Uses match() for robust parsing and counts 'not run' ---
+      # --- MODIFIED STEP: Replaced gawk-specific match() with POSIX-compatible parsing ---
       - name: Generate Test Summary
         if: always() # This step will always run
         shell: bash
@@ -201,11 +201,16 @@ jobs:
             next
           }
 
-          # Use match() for robust parsing of the test line
-          match($0, /^(ok|not ok) ([0-9]+) (.*)/, arr) {
-            status_word = arr[1]
-            test_number = arr[2]
-            test_name_full = arr[3]
+          # Use POSIX-compatible regex match and field splitting
+          /^(ok|not ok) [0-9]+ / {
+            status_word = $1
+            test_number = $2
+
+            # Rebuild the full test name line from $3 onwards
+            test_name_full = $3
+            for (i = 4; i <= NF; i++) {
+              test_name_full = test_name_full " " $i
+            }
 
             file_name = current_file
             test_name = ""
