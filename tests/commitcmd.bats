@@ -79,8 +79,7 @@ TEST_TIMEOUT=$(echo "$GITWATCH_TEST_ARGS" | grep -oE -- '-t [0-9]+' | cut -d' ' 
 
 @test "commit_command_pipe_C_c_and_C_flags_pipe_list_of_changed_files_to_command" {
   # shellcheck disable=SC2016 # Intentional: variable expansion must be deferred to command execution time
-  local custom_cmd='while IFS= read -r file;
-  do echo "Changed: $file"; done'
+  local custom_cmd='while IFS= read -r file; do echo "Changed: $file"; done'
 
   # Start gitwatch with custom command and the pipe flag -C
   # shellcheck disable=SC2154 # testdir is sourced via setup function
