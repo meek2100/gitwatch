@@ -76,18 +76,25 @@ jobs:
             exit 1
           fi
 
-      - name: Start Colima Docker Daemon
+      - name: Clean Colima State
         if: matrix.os == 'macOS-latest'
+        run: colima delete -f || true
         shell: bash
-        run: |
-          # FIX: Force clean state and start with the QEMU driver for better CI stability.
-          echo "Setting up QEMU-based Colima VM (deleting old state first)..."
-          colima delete -f || true
-          colima start --runtime docker --vm-type qemu --cpu 2 --memory 4 --disk 60
-          # Check status to ensure connectivity.
-          docker ps -a
-          # Ensure buildx is ready for the Docker image build in the test.
-          docker buildx install
+
+      - name: Setup Docker (using external action and QEMU override)
+        if: matrix.os == 'macOS-latest'
+        uses: douglascamata/setup-docker-macos-action@v1.0.1
+        id: setup-docker
+        with:
+          # Use QEMU instead of the potentially unstable native vz driver, set resource limits explicitly
+          colima-additional-options: "--vm-type qemu --cpu 2 --memory 4 --disk 60"
+          lima: v1.2.1
+          colima: v0.9.1
+
+      - name: Ensure Docker Buildx is Ready
+        if: matrix.os == 'macOS-latest'
+        run: docker buildx install
+        shell: bash
 
       - name: Verify script content before test
         shell: bash
