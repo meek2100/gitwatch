@@ -285,7 +285,8 @@ jobs:
             gsub(/\|/, "\\|", test_result)
 
             # --- MODIFIED LINE: Prepends test_number to test_name ---
-            print "| " test_number " " test_name " | " icon " " test_result " | " file_name " | " status " |"
+            # --- FIX: Use test_name_full for the name to match the old logic ---
+            print "| " test_number " " test_name_full " | " icon " " test_result " | " file_name " | " status " |"
           }
 
           # Calculate and print the final summary
