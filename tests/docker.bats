@@ -17,6 +17,8 @@ export RUNNER_GID=""
 # ---------------------
 
 setup_file() {
+  echo "# file: $BATS_TEST_FILENAME" >&3
+
   # --- FIX: Skip if Docker is not available/not running ---
   if ! command -v docker &>/dev/null || ! docker info &>/dev/null; then
     skip "Test skipped: Docker command or daemon not found/running, which is required for Docker E2E tests."
