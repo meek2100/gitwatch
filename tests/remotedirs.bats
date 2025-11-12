@@ -1,11 +1,12 @@
 #!/usr/bin/env bats
 
-# Load helpers FIRST
+# Load standard helpers
 load 'bats-support/load'
 load 'bats-assert/load'
 load 'bats-file/load'
-# Load custom helpers
-load 'bats-custom/custom-helpers'
+
+# Load ALL custom config, helpers, and setup/teardown hooks
+load 'bats-custom/load'
 
 # Define the custom cleanup logic specific to this file
 # Use standard echo to output debug info to avoid relying on bats-support inside teardown
