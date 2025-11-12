@@ -128,8 +128,16 @@ jobs:
           echo "Clearing old TAP file at ${BATS_TAP_FILE}"
           > "${BATS_TAP_FILE}"
 
-          # This script runs from the repo root to ensure kcov's paths are valid.
+          # --- MODIFIED: This script now fixes LD_PRELOAD ---
           RUN_SCRIPT=$(cat << 'EOF'
+          # This script is run by 'bash -c' and is wrapped by kcov.
+          # kcov sets a *relative* LD_PRELOAD. We must make it absolute
+          # *before* BATS `cd`s into its temp directory.
+          if [ -n "$LD_PRELOAD" ]; then
+            export LD_PRELOAD="$PWD/$LD_PRELOAD"
+            echo "Fixed LD_PRELOAD to: $LD_PRELOAD"
+          fi
+
           echo "Current directory for BATS tests: $(pwd)"
           echo "Finding and running test files sequentially from ./tests..."
 
@@ -142,6 +150,7 @@ jobs:
           done
           EOF
           )
+          # --- END MODIFICATION ---
 
           if [ "$RUNNER_OS" == "Linux" ];
           then
@@ -149,23 +158,10 @@ jobs:
             mkdir -p ./coverage
             echo "Current directory for kcov: $(pwd)"
 
-            # --- NEW FIX: Manually set LD_PRELOAD to an ABSOLUTE path ---
-            # 1. Construct the absolute path to where kcov *will* create its library.
-            #    ${{ github.workspace }} is an absolute path (e.g., /home/runner/work/gitwatch/gitwatch)
-            export KCOV_LIB_PATH="${{ github.workspace }}/coverage/libkcov_sowrapper.so"
-            echo "Setting absolute LD_PRELOAD path to: $KCOV_LIB_PATH"
-
-            # 2. Export LD_PRELOAD so all child processes (including bats and gitwatch.sh) inherit it.
-            #    This survives the `cd` commands inside the BATS test setup.
-            export LD_PRELOAD="$KCOV_LIB_PATH"
-
-            # 3. Run kcov, telling it *not* to set its own relative LD_PRELOAD,
-            #    but to *use* the one we just provided. kcov will create the file
-            #    at the path we specified.
-            kcov --skip-solib-preload --include-path=./ --exclude-path=tests/ coverage/ \
+            # Run kcov. It will set its relative LD_PRELOAD, and our
+            # RUN_SCRIPT wrapper will immediately fix it.
+            kcov --include-path=./ --exclude-path=tests/ coverage/ \
               bash -c "$RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
-            # --- END NEW FIX ---
-
           else
             echo "Running tests sequentially for clear debug logging..."
 
