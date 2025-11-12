@@ -128,7 +128,7 @@ jobs:
           echo "Clearing old TAP file at ${BATS_TAP_FILE}"
           > "${BATS_TAP_FILE}"
 
-          # --- MODIFICATION: Re-added NPROC logic ---
+          # Get the number of available processor cores
           NPROC=1
           if [ "$RUNNER_OS" == "Linux" ];
           then
@@ -138,16 +138,19 @@ jobs:
             NPROC=$(sysctl -n hw.ncpu)
           fi
           echo "Running BATS tests in parallel using $NPROC cores..."
-          # --- END MODIFICATION ---
 
-          echo "Finding test files..."
-          # Note: $TEST_FILES_TO_RUN is expanded here
-          TEST_FILE_LIST=$(find ./tests -name "$TEST_FILES_TO_RUN" | sort)
+          # --- MODIFICATION: Correctly find files from glob or list ---
+          echo "Finding test files for glob/list: $TEST_FILES_TO_RUN"
+          # Use xargs to run find for each space-separated item in the input
+          # This correctly handles both "file1.bats file2.bats" and "*.bats"
+          TEST_FILE_LIST=$(echo $TEST_FILES_TO_RUN | xargs -n 1 -I {} find ./tests -name {} | sort)
+
           if [ -z "$TEST_FILE_LIST" ]; then
-              echo "No test files found."
-              exit 0
+              echo "No test files found matching: $TEST_FILES_TO_RUN"
+              exit 0 # Exit gracefully
           fi
           echo "Running BATS on files: $TEST_FILE_LIST"
+          # --- END MODIFICATION ---
 
           if [ "$RUNNER_OS" == "Linux" ];
           then
@@ -155,13 +158,10 @@ jobs:
             mkdir -p ${{ github.workspace }}/coverage
             echo "Current directory for kcov: $(pwd)"
 
-            # --- MODIFICATION: Added --jobs $NPROC ---
             kcov --include-path=./ --exclude-path=tests/ ${{ github.workspace }}/coverage/ \
               bats --jobs $NPROC --tap $TEST_FILE_LIST | tee "${BATS_TAP_FILE}"
           else
-            echo "Running tests sequentially for clear debug logging..."
-
-            # --- MODIFICATION: Added --jobs $NPROC ---
+            echo "Running tests in parallel for clear debug logging..."
             bats --jobs $NPROC --tap $TEST_FILE_LIST | tee "${BATS_TAP_FILE}"
           fi
 
