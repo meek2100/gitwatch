@@ -128,8 +128,6 @@ jobs:
           echo "Clearing old TAP file at ${BATS_TAP_FILE}"
           > "${BATS_TAP_FILE}"
 
-          # --- MODIFICATION: Removed the entire RUN_SCRIPT wrapper ---
-
           echo "Finding test files..."
           # Note: $TEST_FILES_TO_RUN is expanded here
           TEST_FILE_LIST=$(find ./tests -name "$TEST_FILES_TO_RUN" | sort)
@@ -145,13 +143,13 @@ jobs:
             mkdir -p ${{ github.workspace }}/coverage
             echo "Current directory for kcov: $(pwd)"
 
-            # --- MODIFICATION: Run kcov wrapping bats, passing the file list ---
+            # Run kcov wrapping bats, passing the file list
             kcov --include-path=./ --exclude-path=tests/ ${{ github.workspace }}/coverage/ \
               bats --tap $TEST_FILE_LIST | tee "${BATS_TAP_FILE}"
           else
             echo "Running tests sequentially for clear debug logging..."
 
-            # --- MODIFICATION: Run bats sequentially ---
+            # Run bats sequentially
             bats --tap $TEST_FILE_LIST | tee "${BATS_TAP_FILE}"
           fi
 
@@ -201,15 +199,37 @@ jobs:
         run: |
           echo "--- Reading summary from ${BATS_TAP_FILE} ---"
 
-          # Add a section for the kcov report (Linux only)
+          # --- MODIFICATION: Parse kcov JSON output ---
           if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
             echo "### 📈 Code Coverage (Linux)" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Kcov report uploaded as **coverage-report-linux-debug**." >> $GITHUB_STEP_SUMMARY
-            echo "View the report by downloading the artifact from this run." >> $GITHUB_STEP_SUMMARY
+
+            # Install jq to parse JSON
+            sudo apt-get install -y jq > /dev/null 2>&1
+
+            COVERAGE_FILE="${{ github.workspace }}/coverage/bats/coverage.json"
+
+            if [ -f "$COVERAGE_FILE" ]; then
+              echo "Found coverage file at $COVERAGE_FILE"
+
+              # Extract data. Use '|| echo "0"' as a fallback.
+              PERCENT=$(jq -r '.percent_covered' "$COVERAGE_FILE" || echo "0")
+              EXECUTED=$(jq -r '.covered_lines' "$COVERAGE_FILE" || echo "0")
+              TOTAL=$(jq -r '.total_lines' "$COVERAGE_FILE" || echo "0")
+
+              # Format the output
+              echo "**${PERCENT}%** covered" >> $GITHUB_STEP_SUMMARY
+              echo "(${EXECUTED} / ${TOTAL} instrumented lines)" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "Full report uploaded as **coverage-report-linux-debug**." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "Kcov coverage.json file not found at $COVERAGE_FILE." >> $GITHUB_STEP_SUMMARY
+              echo "Kcov report uploaded as **coverage-report-linux-debug**." >> $GITHUB_STEP_SUMMARY
+            fi
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "---" >> $GITHUB_STEP_SUMMARY
           fi
+          # --- END MODIFICATION ---
 
           if [ ! -f "${BATS_TAP_FILE}" ]; then
             echo "BATS results file (${BATS_TAP_FILE}) not found." >> $GITHUB_STEP_SUMMARY
