@@ -8,6 +8,11 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
+# Override setup to use the remote-enabled one
+setup() {
+  setup_with_remote
+}
+
 # Test 1: Commit on start successfully commits staged changes
 @test "startup_commit_f_flag_commits_staged_changes_on_startup" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -382,8 +387,7 @@ load 'bats-custom/load'
 
   # Get initial hash (should fail or be empty)
   local initial_hash
-  initial_hash=$(git log -1 --format=%H 2>/dev/null ||
-  echo "no_commit")
+  initial_hash=$(git log -1 --format=%H 2>/dev/null || echo "no_commit")
 
   # Start gitwatch
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" "$empty_repo_dir" &

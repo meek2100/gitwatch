@@ -8,6 +8,11 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
+# Override setup to use the remote-enabled one
+setup() {
+  setup_with_remote
+}
+
 @test "skip_if_merging_M_m_flag_prevents_commit_during_a_merge_conflict" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function

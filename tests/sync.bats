@@ -8,6 +8,11 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
+# Override setup to use the remote-enabled one
+setup() {
+  setup_with_remote
+}
+
 @test "syncing_correctly_commits_and_pushes_adds_subdir_adds_and_removals" {
   # Start gitwatch directly in the background
   # shellcheck disable=SC2154 # testdir is sourced via setup function

@@ -8,6 +8,11 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
+# Override setup to use the remote-enabled one
+setup() {
+  setup_with_remote
+}
+
 @test "pulling_and_rebasing_correctly_handles_upstream_changes_with_r_flag" {
   # Start gitwatch directly in the background with pull-rebase enabled
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -20,7 +25,7 @@ load 'bats-custom/load'
 
   # Wait for commit+push for file1 (wait for remote ref to update)
   run wait_for_git_change 20 0.5 git rev-parse origin/master ||
-  fail "wait_for_git_change timed out after file1 add"
+    fail "wait_for_git_change timed out after file1 add"
 
   sleep 0.2
 
@@ -40,7 +45,6 @@ load 'bats-custom/load'
   # Simulate another user cloning and pushing (file2)
   cd "$testdir"
   run git clone -q remote local2
-
   assert_success "Cloning for local2 failed"
 
   cd local2
@@ -171,7 +175,7 @@ load 'bats-custom/load'
   run cat "$output_file"
   assert_output --partial "Executing pull command:" "Should execute pull command"
   assert_output --partial "Successfully rebased and updated" "Rebase should succeed (Linux/Git message)" ||
-  assert_output --partial "Current branch master is up to date." "Pull might say up to date if rebase was fast-forward/already happened"
+    assert_output --partial "Current branch master is up to date." "Pull might say up to date if rebase was fast-forward/already happened"
 
   # The existing files must be present
   assert_file_exist "initial_file.txt"

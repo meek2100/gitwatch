@@ -80,6 +80,10 @@ teardown_file() {
 }
 
 setup() {
+  # --- FIX: Add this line to print the filename for the summary ---
+  echo "# file: $BATS_TEST_FILENAME" >&3
+  # --- END FIX ---
+
   # Get the UID/GID of the user running the tests on the host
   RUNNER_UID=$(id -u)
   RUNNER_GID=$(id -g)
@@ -113,8 +117,7 @@ teardown() {
   # Stop and remove all containers with the test prefix
   docker ps -a --filter "name=${DOCKER_CONTAINER_NAME_PREFIX}-" --format "{{.ID}}" | xargs -r docker rm -f
   # Clean up the host directory
-  if [ -d "$TEST_REPO_HOST_DIR" ];
-  then
+  if [ -d "$TEST_REPO_HOST_DIR" ]; then
     # We must 'sudo' this because the container might have changed permissions
     sudo rm -rf "$TEST_REPO_HOST_DIR"
     verbose_echo "# DEBUG: Cleaned up host repo volume: $TEST_REPO_HOST_DIR"
@@ -134,8 +137,7 @@ create_failing_mock_git() {
 # Mock Git script
 echo "# MOCK_GIT: Received command: \$@" >&2
 
-if [ "\$1" = "push" ];
-then
+if [ "\$1" = "push" ]; then
   echo "# MOCK_GIT: Push command FAILING" >&2
   exit 1 # Always fail the push
 else
@@ -155,13 +157,11 @@ wait_for_health_status() {
   local delay=2
   local attempt=1
 
-  while (( attempt <= max_attempts ));
-  do
+  while (( attempt <= max_attempts )); do
     run docker inspect --format '{{.State.Health.Status}}' "$container_name"
     assert_success "Docker inspect failed"
 
-    if [ "$output" = "$expected_status" ];
-    then
+    if [ "$output" = "$expected_status" ]; then
       verbose_echo "# Health status is '$output' as expected."
       return 0
     fi
@@ -218,7 +218,6 @@ get_container_logs() {
   # 2. Check the file still exists on the host (confirms volume functionality)
   run test -f "$TEST_REPO_HOST_DIR/test-touch"
   assert_success "File created in container is missing on host."
-
   # Cleanup
   run rm "$TEST_REPO_HOST_DIR/test-touch"
 }
