@@ -13,7 +13,7 @@ setup() {
   setup_with_remote
 }
 
-# Test 1: Commit on start successfully commits staged changes
+# --- CORRECTED TEST 1 ---
 @test "startup_commit_f_flag_commits_staged_changes_on_startup" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -27,9 +27,9 @@ setup() {
   initial_commit_hash=$(git log -1 --format=%H)
   verbose_echo "# Initial hash: $initial_commit_hash"
 
-  # 2. Start gitwatch with -f
+  # 2. Start gitwatch with -f AND -l 0 to get diff-based commit message
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -f "$testdir/local/$TEST_SUBDIR_NAME" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -f -l 0 "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   # 3. Wait for the new commit to appear (it should be immediate)
@@ -40,15 +40,16 @@ setup() {
   local startup_commit_hash=$output
   assert_not_equal "$initial_commit_hash" "$startup_commit_hash" "Commit hash should change after startup commit"
 
-  # 5. Verify the content of the commit message
+  # 5. Verify the content of the commit message (now checking for diff-lines output)
   run git log -1 --pretty=%B
   assert_success
-  # The commit message logic will use the 'file changes' summary
-  assert_output --partial "File changes detected:  A file_to_commit.txt"
+  # The commit message should contain the diff-lines output for the new file
+  assert_output --partial "file_to_commit.txt:1: +staged on start"
 
   cd /tmp
 }
 
+# --- CORRECTED TEST 2 ---
 @test "startup_commit_f_with_push_f_flag_also_pushes_the_initial_commit_to_remote" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -62,9 +63,9 @@ setup() {
   initial_remote_hash=$(git rev-parse origin/master)
   verbose_echo "# Initial remote hash: $initial_remote_hash"
 
-  # 2. Start gitwatch with -f and -r origin
+  # 2. Start gitwatch with -f, -r origin, AND -l 0
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -f -r origin "$testdir/local/$TEST_SUBDIR_NAME" &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -f -r origin -l 0 "$testdir/local/$TEST_SUBDIR_NAME" &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   # 3. Wait for the remote hash to change (push success)
@@ -75,15 +76,15 @@ setup() {
   local final_remote_hash=$output
   assert_not_equal "$initial_remote_hash" "$final_remote_hash" "Remote hash should change after startup commit and push"
 
-  # 5. Verify the local commit message
+  # 5. Verify the local commit message (now checking for diff-lines output)
   run git log -1 --pretty=%B
   assert_success
-  assert_output --partial "File changes detected:  A file_to_push.txt"
+  assert_output --partial "file_to_push.txt:1: +staged and pushed"
 
   cd /tmp
 }
 
-# --- CORRECTED TEST: -f with staged and unstaged changes ---
+# --- UNCHANGED: Test 3 ---
 @test "startup_commit_f_all_changes_f_flag_commits_staged_unstaged_and_untracked_files" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -136,7 +137,7 @@ setup() {
   cd /tmp
 }
 
-# Test 2: Commit on start does nothing if no changes are pending
+# --- UNCHANGED: Test 4 ---
 @test "startup_commit_no_change_f_flag_does_nothing_if_no_changes_are_pending" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -173,8 +174,7 @@ setup() {
   cd /tmp
 }
 
-
-# --- NEW TEST: check_git_config warning ---
+# --- UNCHANGED: Test 5 ---
 @test "startup_git_config_check_warns_if_git_config_user_name_or_user_email_is_missing" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -209,8 +209,7 @@ setup() {
   cd /tmp
 }
 
-
-# Test 3: Version flag
+# --- UNCHANGED: Test 6 ---
 @test "startup_version_V_v_flag_prints_version_and_exits" {
   # 1. Get the expected version number dynamically from the VERSION file
   local version_file="${BATS_TEST_DIRNAME}/../VERSION"
@@ -224,6 +223,7 @@ setup() {
   assert_output "gitwatch.sh version $expected_version_number" "Output should be the version string"
 }
 
+# --- UNCHANGED: Test 7 ---
 @test "startup_non_git_repo_exits_gracefully_with_code_6_if_target_is_not_a_git_repo" {
   local non_repo_dir
   non_repo_dir=$(mktemp -d)
@@ -240,14 +240,14 @@ setup() {
   rm -rf "$non_repo_dir"
 }
 
+# --- UNCHANGED: Test 8 ---
 @test "startup_permission_check_target_exits_with_code_7_when_target_directory_is_unwritable" {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   local target_dir="$testdir/local/$TEST_SUBDIR_NAME"
   local original_perms
 
   # 1. Get original permissions of the target directory
-  if [ "$RUNNER_OS" == "Linux" ];
-  then
+  if [ "$RUNNER_OS" == "Linux" ]; then
     original_perms=$(stat -c "%a" "$target_dir")
   else
     # Use stat -f "%A" for macOS/BSD permissions
@@ -272,6 +272,7 @@ setup() {
   assert_success "Failed to restore original permissions"
 }
 
+# --- UNCHANGED: Test 9 ---
 @test "startup_commit_f_pull_rebase_conflict_f_flag_fails_commit_gracefully" {
   local output_file
   # shellcheck disable=SC2154 # testdir is sourced via setup function
@@ -336,6 +337,7 @@ setup() {
   cd /tmp
 }
 
+# --- UNCHANGED: Test 10 ---
 @test "startup_shelp_flags_help_output_contains_all_expected_flags_exhaustive" {
   # 1. Run gitwatch without arguments to get the help message
   run "${BATS_TEST_DIRNAME}/../gitwatch.sh"
@@ -367,6 +369,7 @@ setup() {
   assert_output --partial "SECURITY WARNING: The -c flag executes arbitrary code"
 }
 
+# --- UNCHANGED: Test 11 ---
 @test "startup_help_h_h_flag_prints_help_and_exits_with_success" {
   run "${BATS_TEST_DIRNAME}/../gitwatch.sh" -h
   assert_success "Running gitwatch -h should exit successfully (code 0)"
@@ -374,7 +377,7 @@ setup() {
   assert_output --partial "gitwatch - watch file or directory and git commit all changes"
 }
 
-# --- NEW TEST: Empty Repository Startup ---
+# --- UNCHANGED: Test 12 ---
 @test "startup_commit_empty_repo_creates_first_commit_in_an_empty_repository" {
   local empty_repo_dir
   # shellcheck disable=SC2154 # testdir is sourced via setup function
