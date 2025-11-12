@@ -4,7 +4,9 @@
 load 'bats-support/load'
 load 'bats-assert/load'
 load 'bats-file/load'
-load 'bats-custom/custom-helpers'
+
+# Load ALL custom config, helpers, and setup/teardown hooks
+load 'bats-custom/load'
 
 # --- FIX: Define a writable mock output file ---
 export MOCK_OUTPUT_FILE=""
