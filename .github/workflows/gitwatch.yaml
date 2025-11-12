@@ -117,7 +117,18 @@ jobs:
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
 
-          echo "Running BATS tests sequentially..."
+          # --- MODIFICATION: Re-added NPROC logic ---
+          # Get the number of available processor cores
+          NPROC=1
+          if [ "$RUNNER_OS" == "Linux" ];
+          then
+            NPROC=$(nproc)
+          elif [ "$RUNNER_OS" == "macOS" ];
+          then
+            NPROC=$(sysctl -n hw.ncpu)
+          fi
+          echo "Running BATS tests in parallel using $NPROC cores..."
+          # --- END MODIFICATION ---
 
           # Export env vars needed by bats
           export BATS_LIB_PATH
@@ -137,16 +148,17 @@ jobs:
 
           if [ "$RUNNER_OS" == "Linux" ];
           then
-            echo "Running with kcov for code coverage (sequentially)..."
+            echo "Running with kcov for code coverage (in parallel)..."
             mkdir -p ${{ github.workspace }}/coverage
             echo "Current directory for kcov: $(pwd)"
 
-            # Run kcov wrapping bats, passing the file list
+            # --- MODIFICATION: Added --jobs $NPROC ---
             kcov --include-path=./ --exclude-path=tests/ ${{ github.workspace }}/coverage/ \
-              bats --tap $TEST_FILE_LIST | tee "${BATS_TAP_FILE}"
+              bats --jobs $NPROC --tap $TEST_FILE_LIST | tee "${BATS_TAP_FILE}"
           else
-            # On macOS, just run bats sequentially
-            bats --tap $TEST_FILE_LIST | tee "${BATS_TAP_FILE}"
+            # On macOS, just run bats in parallel
+            # --- MODIFICATION: Added --jobs $NPROC ---
+            bats --jobs $NPROC --tap $TEST_FILE_LIST | tee "${BATS_TAP_FILE}"
           fi
 
           # Capture the exit code. We check the TAP file for "not ok"
@@ -190,7 +202,7 @@ jobs:
         run: |
           echo "--- Reading summary from ${BATS_TAP_FILE} ---"
 
-          # --- MODIFICATION: Parse kcov JSON output ---
+          # Parse kcov JSON output
           if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
             echo "### 📈 Code Coverage (Linux)" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
@@ -220,7 +232,6 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "---" >> $GITHUB_STEP_SUMMARY
           fi
-          # --- END MODIFICATION ---
 
           if [ ! -f "${BATS_TAP_FILE}" ]; then
             echo "BATS results file (${BATS_TAP_FILE}) not found." >> $GITHUB_STEP_SUMMARY
