@@ -141,9 +141,9 @@ jobs:
 
           # --- MODIFICATION: Correctly find files from glob or list ---
           echo "Finding test files for glob/list: $TEST_FILES_TO_RUN"
-          # Use xargs to run find for each space-separated item in the input
+          # Use xargs -n 1 to run find for each space-separated item in the input
           # This correctly handles both "file1.bats file2.bats" and "*.bats"
-          TEST_FILE_LIST=$(echo $TEST_FILES_TO_RUN | xargs -n 1 -I {} find ./tests -name {} | sort)
+          TEST_FILE_LIST=$(echo $TEST_FILES_TO_RUN | xargs -n 1 find ./tests -name | sort)
 
           if [ -z "$TEST_FILE_LIST" ]; then
               echo "No test files found matching: $TEST_FILES_TO_RUN"
