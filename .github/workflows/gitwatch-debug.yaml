@@ -128,22 +128,20 @@ jobs:
           echo "Clearing old TAP file at ${BATS_TAP_FILE}"
           > "${BATS_TAP_FILE}"
 
-          # <--- MODIFIED: This script no longer `cd tests` --->
+          # This script runs from the repo root to ensure kcov's paths are valid.
           RUN_SCRIPT=$(cat << 'EOF'
           echo "Current directory for BATS tests: $(pwd)"
           echo "Finding and running test files sequentially from ./tests..."
 
-          # Find files starting from ./tests. $test_file will be e.g., ./tests/foo.bats
+          # Find files starting from ./tests.
           find ./tests -name "$TEST_FILES_TO_RUN" | sort | while read test_file; do
             if [ -f "$test_file" ]; then
               echo "--- Running $test_file ---"
-              # Run bats with the full path to the test file
               bats --tap "$test_file"
             fi
           done
           EOF
           )
-          # <--- END MODIFICATION --->
 
           if [ "$RUNNER_OS" == "Linux" ];
           then
@@ -151,9 +149,27 @@ jobs:
             mkdir -p ./coverage
             echo "Current directory for kcov: $(pwd)"
 
-            # kcov wraps the *entire* bash -c script, which now runs from the root.
-            kcov --include-path=./ --exclude-path=tests/ coverage/ \
+            # --- NEW FIX: Manually set LD_PRELOAD to an absolute path ---
+            # 1. Create the coverage dir and cd into it
+            cd coverage
+
+            # 2. Run kcov in print-only mode. This creates the wrapper library
+            #    and prints its *absolute path*.
+            KCOV_LIB_PATH=$(kcov --print-ld-preload-path .)
+            echo "KCOV Lib Path: $KCOV_LIB_PATH"
+
+            # 3. Export the absolute path. This will be inherited by all child processes.
+            export LD_PRELOAD="$KCOV_LIB_PATH"
+
+            # 4. Go back to the repo root
+            cd ..
+
+            # 5. Run kcov with --skip-solib-preload to tell it to use our
+            #    manually-set, absolute path instead of its own relative one.
+            kcov --skip-solib-preload --include-path=./ --exclude-path=tests/ coverage/ \
               bash -c "$RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
+            # --- END NEW FIX ---
+
           else
             echo "Running tests sequentially for clear debug logging..."
 

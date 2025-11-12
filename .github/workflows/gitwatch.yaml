@@ -76,7 +76,6 @@ jobs:
             exit 1
           fi
 
-      # --- NEW: Use the desired external action for Docker/Colima setup ---
       - name: Setup Docker on macOS (External Action)
         if: matrix.os == 'macOS-latest'
         uses: douglascamata/setup-docker-macos-action@v1
@@ -137,18 +136,14 @@ jobs:
           # Ensure the TAP file is empty
           > "${BATS_TAP_FILE}"
 
-          # <--- MODIFIED: This script no longer `cd tests` --->
+          # This script runs from the repo root to ensure kcov's paths are valid.
           RUN_SCRIPT=$(cat << 'EOF'
           echo "Current directory for BATS tests: $(pwd)"
 
           # Find all .bats files in ./tests, pipe to parallel.
-          # --group = Keep output for one job together (no interleaving).
-          # --jobs $NPROC = Use N cores.
-          # 'bats --tap {}' = Run bats on the input file {}.
           find ./tests -name "*.bats" | parallel --jobs $NPROC --group 'bats --tap {}'
           EOF
           )
-          # <--- END MODIFICATION --->
 
           if [ "$RUNNER_OS" == "Linux" ];
           then
@@ -156,9 +151,27 @@ jobs:
             mkdir -p ./coverage
             echo "Current directory for kcov: $(pwd)"
 
-            # kcov wraps the entire bash script that invokes parallel
-            kcov --include-path=./ --exclude-path=tests/ coverage/ \
+            # --- NEW FIX: Manually set LD_PRELOAD to an absolute path ---
+            # 1. Create the coverage dir and cd into it
+            cd coverage
+
+            # 2. Run kcov in print-only mode. This creates the wrapper library
+            #    and prints its *absolute path*.
+            KCOV_LIB_PATH=$(kcov --print-ld-preload-path .)
+            echo "KCOV Lib Path: $KCOV_LIB_PATH"
+
+            # 3. Export the absolute path. This will be inherited by all child processes.
+            export LD_PRELOAD="$KCOV_LIB_PATH"
+
+            # 4. Go back to the repo root
+            cd ..
+
+            # 5. Run kcov with --skip-solib-preload to tell it to use our
+            #    manually-set, absolute path instead of its own relative one.
+            kcov --skip-solib-preload --include-path=./ --exclude-path=tests/ coverage/ \
               bash -c "NPROC=$NPROC $RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
+            # --- END NEW FIX ---
+
           else
             # On macOS, just run the parallel script
             bash -c "NPROC=$NPROC $RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
