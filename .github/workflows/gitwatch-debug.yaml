@@ -81,7 +81,6 @@ jobs:
             exit 1
           fi
 
-      # --- NEW: Use the desired external action for Docker/Colima setup ---
       - name: Setup Docker on macOS (External Action)
         if: matrix.os == 'macOS-latest'
         uses: douglascamata/setup-docker-macos-action@v1
@@ -119,8 +118,10 @@ jobs:
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
 
-          # Get the test file glob from the workflow input
-          TEST_FILES_TO_RUN=${{ github.event.inputs.test_files }}
+          # <--- MODIFIED: Set AND EXPORT the variable --->
+          # We must export it so the 'bash -c' subshell below can read it.
+          # We quote it to prevent glob expansion in *this* shell.
+          export TEST_FILES_TO_RUN="${{ github.event.inputs.test_files }}"
           echo "Test files glob: $TEST_FILES_TO_RUN"
 
           # We MUST run each test file in a sequential loop to force
@@ -135,7 +136,7 @@ jobs:
           > "${BATS_TAP_FILE}"
 
           # This script will be run by bash -c, either wrapped by kcov (Linux)
-          # or directly (macOS).
+          # or directly (macOS). It reads $TEST_FILES_TO_RUN from the environment.
           RUN_SCRIPT=$(cat << 'EOF'
           echo "Moving to tests directory..."
           cd tests
@@ -160,14 +161,15 @@ jobs:
             mkdir -p ./coverage
             echo "Current directory for kcov: $(pwd)"
 
-            # kcov wraps the *entire* bash -c script.
+            # <--- MODIFIED: Removed the "TEST_FILES_TO_RUN=..." assignment --->
+            # The subshell now correctly inherits the exported variable.
             kcov --include-path=./ --exclude-path=tests/ coverage/ \
-              bash -c "TEST_FILES_TO_RUN=$TEST_FILES_TO_RUN $RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
+              bash -c "$RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
           else
             echo "Running tests sequentially for clear debug logging..."
 
-            # macOS just runs the script directly and pipes to tee.
-            bash -c "TEST_FILES_TO_RUN=$TEST_FILES_TO_RUN $RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
+            # <--- MODIFIED: Removed the "TEST_FILES_TO_RUN=..." assignment --->
+            bash -c "$RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
           fi
 
           # Capture the exit code. We check the TAP file for "not ok"
