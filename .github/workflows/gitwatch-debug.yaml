@@ -134,8 +134,16 @@ jobs:
           # *before* BATS `cd`s into its temp directory.
           RUN_SCRIPT=$(cat << 'EOF'
           if [ -n "$LD_PRELOAD" ]; then
-            export LD_PRELOAD="$PWD/$LD_PRELOAD"
-            echo "Fixed LD_PRELOAD to: $LD_PRELOAD"
+            # --- MODIFICATION: Check if path is already absolute ---
+            if [[ "$LD_PRELOAD" == /* ]]; then
+              echo "LD_PRELOAD is already absolute: $LD_PRELOAD"
+              export LD_PRELOAD
+            else
+              # Path is relative, make it absolute
+              export LD_PRELOAD="$PWD/$LD_PRELOAD"
+              echo "Fixed relative LD_PRELOAD to: $LD_PRELOAD"
+            fi
+            # --- END MODIFICATION ---
           fi
 
           echo "Current directory for BATS tests: $(pwd)"
@@ -155,13 +163,11 @@ jobs:
           if [ "$RUNNER_OS" == "Linux" ];
           then
             echo "Running with kcov for code coverage..."
-            # --- MODIFICATION: Create directory with absolute path ---
             mkdir -p ${{ github.workspace }}/coverage
             echo "Current directory for kcov: $(pwd)"
 
             # Run kcov. It will set its relative LD_PRELOAD, and our
             # RUN_SCRIPT wrapper will immediately fix it.
-            # --- MODIFICATION: Use absolute path for kcov output ---
             kcov --include-path=./ --exclude-path=tests/ ${{ github.workspace }}/coverage/ \
               bash -c "$RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
           else
