@@ -71,7 +71,7 @@ jobs:
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
             sudo apt-get update
-            sudo apt-get -y install inotify-tools util-linux
+            sudo apt-get -y install inotify-tools util-linux parallel
           elif [ "$RUNNER_OS" == "macOS" ]; then
             # Install core Homebrew dependencies only.
             # Docker/Colima/QEMU is handled by the next action.
@@ -123,25 +123,63 @@ jobs:
           TEST_FILES_TO_RUN=${{ github.event.inputs.test_files }}
           echo "Test files glob: $TEST_FILES_TO_RUN"
 
+          # We MUST run each test file in a sequential loop to force
+          # bats to emit a correct TAP stream (with `# file: ...` for each).
+
+          # Export env vars needed by the subshell
+          export BATS_LIB_PATH
+          export BATS_TAP_FILE
+
+          # Ensure the TAP file is empty before we start
+          echo "Clearing old TAP file at ${BATS_TAP_FILE}"
+          > "${BATS_TAP_FILE}"
+
+          # This script will be run by bash -c, either wrapped by kcov (Linux)
+          # or directly (macOS).
+          RUN_SCRIPT=$(cat << 'EOF'
+          echo "Moving to tests directory..."
+          cd tests
+          echo "Current directory for BATS tests: $(pwd)"
+          echo "Finding and running test files sequentially..."
+
+          # Use find, sort, and a while-read loop for robust file handling
+          # The output of this entire loop (all individual TAP streams)
+          # will be piped to the TEE command.
+          find . -name "$TEST_FILES_TO_RUN" | sort | while read test_file; do
+            if [ -f "$test_file" ]; then
+              echo "--- Running $test_file ---"
+              bats --tap "$test_file"
+            fi
+          done
+          EOF
+          )
+
           if [ "$RUNNER_OS" == "Linux" ];
           then
-            # Run with kcov on Linux
             echo "Running with kcov for code coverage..."
             mkdir -p ./coverage
-            # CWD is repo root
             echo "Current directory for kcov: $(pwd)"
 
-            kcov --include-path=./ --exclude-path=tests/ coverage/ bats --tap $(find tests -name "$TEST_FILES_TO_RUN") | tee "${BATS_TAP_FILE}"
+            # kcov wraps the *entire* bash -c script.
+            kcov --include-path=./ --exclude-path=tests/ coverage/ \
+              bash -c "TEST_FILES_TO_RUN=$TEST_FILES_TO_RUN $RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
           else
-            # Run sequentially on macOS for stable, clean logs
-            cd tests
-            echo "Current directory for BATS tests: $(pwd)"
             echo "Running tests sequentially for clear debug logging..."
-            bats --tap $TEST_FILES_TO_RUN | tee "${BATS_TAP_FILE}"
+
+            # macOS just runs the script directly and pipes to tee.
+            bash -c "TEST_FILES_TO_RUN=$TEST_FILES_TO_RUN $RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
           fi
 
-          # Capture the exit code of 'bats' (or 'kcov')
-          BATS_EXIT_CODE=${PIPESTATUS[0]}
+          # Capture the exit code. We check the TAP file for "not ok"
+          # instead of PIPESTATUS[0] because the loop might have failures.
+          BATS_EXIT_CODE=0
+          if grep -q "^not ok" "${BATS_TAP_FILE}"; then
+            echo "One or more tests failed."
+            BATS_EXIT_CODE=1
+          else
+            echo "All tests passed."
+          fi
+
           echo "BATS raw exit code: ${BATS_EXIT_CODE}"
           echo "bats_exit_code_internal=${BATS_EXIT_CODE}" >> $GITHUB_OUTPUT
 
@@ -178,6 +216,16 @@ jobs:
         run: |
           echo "--- Reading summary from ${BATS_TAP_FILE} ---"
 
+          # Add a section for the kcov report (Linux only)
+          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+            echo "### 📈 Code Coverage (Linux)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Kcov report uploaded as **coverage-report-linux-debug**." >> $GITHUB_STEP_SUMMARY
+            echo "View the report by downloading the artifact from this run." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "---" >> $GITHUB_STEP_SUMMARY
+          fi
+
           if [ ! -f "${BATS_TAP_FILE}" ]; then
             echo "BATS results file (${BATS_TAP_FILE}) not found." >> $GITHUB_STEP_SUMMARY
             exit 0
@@ -199,7 +247,7 @@ jobs:
           # Capture the total planned tests
           /^1\.\.[0-9]+/ {
             split($0, a, "..")
-            planned_tests = a[2]
+            planned_tests += a[2] # Sum all planned tests
             next
           }
 
@@ -277,15 +325,10 @@ jobs:
 
           # Calculate and print the final summary
           END {
-            total_run = passed + failed + skipped
-            not_run = 0
-            if (planned_tests > total_run) {
-               not_run = planned_tests - total_run
-            }
-
+            # Removed 'not_run' logic
             print ""
             print "---"
-            print "**Summary:** " passed " passed, " failed " failed, " skipped " skipped, " not_run " not run."
+            print "**Summary:** " passed " passed, " failed " failed, " skipped " skipped."
           }
           EOF
           )

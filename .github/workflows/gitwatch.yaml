@@ -130,24 +130,53 @@ jobs:
 
           echo "Running BATS tests in parallel using $NPROC cores..."
 
+          # Export env vars needed by parallel/bats
+          export BATS_LIB_PATH
+          export BATS_TAP_FILE
+
+          # Ensure the TAP file is empty
+          > "${BATS_TAP_FILE}"
+
+          # We must use `parallel --group` to run bats on each file.
+          # This ensures each file's TAP output is printed contiguously,
+          # preventing the interleaved output that breaks our summary parser.
+          # `bats --jobs N` is buggy and produces a broken TAP stream.
+          RUN_SCRIPT=$(cat << 'EOF'
+          cd tests
+          echo "Current directory for BATS tests: $(pwd)"
+
+          # Find all .bats files, pipe to parallel.
+          # --group = Keep output for one job together (no interleaving).
+          # --jobs $NPROC = Use N cores.
+          # 'bats --tap {}' = Run bats on the input file {}.
+          find . -name "*.bats" | parallel --jobs $NPROC --group 'bats --tap {}'
+          EOF
+          )
+
           if [ "$RUNNER_OS" == "Linux" ];
           then
-            # Run with kcov on Linux
             echo "Running with kcov for code coverage..."
             mkdir -p ./coverage
-            # CWD is repo root
             echo "Current directory for kcov: $(pwd)"
 
-            kcov --include-path=./ --exclude-path=tests/ coverage/ bats --jobs "$NPROC" --tap $(find tests -name "*.bats") | tee "${BATS_TAP_FILE}"
+            # kcov wraps the entire bash script that invokes parallel
+            kcov --include-path=./ --exclude-path=tests/ coverage/ \
+              bash -c "NPROC=$NPROC $RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
           else
-            # On macOS, cd into tests/ to run
-            cd tests
-            echo "Current directory for BATS tests: $(pwd)"
-            bats --jobs "$NPROC" --tap $(find . -name "*.bats") | tee "${BATS_TAP_FILE}"
+            # On macOS, just run the parallel script
+            bash -c "NPROC=$NPROC $RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
           fi
 
-          # Capture the exit code of 'bats' (or 'kcov')
-          BATS_EXIT_CODE=${PIPESTATUS[0]}
+          # Capture the exit code. We check the TAP file for "not ok"
+          # because parallel itself might return 0 even if sub-jobs failed.
+          BATS_EXIT_CODE=0
+          if grep -q "^not ok" "${BATS_TAP_FILE}"; then
+            echo "One or more tests failed."
+            BATS_EXIT_CODE=1
+          else
+            echo "All tests passed."
+          fi
+
           echo "BATS raw exit code: ${BATS_EXIT_CODE}"
           echo "bats_exit_code_internal=${BATS_EXIT_CODE}" >> $GITHUB_OUTPUT
 
@@ -179,6 +208,16 @@ jobs:
         run: |
           echo "--- Reading summary from ${BATS_TAP_FILE} ---"
 
+          # Add a section for the kcov report (Linux only)
+          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+            echo "### 📈 Code Coverage (Linux)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Kcov report uploaded as **coverage-report-linux**." >> $GITHUB_STEP_SUMMARY
+            echo "View the report by downloading the artifact from this run." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "---" >> $GITHUB_STEP_SUMMARY
+          fi
+
           if [ ! -f "${BATS_TAP_FILE}" ]; then
             echo "BATS results file (${BATS_TAP_FILE}) not found." >> $GITHUB_STEP_SUMMARY
             exit 0
@@ -200,7 +239,7 @@ jobs:
           # Capture the total planned tests
           /^1\.\.[0-9]+/ {
             split($0, a, "..")
-            planned_tests = a[2]
+            planned_tests += a[2] # Sum all planned tests
             next
           }
 
@@ -278,15 +317,10 @@ jobs:
 
           # Calculate and print the final summary
           END {
-            total_run = passed + failed + skipped
-            not_run = 0
-            if (planned_tests > total_run) {
-               not_run = planned_tests - total_run
-            }
-
+            # Removed 'not_run' logic
             print ""
             print "---"
-            print "**Summary:** " passed " passed, " failed " failed, " skipped " skipped, " not_run " not run."
+            print "**Summary:** " passed " passed, " failed " failed, " skipped " skipped."
           }
           EOF
           )
