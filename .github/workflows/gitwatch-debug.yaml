@@ -149,23 +149,19 @@ jobs:
             mkdir -p ./coverage
             echo "Current directory for kcov: $(pwd)"
 
-            # --- NEW FIX: Manually set LD_PRELOAD to an absolute path ---
-            # 1. Create the coverage dir and cd into it
-            cd coverage
+            # --- NEW FIX: Manually set LD_PRELOAD to an ABSOLUTE path ---
+            # 1. Construct the absolute path to where kcov *will* create its library.
+            #    ${{ github.workspace }} is an absolute path (e.g., /home/runner/work/gitwatch/gitwatch)
+            export KCOV_LIB_PATH="${{ github.workspace }}/coverage/libkcov_sowrapper.so"
+            echo "Setting absolute LD_PRELOAD path to: $KCOV_LIB_PATH"
 
-            # 2. Run kcov in print-only mode. This creates the wrapper library
-            #    and prints its *absolute path*.
-            KCOV_LIB_PATH=$(kcov --print-ld-preload-path .)
-            echo "KCOV Lib Path: $KCOV_LIB_PATH"
-
-            # 3. Export the absolute path. This will be inherited by all child processes.
+            # 2. Export LD_PRELOAD so all child processes (including bats and gitwatch.sh) inherit it.
+            #    This survives the `cd` commands inside the BATS test setup.
             export LD_PRELOAD="$KCOV_LIB_PATH"
 
-            # 4. Go back to the repo root
-            cd ..
-
-            # 5. Run kcov with --skip-solib-preload to tell it to use our
-            #    manually-set, absolute path instead of its own relative one.
+            # 3. Run kcov, telling it *not* to set its own relative LD_PRELOAD,
+            #    but to *use* the one we just provided. kcov will create the file
+            #    at the path we specified.
             kcov --skip-solib-preload --include-path=./ --exclude-path=tests/ coverage/ \
               bash -c "$RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
             # --- END NEW FIX ---
