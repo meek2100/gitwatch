@@ -128,53 +128,25 @@ jobs:
           echo "Clearing old TAP file at ${BATS_TAP_FILE}"
           > "${BATS_TAP_FILE}"
 
-          # --- MODIFIED: This script now fixes LD_PRELOAD ---
-          # This script is run by 'bash -c' and is wrapped by kcov.
-          # kcov sets a *relative* LD_PRELOAD. We must make it absolute
-          # *before* BATS `cd`s into its temp directory.
-          RUN_SCRIPT=$(cat << 'EOF'
-          if [ -n "$LD_PRELOAD" ]; then
-            # --- MODIFICATION: Check if path is already absolute ---
-            if [[ "$LD_PRELOAD" == /* ]]; then
-              echo "LD_PRELOAD is already absolute: $LD_PRELOAD"
-              export LD_PRELOAD
-            else
-              # Path is relative, make it absolute
-              export LD_PRELOAD="$PWD/$LD_PRELOAD"
-              echo "Fixed relative LD_PRELOAD to: $LD_PRELOAD"
-            fi
-            # --- END MODIFICATION ---
-          fi
-
-          echo "Current directory for BATS tests: $(pwd)"
-          echo "Finding and running test files sequentially from ./tests..."
-
-          # Find files starting from ./tests.
-          find ./tests -name "$TEST_FILES_TO_RUN" | sort | while read test_file; do
-            if [ -f "$test_file" ]; then
-              echo "--- Running $test_file ---"
-              bats --tap "$test_file"
-            fi
-          done
-          EOF
-          )
-          # --- END MODIFICATION ---
+          # --- MODIFICATION: Removed the entire RUN_SCRIPT wrapper ---
 
           if [ "$RUNNER_OS" == "Linux" ];
           then
             echo "Running with kcov for code coverage..."
+            # --- MODIFICATION: Create directory with absolute path ---
             mkdir -p ${{ github.workspace }}/coverage
             echo "Current directory for kcov: $(pwd)"
 
-            # Run kcov. It will set its relative LD_PRELOAD, and our
-            # RUN_SCRIPT wrapper will immediately fix it.
+            # --- MODIFICATION: Use absolute path for kcov output and simple bash -c command ---
+            # Note: $TEST_FILES_TO_RUN is expanded here.
+            # The inner $test_file variables are escaped (\$) to be evaluated inside the subshell.
             kcov --include-path=./ --exclude-path=tests/ ${{ github.workspace }}/coverage/ \
-              bash -c "$RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
+              bash -c "find ./tests -name \"$TEST_FILES_TO_RUN\" | sort | while read test_file; do if [ -f \"\$test_file\" ]; then echo \"--- Running \$test_file ---\"; bats --tap \"\$test_file\"; fi; done" | tee "${BATS_TAP_FILE}"
           else
             echo "Running tests sequentially for clear debug logging..."
 
-            # macOS just runs the script directly.
-            bash -c "$RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
+            # --- MODIFICATION: Use simple bash -c command ---
+            bash -c "find ./tests -name \"$TEST_FILES_TO_RUN\" | sort | while read test_file; do if [ -f \"\$test_file\" ]; then echo \"--- Running \$test_file ---\"; bats --tap \"\$test_file\"; fi; done" | tee "${BATS_TAP_FILE}"
           fi
 
           # Capture the exit code. We check the TAP file for "not ok"
