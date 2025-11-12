@@ -8,26 +8,33 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-# Define the custom cleanup logic specific to this file
-# Use standard echo to output debug info to avoid relying on bats-support inside teardown
+# ---
+# This file's tests require a remote repo, so we override the default
+# setup to use the 'setup_with_remote' helper.
+setup() {
+  setup_with_remote
+}
+
+# ---
+# This file needs custom cleanup logic to remove the external .git dir
+# (dotgittestdir) that it creates during the tests.
 _remotedirs_cleanup() {
   verbose_echo "# Running custom cleanup for remotedirs"
   if [ -n "${dotgittestdir:-}" ] && [ -d "$dotgittestdir" ];
-  then
+ then
     verbose_echo "# Removing external git dir: $dotgittestdir"
     rm -rf "$dotgittestdir"
   fi
 }
 
-# Load the base setup/teardown AFTER defining the custom helper
-# This file now contains _common_teardown() and a default teardown() wrapper
-load 'bats-custom/startup-shutdown'
-
-# Define the final teardown override that calls both the custom
-# cleanup for this file and the common teardown logic.
+# ---
+# Define the final teardown override.
+# This overrides the default 'teardown()' from 'bats-custom/load'.
+# It calls this file's custom cleanup, then calls the common
+# teardown logic (which is available via 'bats-custom/load' ).
 teardown() {
   _remotedirs_cleanup # Call custom part first
-  _common_teardown    # Then call the common part directly from the loaded file
+  _common_teardown    # Then call the common part
 }
 
 
