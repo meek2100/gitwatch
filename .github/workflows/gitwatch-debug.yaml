@@ -130,23 +130,29 @@ jobs:
 
           # --- MODIFICATION: Removed the entire RUN_SCRIPT wrapper ---
 
+          echo "Finding test files..."
+          # Note: $TEST_FILES_TO_RUN is expanded here
+          TEST_FILE_LIST=$(find ./tests -name "$TEST_FILES_TO_RUN" | sort)
+          if [ -z "$TEST_FILE_LIST" ]; then
+              echo "No test files found."
+              exit 0
+          fi
+          echo "Running BATS on files: $TEST_FILE_LIST"
+
           if [ "$RUNNER_OS" == "Linux" ];
           then
             echo "Running with kcov for code coverage..."
-            # --- MODIFICATION: Create directory with absolute path ---
             mkdir -p ${{ github.workspace }}/coverage
             echo "Current directory for kcov: $(pwd)"
 
-            # --- MODIFICATION: Use absolute path for kcov output and simple bash -c command ---
-            # Note: $TEST_FILES_TO_RUN is expanded here.
-            # The inner $test_file variables are escaped (\$) to be evaluated inside the subshell.
+            # --- MODIFICATION: Run kcov wrapping bats, passing the file list ---
             kcov --include-path=./ --exclude-path=tests/ ${{ github.workspace }}/coverage/ \
-              bash -c "find ./tests -name \"$TEST_FILES_TO_RUN\" | sort | while read test_file; do if [ -f \"\$test_file\" ]; then echo \"--- Running \$test_file ---\"; bats --tap \"\$test_file\"; fi; done" | tee "${BATS_TAP_FILE}"
+              bats --tap $TEST_FILE_LIST | tee "${BATS_TAP_FILE}"
           else
             echo "Running tests sequentially for clear debug logging..."
 
-            # --- MODIFICATION: Use simple bash -c command ---
-            bash -c "find ./tests -name \"$TEST_FILES_TO_RUN\" | sort | while read test_file; do if [ -f \"\$test_file\" ]; then echo \"--- Running \$test_file ---\"; bats --tap \"\$test_file\"; fi; done" | tee "${BATS_TAP_FILE}"
+            # --- MODIFICATION: Run bats sequentially ---
+            bats --tap $TEST_FILE_LIST | tee "${BATS_TAP_FILE}"
           fi
 
           # Capture the exit code. We check the TAP file for "not ok"
