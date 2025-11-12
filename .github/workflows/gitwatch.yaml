@@ -137,21 +137,18 @@ jobs:
           # Ensure the TAP file is empty
           > "${BATS_TAP_FILE}"
 
-          # We must use `parallel --group` to run bats on each file.
-          # This ensures each file's TAP output is printed contiguously,
-          # preventing the interleaved output that breaks our summary parser.
-          # `bats --jobs N` is buggy and produces a broken TAP stream.
+          # <--- MODIFIED: This script no longer `cd tests` --->
           RUN_SCRIPT=$(cat << 'EOF'
-          cd tests
           echo "Current directory for BATS tests: $(pwd)"
 
-          # Find all .bats files, pipe to parallel.
+          # Find all .bats files in ./tests, pipe to parallel.
           # --group = Keep output for one job together (no interleaving).
           # --jobs $NPROC = Use N cores.
           # 'bats --tap {}' = Run bats on the input file {}.
-          find . -name "*.bats" | parallel --jobs $NPROC --group 'bats --tap {}'
+          find ./tests -name "*.bats" | parallel --jobs $NPROC --group 'bats --tap {}'
           EOF
           )
+          # <--- END MODIFICATION --->
 
           if [ "$RUNNER_OS" == "Linux" ];
           then

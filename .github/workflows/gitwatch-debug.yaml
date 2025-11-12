@@ -118,42 +118,32 @@ jobs:
           git config --global user.email "test@email.com"
           git config --global user.name "test user"
 
-          # <--- MODIFIED: Set AND EXPORT the variable --->
-          # We must export it so the 'bash -c' subshell below can read it.
-          # We quote it to prevent glob expansion in *this* shell.
+          # Set AND EXPORT the variable
           export TEST_FILES_TO_RUN="${{ github.event.inputs.test_files }}"
           echo "Test files glob: $TEST_FILES_TO_RUN"
 
-          # We MUST run each test file in a sequential loop to force
-          # bats to emit a correct TAP stream (with `# file: ...` for each).
-
-          # Export env vars needed by the subshell
           export BATS_LIB_PATH
           export BATS_TAP_FILE
 
-          # Ensure the TAP file is empty before we start
           echo "Clearing old TAP file at ${BATS_TAP_FILE}"
           > "${BATS_TAP_FILE}"
 
-          # This script will be run by bash -c, either wrapped by kcov (Linux)
-          # or directly (macOS). It reads $TEST_FILES_TO_RUN from the environment.
+          # <--- MODIFIED: This script no longer `cd tests` --->
           RUN_SCRIPT=$(cat << 'EOF'
-          echo "Moving to tests directory..."
-          cd tests
           echo "Current directory for BATS tests: $(pwd)"
-          echo "Finding and running test files sequentially..."
+          echo "Finding and running test files sequentially from ./tests..."
 
-          # Use find, sort, and a while-read loop for robust file handling
-          # The output of this entire loop (all individual TAP streams)
-          # will be piped to the TEE command.
-          find . -name "$TEST_FILES_TO_RUN" | sort | while read test_file; do
+          # Find files starting from ./tests. $test_file will be e.g., ./tests/foo.bats
+          find ./tests -name "$TEST_FILES_TO_RUN" | sort | while read test_file; do
             if [ -f "$test_file" ]; then
               echo "--- Running $test_file ---"
+              # Run bats with the full path to the test file
               bats --tap "$test_file"
             fi
           done
           EOF
           )
+          # <--- END MODIFICATION --->
 
           if [ "$RUNNER_OS" == "Linux" ];
           then
@@ -161,14 +151,13 @@ jobs:
             mkdir -p ./coverage
             echo "Current directory for kcov: $(pwd)"
 
-            # <--- MODIFIED: Removed the "TEST_FILES_TO_RUN=..." assignment --->
-            # The subshell now correctly inherits the exported variable.
+            # kcov wraps the *entire* bash -c script, which now runs from the root.
             kcov --include-path=./ --exclude-path=tests/ coverage/ \
               bash -c "$RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
           else
             echo "Running tests sequentially for clear debug logging..."
 
-            # <--- MODIFIED: Removed the "TEST_FILES_TO_RUN=..." assignment --->
+            # macOS just runs the script directly.
             bash -c "$RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
           fi
 
