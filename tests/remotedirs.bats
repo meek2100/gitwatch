@@ -21,7 +21,7 @@ setup() {
 _remotedirs_cleanup() {
   verbose_echo "# Running custom cleanup for remotedirs"
   if [ -n "${dotgittestdir:-}" ] && [ -d "$dotgittestdir" ];
- then
+  then
     verbose_echo "# Removing external git dir: $dotgittestdir"
     rm -rf "$dotgittestdir"
   fi

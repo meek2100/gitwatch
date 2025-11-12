@@ -25,7 +25,7 @@ setup() {
 
   # Wait for commit+push for file1 (wait for remote ref to update)
   run wait_for_git_change 20 0.5 git rev-parse origin/master ||
-    fail "wait_for_git_change timed out after file1 add"
+  fail "wait_for_git_change timed out after file1 add"
 
   sleep 0.2
 
@@ -175,7 +175,7 @@ setup() {
   run cat "$output_file"
   assert_output --partial "Executing pull command:" "Should execute pull command"
   assert_output --partial "Successfully rebased and updated" "Rebase should succeed (Linux/Git message)" ||
-    assert_output --partial "Current branch master is up to date." "Pull might say up to date if rebase was fast-forward/already happened"
+  assert_output --partial "Current branch master is up to date." "Pull might say up to date if rebase was fast-forward/already happened"
 
   # The existing files must be present
   assert_file_exist "initial_file.txt"
