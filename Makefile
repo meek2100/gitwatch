@@ -25,9 +25,9 @@ coverage:
 		echo "Error: 'kcov' not found. Please install it (e.g., sudo apt install kcov)."; \
 		exit 1; \
 	fi
-	@mkdir -p coverage
-	@kcov --include-path=./ --bash-parser=./gitwatch.sh coverage/ bats $(find tests -name "*.bats")
-	@echo "Coverage report generated in ./coverage/index.html"
+	@mkdir -p $(PWD)/coverage
+	@kcov --include-path=./ --bash-parser=./gitwatch.sh $(PWD)/coverage/ bats $(find tests -name "*.bats")
+	@echo "Coverage report generated in $(PWD)/coverage/index.html"
 
 # Run all pre-commit hooks against all files
 lint:

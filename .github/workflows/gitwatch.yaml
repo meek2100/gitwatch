@@ -157,12 +157,14 @@ jobs:
           if [ "$RUNNER_OS" == "Linux" ];
           then
             echo "Running with kcov for code coverage..."
-            mkdir -p ./coverage
+            # --- MODIFICATION: Create directory with absolute path ---
+            mkdir -p ${{ github.workspace }}/coverage
             echo "Current directory for kcov: $(pwd)"
 
             # Run kcov normally.
             # The $RUN_SCRIPT wrapper will fix the LD_PRELOAD path internally.
-            kcov --include-path=./ --exclude-path=tests/ coverage/ \
+            # --- MODIFICATION: Use absolute path for kcov output ---
+            kcov --include-path=./ --exclude-path=tests/ ${{ github.workspace }}/coverage/ \
               bash -c "NPROC=$NPROC $RUN_SCRIPT" | tee "${BATS_TAP_FILE}"
           else
             # On macOS, just run the parallel script
@@ -227,15 +229,15 @@ jobs:
 
           AWK_SCRIPT=$(cat << 'EOF'
           BEGIN {
-            print "### BATS Test Results"
-            print ""
-            print "| Test | File | Status |"
-            print "| --- | --- | --- |"
-            passed = 0
-            failed = 0
-            skipped = 0
-            planned_tests = 0
-            current_file = "N/A"
+              print "### BATS Test Results"
+              print ""
+              print "| Test | File | Status |"
+              print "| --- | --- | --- |"
+              passed = 0
+              failed = 0
+              skipped = 0
+              planned_tests = 0
+              current_file = "N/A"
           }
 
           # Capture the total planned tests
