@@ -1,4 +1,4 @@
-#!/usr/bin/env bats
+#!/usr/bin/env bash
 
 # Load standard helpers
 load 'bats-support/load'
@@ -16,13 +16,14 @@ create_failing_mock_git_config() {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   mkdir -p "$testdir/bin"
 
-  cat > "$dummy_path" << EOF
-#!/usr/bin/env bash
-# Mock Git script
-echo "# MOCK_GIT: Received command: \$@" >&2
+  echo "#!/usr/bin/env bash" > "$dummy_path"
+  echo "echo \"# MOCK_GIT: Received command: \$@\" >&2" >> "$dummy_path"
 
-if [ "\$1" = "config" ];
-  then
+  # Inject the parser logic
+  write_mock_git_parser >> "$dummy_path"
+
+  cat >> "$dummy_path" << EOF
+if [ "\$subcommand" = "config" ]; then
   echo "# MOCK_GIT: Simulating 'git config' failure" >&2
   exit 128
 else

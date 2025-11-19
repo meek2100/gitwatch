@@ -18,13 +18,14 @@ create_failing_mock_git_commit() {
   mkdir -p "$testdir/bin"
 
   # Create the mock script
-  cat > "$dummy_path" << EOF
-#!/usr/bin/env bash
-# Mock Git script
-echo "# MOCK_GIT: Received command: \$@" >&2
+  echo "#!/usr/bin/env bash" > "$dummy_path"
+  echo "echo \"# MOCK_GIT: Received command: \$@\" >&2" >> "$dummy_path"
 
-if [ "\$1" = "commit" ];
-  then
+  # Inject the parser logic
+  write_mock_git_parser >> "$dummy_path"
+
+  cat >> "$dummy_path" << EOF
+if [ "\$subcommand" = "commit" ]; then
   if [ -f "$state_file" ]; then
     # State file exists, so SUCCEED
     echo "# MOCK_GIT: 'commit' SUCCEEDING (state file exists)." >&2
@@ -104,6 +105,7 @@ EOF
   run cat "$output_file"
   assert_output --partial "MOCK_GIT: 'commit' SUCCEEDING"
   assert_output --partial "Git operation succeeded. Resetting failure count."
+
   # 11. Cleanup
   unset GW_GIT_BIN
   unset GW_MAX_FAIL_COUNT

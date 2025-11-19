@@ -331,11 +331,27 @@ _trim_spaces() {
 # shellcheck disable=SC2329 # Function is used via trap
 # clean up at end of program
 cleanup() {
+  local exit_code=$1
   # shellcheck disable=SC2317 # Code is reachable via trap
-  log_debug "Cleanup function called. Exiting."
+  log_debug "Cleanup function called. Exit code: $exit_code."
+
+  # Check for active timer process and kill it if needed
+  if [ -f "$TIMER_PID_FILE" ]; then
+    local pid
+    pid=$(cat "$TIMER_PID_FILE" 2>/dev/null || echo "")
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+      log_debug "Cleanup: Killing active debounce timer PID $pid."
+      kill -9 "$pid" 2>/dev/null || true
+    fi
+    rm -f "$TIMER_PID_FILE"
+  fi
+
+  # Remove health file
+  rm -f "$HEALTH_STATUS_FILE"
+
   # The lockfile descriptors (8 and 9) will be auto-released on exit
   # shellcheck disable=SC2317 # Code is reachable via trap
-  exit "$1" # Pass the exit code from the caller (or 0 if unset)
+  exit "$exit_code"
 }
 
 # shellcheck disable=SC2329 # Function is used via trap
@@ -368,7 +384,9 @@ _get_path_hash() {
     path_hash=$(echo -n "$path_to_hash" | shasum -a 256 | awk '{print $1}')
   else
     # Simple "hash" for POSIX compliance, replaces / with _
-    path_hash="${path_to_hash//\//_}"
+    # Truncate to last 200 chars to avoid filesystem length limits on deep paths
+    local safe_string="${path_to_hash//\//_}"
+    path_hash="${safe_string: -200}"
   fi
   log_trace "Exiting function _get_path_hash"
   echo "$path_hash"
@@ -486,10 +504,10 @@ while getopts b:d:h:g:L:l:m:c:C:p:r:s:t:e:x:X:o:MRvSfVqn option; do # Process co
         fi
         # Resolve the user-provided path for GIT_DIR robustly
         RESOLVED_GIT_DIR=$(cd "$GIT_DIR" && pwd -P) || { log_fatal "Error resolving path for GIT_DIR '$GIT_DIR'"; exit 4; }
-        # Modify the *global* GIT variable string, quoting paths
-        read -r GIT_CMD_BASE _ <<< "$GIT" # Get base git command
-        # Reconstruct the GIT command string safely using printf %q
-        GIT=$(printf "%s --no-pager --work-tree %q --git-dir %q" "$GIT_CMD_BASE" "$PRELIM_TARGETDIR_ABS" "$RESOLVED_GIT_DIR")
+
+        # Modify the *global* GIT variable string, quoting paths.
+        # We append the new flags to the existing $GIT variable to preserve defaults (like -c core.quotepath=false).
+        GIT=$(printf "%s --no-pager --work-tree %q --git-dir %q" "$GIT" "$PRELIM_TARGETDIR_ABS" "$RESOLVED_GIT_DIR")
 
         log_debug "Using specified git directory: $RESOLVED_GIT_DIR (applied early to GIT command string)"
       else
@@ -976,7 +994,9 @@ if [ "$NO_LOCK" -eq 0 ]; then
 
     # We must check for hash commands *before* attempting to use them here
     if ! is_command "sha256sum" && ! is_command "md5sum" && ! is_command "shasum"; then
-      log_warn "Warning: Neither 'sha256sum' nor 'md5sum' found. Using insecure path-based lockfile name in /tmp."
+      log_warn "Warning: Neither 'sha256sum' nor 'md5sum' nor 'shasum' found."
+      log_warn "  Will use a simple path-based name for lockfiles if /tmp fallback is needed."
+      log_warn "  It is recommended to install 'coreutils' for robust lockfile naming."
     fi
     REPO_HASH=$(_get_path_hash "$GIT_DIR_PATH")
     # TARGET_HASH is already defined above
@@ -1577,7 +1597,7 @@ HEALTH_STATUS_FILE="${TMPDIR:-/tmp}/gitwatch.status"
 
 # Cleanup PID file on exit
 # Redefine trap to include PID file removal AND health file removal
-trap 'rm -f "$TIMER_PID_FILE" "$HEALTH_STATUS_FILE"; cleanup "$?"' EXIT INT TERM
+trap 'cleanup "$?"' EXIT INT TERM
 log_debug "Signal traps set."
 
 

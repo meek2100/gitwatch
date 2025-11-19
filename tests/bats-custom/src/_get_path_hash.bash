@@ -11,12 +11,13 @@ _get_path_hash() {
 
   if is_command "sha256sum"; then
     path_hash=$(echo -n "$path_to_hash" | sha256sum | (read -r hash _; echo "$hash"))
-  elif is_command "md5sum";
-  then
+  elif is_command "md5sum"; then
     path_hash=$(echo -n "$path_to_hash" | md5sum | (read -r hash _; echo "$hash"))
   else
     # Simple "hash" for POSIX compliance, replaces / with _
-    path_hash="${path_to_hash//\//_}"
+    # Truncate to last 200 chars to avoid filesystem length limits on deep paths
+    local safe_string="${path_to_hash//\//_}"
+    path_hash="${safe_string: -200}"
   fi
   echo "$path_hash"
 }

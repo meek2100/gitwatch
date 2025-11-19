@@ -1,4 +1,4 @@
-#!/usr/bin/env bats
+#!/usr/bin/env bash
 
 # Load standard helpers
 load 'bats-support/load'
@@ -22,16 +22,16 @@ create_failing_mock_git() {
   mkdir -p "$testdir/bin"
 
   # Create the mock script
-  cat > "$dummy_path" << EOF
-#!/usr/bin/env bash
-# Mock Git script
+  echo "#!/usr/bin/env bash" > "$dummy_path"
+  echo "echo \"# MOCK_GIT: Received command: \$@\" >&2" >> "$dummy_path"
 
-# Log the command for debugging
-echo "# MOCK_GIT: Received command: \$@" >&2
+  # Inject the parser logic
+  write_mock_git_parser >> "$dummy_path"
 
-if [ "\$1" = "push" ]; then
-  if [ -f "$state_file" ];
-  then
+  # Append the specific logic
+  cat >> "$dummy_path" << EOF
+if [ "\$subcommand" = "push" ]; then
+  if [ -f "$state_file" ]; then
     echo "# MOCK_GIT: Push command SUCCEEDING (state file exists)." >&2
     exec $real_path "\$@"
   else
@@ -78,12 +78,9 @@ EOF
 
   # 3. Trigger 3 failures (GW_MAX_FAIL_COUNT)
   verbose_echo "# DEBUG: Triggering 3 failures..."
-  echo "change 1" >> file.txt;
-  sleep 2 # Wait for commit/push to fail
-  echo "change 2" >> file.txt;
-  sleep 2 # Wait for commit/push to fail
-  echo "change 3" >> file.txt;
-  sleep 2 # Wait for commit/push to fail
+  echo "change 1" >> file.txt; sleep 2 # Wait for commit/push to fail
+  echo "change 2" >> file.txt; sleep 2 # Wait for commit/push to fail
+  echo "change 3" >> file.txt; sleep 2 # Wait for commit/push to fail
 
   # 4. Assert: Check log for 3 failures and entry into cool-down
   run cat "$output_file"
@@ -91,6 +88,7 @@ EOF
   assert_output --partial "Incrementing failure count to 2/3"
   assert_output --partial "Incrementing failure count to 3/3"
   assert_output --partial "Max failures reached. Entering cool-down period for 4 seconds."
+
   # 5. Trigger a 4th change *during* the cool-down
   verbose_echo "# DEBUG: Triggering change during cool-down..."
   echo "change 4 (SKIPPED)" >> file.txt
@@ -99,6 +97,7 @@ EOF
   # 6. Assert: Check log for the "Skipping trigger" message
   run cat "$output_file"
   assert_output --partial "In cool-down mode. Skipping trigger."
+
   # 7. Wait for cool-down to end (4s) + buffer (2s)
   verbose_echo "# DEBUG: Waiting for cool-down to expire..."
   sleep 5
@@ -122,6 +121,7 @@ EOF
   # 11. Assert: Check log for success and reset
   run cat "$output_file"
   assert_output --partial "Git operation succeeded. Resetting failure count."
+
   # 12. Cleanup
   unset GW_GIT_BIN
   unset GW_MAX_FAIL_COUNT

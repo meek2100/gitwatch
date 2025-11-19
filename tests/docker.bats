@@ -117,7 +117,8 @@ teardown() {
   # Stop and remove all containers with the test prefix
   docker ps -a --filter "name=${DOCKER_CONTAINER_NAME_PREFIX}-" --format "{{.ID}}" | xargs -r docker rm -f
   # Clean up the host directory
-  if [ -d "$TEST_REPO_HOST_DIR" ]; then
+  if [ -d "$TEST_REPO_HOST_DIR" ];
+  then
     # We must 'sudo' this because the container might have changed permissions
     sudo rm -rf "$TEST_REPO_HOST_DIR"
     verbose_echo "# DEBUG: Cleaned up host repo volume: $TEST_REPO_HOST_DIR"
@@ -132,12 +133,14 @@ create_failing_mock_git() {
   dummy_dir=$(dirname "$dummy_path")
   mkdir -p "$dummy_dir"
 
-  cat > "$dummy_path" << EOF
-#!/usr/bin/env bash
-# Mock Git script
-echo "# MOCK_GIT: Received command: \$@" >&2
+  echo "#!/usr/bin/env bash" > "$dummy_path"
+  echo "echo \"# MOCK_GIT: Received command: \$@\" >&2" >> "$dummy_path"
 
-if [ "\$1" = "push" ]; then
+  # Inject the parser logic
+  write_mock_git_parser >> "$dummy_path"
+
+  cat >> "$dummy_path" << EOF
+if [ "\$subcommand" = "push" ]; then
   echo "# MOCK_GIT: Push command FAILING" >&2
   exit 1 # Always fail the push
 else
@@ -211,7 +214,8 @@ get_container_logs() {
     -e PGID="$RUNNER_GID"
 
   # 1. Assert: Check if the user can write to the volume as 'appuser'
-  #    This check confirms PUID/PGID mapping and correct permissions. (Fixes original assertion failure)
+  #    This check confirms PUID/PGID mapping and correct permissions.
+  # (Fixes original assertion failure)
   run docker exec --user appuser "$container_name" touch /app/watched-repo/test-touch
   assert_success "docker exec 'touch' command failed (PUID/PGID mapping likely failed or permissions are wrong)"
 

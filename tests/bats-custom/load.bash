@@ -17,6 +17,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/src/_get_path_hash.bash"
 source "$(dirname "${BASH_SOURCE[0]}")/src/wait_for_git_change.bash"
 source "$(dirname "${BASH_SOURCE[0]}")/src/wait_for_process_to_die.bash"
 source "$(dirname "${BASH_SOURCE[0]}")/src/create_failing_watcher_bin.bash"
+source "$(dirname "${BASH_SOURCE[0]}")/src/write_mock_git_parser.bash" # <--- ADDED
 
 # 4. Load the setup/teardown logic
 source "$(dirname "${BASH_SOURCE[0]}")/src/common_setup.bash"
