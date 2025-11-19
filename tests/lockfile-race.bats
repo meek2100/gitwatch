@@ -49,30 +49,25 @@ teardown() {
   # shellcheck disable=SC2034 # Used by manual teardown
   GITWATCH_PID_A=$!
 
-  # --- FIX: Wait for Instance A's lockfile to exist instead of sleeping ---
-  # This ensures A is fully up and holding the lock (even though -n ignores it)
-  # before we start B, making the test deterministic.
-  local lockfile_a_found=0
+  # --- FIX: Wait for Instance A to initialize by checking LOGS ---
+  # Since -n disables lockfiles, we cannot wait for a file.
+  # We wait for the "Starting file watch" message in the log.
+  local started_a=0
   local max_wait_loops=20
   local i=0
 
-  # We need to know where the lockfile *would* be.
-  # Based on the script logic, it will be in the .git dir.
-  local git_dir="$testdir/local/$TEST_SUBDIR_NAME/.git"
-
   while [ $i -lt $max_wait_loops ]; do
-    # Check for ANY lockfile in the git dir (simplest check)
-    if ls "$git_dir"/*.lock 1> /dev/null 2>&1; then
-      lockfile_a_found=1
+    if grep -q "Starting file watch" "$output_file_A"; then
+      started_a=1
       break
     fi
     sleep 0.1
     i=$((i + 1))
   done
 
-  if [ $lockfile_a_found -eq 0 ]; then
-    # Fail gracefully if A didn't start, but don't hard fail to allow teardown
-    verbose_echo "# Warning: Instance A lockfile not found after waiting."
+  if [ $started_a -eq 0 ]; then
+     # Fail gracefully if A didn't start
+     verbose_echo "# Warning: Instance A did not log start message after waiting."
   fi
   # ---------------------------------------------------------------------
 
@@ -82,7 +77,7 @@ teardown() {
   # shellcheck disable=SC2034 # Used by manual teardown
   GITWATCH_PID_B=$!
 
-  # 3. Wait for both instances to initialize
+  # 3. Wait for both instances to initialize (B catch-up)
   sleep 1
   cd "$testdir/local/$TEST_SUBDIR_NAME"
 
