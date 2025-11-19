@@ -42,7 +42,7 @@
 #                  the last command to exit with a non-zero status,
 #                  or zero if no command exited with a non-zero status.
 set -euo pipefail
-
+export LC_ALL=C # Ensure standard English output for regex matching (e.g. "nothing to commit")
 
 # --- Platform & Distro Detection ---
 SUDO_CMD="sudo "
@@ -363,6 +363,9 @@ _get_path_hash() {
     path_hash=$(echo -n "$path_to_hash" | sha256sum | (read -r hash _; echo "$hash"))
   elif is_command "md5sum"; then
     path_hash=$(echo -n "$path_to_hash" | md5sum | (read -r hash _; echo "$hash"))
+  elif is_command "shasum"; then
+    # Fallback for macOS which usually has shasum but not sha256sum
+    path_hash=$(echo -n "$path_to_hash" | shasum -a 256 | awk '{print $1}')
   else
     # Simple "hash" for POSIX compliance, replaces / with _
     path_hash="${path_to_hash//\//_}"
@@ -424,35 +427,21 @@ check_git_config() {
 
 # --- Signal Trapping ---
 # Note: The trap for EXIT/INT/TERM is redefined later to include PID file cleanup
-#
-# --- BUG 1 FIX ---
-# Was: trap "cleanup 0" EXIT
-# This was masking all early exit codes.
-# Changed to 'cleanup "$?"' to honor the script's exit code.
 trap 'cleanup "$?"' EXIT # Ensure cleanup runs on script exit, for any reason
-# --- END BUG 1 FIX ---
 trap "signal_handler INT" INT # Handle Ctrl+C
 trap "signal_handler TERM" TERM # Handle kill/systemd stop
 # ---------------------
 
 # --- Initialize GIT command string ---
-# Use GW_GIT_BIN if set, otherwise default to "git"
-# Use ${VAR:-} expansion for safety with set -u
-if [ -z "${GW_GIT_BIN:-}" ]; then GIT="git"; else GIT="$GW_GIT_BIN"; fi
+# Use GW_GIT_BIN if set, otherwise default to "git". Force core.quotepath=false to handle non-ASCII filenames safely.
+if [ -z "${GW_GIT_BIN:-}" ]; then GIT="git -c core.quotepath=false"; else GIT="$GW_GIT_BIN -c core.quotepath=false"; fi
 # --- End Initialize GIT ---
 
 # --- Determine Target Directory Path *preliminarily* for -g flag ---
 # This is needed because -g flag processing modifies the $GIT command string,
 # which requires knowing the work-tree path early.
-# Get the last argument properly, ignoring options and "--"
-PRELIM_USER_PATH=""
-for arg in "$@"; do
-  # Skip options starting with '-' unless it's just '-' (stdin) or './-'
-  if [[ "$arg" == -* ]] && [[ "$arg" != "-" ]] && [[ "$arg" != -./* ]]; then
-    continue
-  fi
-  PRELIM_USER_PATH="$arg" # Keep track of the last non-option argument
-done
+# Use Bash parameter expansion to grab the last argument (standard convention for target path)
+PRELIM_USER_PATH="${!#}"
 
 PRELIM_TARGETDIR_ABS=""
 # Use subshell to avoid changing main script directory yet and capture output
@@ -522,8 +511,20 @@ while getopts b:d:h:g:L:l:m:c:C:p:r:s:t:e:x:X:o:MRvSfVqn option; do # Process co
     M) SKIP_IF_MERGING=1 ;;
     p | r) REMOTE=${OPTARG} ;;
     R) PULL_BEFORE_PUSH=1 ;;
-    s) SLEEP_TIME=${OPTARG} ;;
-    t) TIMEOUT=${OPTARG} ;; # Set timeout
+    s)
+      if ! [[ "${OPTARG}" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        log_fatal "Error: -s (sleep time) must be a number. Got: '${OPTARG}'"
+        exit 1
+      fi
+      SLEEP_TIME=${OPTARG}
+      ;;
+    t)
+      if ! [[ "${OPTARG}" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        log_fatal "Error: -t (timeout) must be a number. Got: '${OPTARG}'"
+        exit 1
+      fi
+      TIMEOUT=${OPTARG}
+      ;;
     S) USE_SYSLOG=1 ;;
     o) _set_log_level "${OPTARG}" ;;
     v) GW_LOG_LEVEL=$LEVEL_DEBUG ;;
@@ -549,11 +550,7 @@ shift $((OPTIND - 1)) # Shift the input arguments, so that the input file (last 
 
 if [ $# -ne 1 ]; then # If no command line options are left (that's bad: no target was passed)
   shelp               # print usage help
-  # --- BUG 3 FIX ---
-  # Was: exit
-  # This exited with 0, causing test 10 to fail.
   exit 1              # and exit with an error
-  # --- END BUG 3 FIX ---
 fi
 USER_PATH="$1" # Final user path after shifting options
 log_debug "Log level set to $GW_LOG_LEVEL."
@@ -575,14 +572,9 @@ else
   INW="$GW_INW_BIN"
 fi
 
-# --- FIX: Moved Event Defaulting Logic ---
 # Set default events based on the *watcher*, not based on GW_INW_BIN
 # This must happen *after* INW is determined, but *before* the -e check.
 if [ -z "${EVENTS:-}" ]; then # Only set if user did not provide -e
-  # ---
-  # BUGFIX: Base default events on OS_TYPE, not the unreliable $INW path.
-  # $OS_TYPE was set reliably earlier.
-  # ---
   if [ "$OS_TYPE" = "Darwin" ] || [ "$OS_TYPE" = "FreeBSD" ] || [ "$OS_TYPE" = "OpenBSD" ]; then
     # default events specified via a mask, see
     # https://emcrisostomo.github.io/fswatch/doc/1.14.0/fswatch.html/Invoking-fswatch.html#Numeric-Event-Flags
@@ -594,15 +586,24 @@ if [ -z "${EVENTS:-}" ]; then # Only set if user did not provide -e
     EVENTS="close_write,move,move_self,delete,create,modify";
   fi
 fi
-# --- END FIX ---
 
 # --- Check for 'flock' dependency ---
 # Use GW_FLOCK_BIN if set, otherwise default to "flock"
 if [ -z "${GW_FLOCK_BIN:-}" ]; then FLOCK="flock"; else FLOCK="$GW_FLOCK_BIN"; fi
 
 # --- Check for 'timeout' dependency ---
-# Use GW_TIMEOUT_BIN if set, otherwise default to "timeout"
-if [ -z "${GW_TIMEOUT_BIN:-}" ]; then TIMEOUT_CMD="timeout"; else TIMEOUT_CMD="$GW_TIMEOUT_BIN"; fi
+# Use GW_TIMEOUT_BIN if set, otherwise auto-detect or default to "timeout"
+if [ -z "${GW_TIMEOUT_BIN:-}" ]; then
+  if is_command "timeout" && timeout --version 2>&1 | grep -q "GNU coreutils"; then
+    TIMEOUT_CMD="timeout"
+  elif is_command "gtimeout" && gtimeout --version 2>&1 | grep -q "GNU coreutils"; then
+    TIMEOUT_CMD="gtimeout"
+  else
+    TIMEOUT_CMD="timeout" # Fallback to be caught by the validation check later
+  fi
+else
+  TIMEOUT_CMD="$GW_TIMEOUT_BIN"
+fi
 
 # --- Check for 'pkill' dependency ---
 # Use GW_PKILL_BIN if set, otherwise default to "pkill"
@@ -729,10 +730,10 @@ fi
 # --- End flock check ---
 
 # Add check for hash command needed for tmpdir fallback
-if [ "$NO_LOCK" -eq 0 ] && ! is_command "sha256sum" && ! is_command "md5sum"; then
+if [ "$NO_LOCK" -eq 0 ] && ! is_command "sha256sum" && ! is_command "md5sum" && ! is_command "shasum"; then
   # This is not a fatal error, but we log a warning as the fallback "hash"
   # is just a path substitution, which is less ideal.
-  log_warn "Warning: Neither 'sha256sum' nor 'md5sum' found."
+  log_warn "Warning: Neither 'sha256sum' nor 'md5sum' nor 'shasum' found."
   log_warn "  Will use a simple path-based name for lockfiles if /tmp fallback is needed."
   log_warn "  It is recommended to install 'coreutils' for robust lockfile naming."
 fi
@@ -749,17 +750,13 @@ if [ -z "$READ_TIMEOUT" ]; then
   READ_TIMEOUT="1" # Default for older bash
   # Check if BASH_VERSINFO is declared and is an array before accessing index 0
   # Use parameter expansion ${VAR[0]:-} to provide a default (e.g., '0') if not set/empty
-  # START Patch for Compatibility Testing
   if [ -n "${MOCK_BASH_MAJOR_VERSION:-}" ]; then
     # Use mock value for testing Bash compatibility logic
     bash_major_version="${MOCK_BASH_MAJOR_VERSION}"
   else
-    # END Patch for Compatibility Testing
     # Use native version array for production
     bash_major_version="${BASH_VERSINFO[0]:-0}"
-    # START Patch for Compatibility Testing
   fi
-  # END Patch for Compatibility Testing
 
   if [[ "$bash_major_version" -ge 4 ]]; then
     READ_TIMEOUT="0.1" # Use faster timeout for modern bash
@@ -815,14 +812,12 @@ if [ -d "$USER_PATH" ]; then
   EXCLUDE_REGEX="(${EXCLUDE_REGEX:1})"
   # --- End NEW ---
 
-  # --- FIX: Use glob matching (==) instead of exact matching (=) ---
   if [[ "$INW" == *"inotifywait"* ]]; then
     INW_ARGS=("-qmr" "-e" "$EVENTS" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS")
   else
     # Default to fswatch-style args
     INW_ARGS=("--recursive" "--event" "$EVENTS" "-E" "--exclude" "$EXCLUDE_REGEX" "$TARGETDIR_ABS")
   fi
-  # --- END FIX ---
   # GIT_ADD_ARGS logic moved to _perform_commit
   GIT_COMMIT_ARGS=""
 
@@ -838,14 +833,12 @@ elif [ -f "$USER_PATH" ]; then
   TARGETFILE_ABS="$TARGETDIR_ABS/$TARGETFILE"
 
   # GIT_DIR_PATH logic moved AFTER getopts, handled below
-  # --- FIX: Use glob matching (==) instead of exact matching (=) ---
   if [[ "$INW" == *"inotifywait"* ]]; then
     INW_ARGS=("-qm" "-e" "$EVENTS" "$TARGETFILE_ABS")
   else
     # Default to fswatch-style args
     INW_ARGS=("--event" "$EVENTS" "$TARGETFILE_ABS")
   fi
-  # --- END FIX ---
   # GIT_ADD_ARGS logic moved to _perform_commit
   GIT_COMMIT_ARGS=""
 else
@@ -911,7 +904,6 @@ GIT_DIR_PATH=$(cd "$TARGETDIR_ABS" && bash -c "$GIT rev-parse --absolute-git-dir
 log_debug "Determined git directory for lockfiles: $GIT_DIR_PATH"
 
 # --- CRITICAL PERMISSION CHECK FOR NON-ROOT USER ON VOLUME MOUNT ---
-# FIX: Only check for Read/Execute. Lack of Write will trigger lockfile fallback below.
 # Check if the current user has the necessary permissions (Read/Execute)
 # on the .git directory. Failure here indicates a permission mismatch.
 if ! [ -r "$GIT_DIR_PATH" ] || ! [ -x "$GIT_DIR_PATH" ]; then
@@ -982,15 +974,13 @@ if [ "$NO_LOCK" -eq 0 ]; then
     # Use $TMPDIR if set, otherwise /tmp
     LOCKFILE_DIR="${TMPDIR:-/tmp}"
 
-    # --- MODIFIED: Use both repo and target hash for unique /tmp name ---
     # We must check for hash commands *before* attempting to use them here
-    if ! is_command "sha256sum" && ! is_command "md5sum"; then
+    if ! is_command "sha256sum" && ! is_command "md5sum" && ! is_command "shasum"; then
       log_warn "Warning: Neither 'sha256sum' nor 'md5sum' found. Using insecure path-based lockfile name in /tmp."
     fi
     REPO_HASH=$(_get_path_hash "$GIT_DIR_PATH")
     # TARGET_HASH is already defined above
     LOCKFILE_BASENAME="gitwatch-repo_${REPO_HASH}-target_${TARGET_HASH}"
-    # --- End modification ---
 
     log_debug "Using temporary lockfile base: $LOCKFILE_DIR/$LOCKFILE_BASENAME"
   else
@@ -1089,7 +1079,6 @@ else
 fi
 # --- End Pull/Push Command Setup ---
 
-# --- MODIFICATION: Added developer maintenance comment ---
 #
 # --- diff-lines ---
 #
@@ -1122,7 +1111,6 @@ diff-lines() {
   while IFS= read -r REPLY; do
     log_trace "diff-lines processing: $REPLY"
     # 1. Strip leading color codes from the line for reliable regex matching
-    # FIX: Quoting $color_regex to fix SC2295
     local stripped_reply="${REPLY##"$color_regex"}"
 
     # 2. Determine the raw line content (after removing the leading color codes)
@@ -1148,7 +1136,6 @@ diff-lines() {
       # Match '--- a/path' or '--- /dev/null' - Capture everything after 'a/' or '/dev/null'
     elif [[ "$stripped_reply" =~ ^---\ (a/)?(.*) ]]; then
       # Capture the raw path (Group 2). Strip any potential trailing color codes.
-      # FIX: Use explicit argument passing to fix SC2119/SC2120 and use pure Bash trim
       previous_path=$(_trim_spaces "$(_strip_color "${BASH_REMATCH[2]}")")
       path="" # Reset new path
       line="" # Reset line number
@@ -1159,7 +1146,6 @@ diff-lines() {
       # Match '+++ b/path' - Capture everything after 'b/'
     elif [[ "$stripped_reply" =~ ^\+\+\+\ (b/)?(.*) ]]; then
       # Capture the raw path (Group 2). Strip any potential trailing color codes.
-      # FIX: Use explicit argument passing to fix SC2119/SC2120 and use pure Bash trim
       path=$(_trim_spaces "$(_strip_color "${BASH_REMATCH[2]}")")
       current_file_path="$path" # Set current path
       # Ensure path is not /dev/null, which is technically possible but not relevant here
@@ -1220,11 +1206,9 @@ diff-lines() {
         # 5. Handle all other lines (Addition, Modification, Context)
       elif [[ -n "$line" ]]; then
         # Apply width limit *after* capturing full content
-        # MODIFIED: Use $LOG_LINE_LENGTH variable instead of 150
         local display_content=${raw_content_match:0:$LOG_LINE_LENGTH}
 
         # Output: path:line: [COLOR_CODES]+/-content
-        # FIX: Quoting $stripped_reply to fix SC2295
         local color_codes=${REPLY%%"$stripped_reply"} # Re-capture original leading color codes
 
         # Ensure '?' is output for line number if not yet set/relevant
@@ -1267,23 +1251,8 @@ generate_commit_message() {
     set +e # Temporarily disable exit on error for this pipeline
     # Use --staged or --cached to show diff of what's about to be committed
 
-    # --- MODIFICATION: Add timeout and check PIPESTATUS ---
     local diff_cmd
-    # --- FIX for SC2183: Removed the 4th %s, 4 specifiers for 4 args ---
     diff_cmd=$(printf "%s -s 9 %s %s diff --staged -U0 %q" "$TIMEOUT_CMD" "$TIMEOUT" "$GIT" "$LISTCHANGES_COLOR")
-
-    # --- BUG 2 FIX ---
-    # Was:
-    # DIFF_COMMITMSG=$(bash -c "$diff_cmd" | diff-lines)
-    # local timeout_status=${PIPESTATUS[0]}
-    # local diff_lines_status=${PIPESTATUS[1]}
-    # set -e # Re-enable exit on error
-    # ...
-    # elif [ "$timeout_status" -ne 0 ] || [ "$diff_lines_status" -ne 0 ]; then
-    #
-    # This was causing "unbound variable" on PIPESTATUS[1] in CI.
-    # The fix is to store the array and only check the first element (for timeout),
-    # removing the dependency on the (unreliable) second element.
 
     DIFF_COMMITMSG=$(bash -c "$diff_cmd" | diff-lines)
     local pipeline_status=("${PIPESTATUS[@]}") # Capture all codes
@@ -1297,7 +1266,6 @@ generate_commit_message() {
       log_warn "Warning: git-diff pipeline failed (code: $timeout_status). Commit message may be incomplete."
       DIFF_COMMITMSG=""
     fi
-    # --- END BUG 2 FIX ---
 
     local LENGTH_DIFF_COMMITMSG=0
     # Count lines using wc -l (more robust than bash loop for potentially large diffs)
@@ -1378,7 +1346,6 @@ _perform_commit() {
     return 0
   fi
 
-  # *** NEW PURE BASH STATUS CHECK ***
   local porcelain_output
   # Note: git status --porcelain is fast and does not need timeout
   log_debug "Checking for changes to commit via 'git status --porcelain'..."
@@ -1389,9 +1356,7 @@ _perform_commit() {
     return 0
   fi
   log_info "Changes detected. Staging files..."
-  # *** END NEW PURE BASH STATUS CHECK ***
 
-  # --- MODIFICATION: Large File Safety Gate ---
   # Before adding, check for large untracked files (only when watching a directory)
   if [ -z "${TARGETFILE_ABS:-}" ]; then
     log_trace "Checking for large untracked files..."
@@ -1421,7 +1386,12 @@ _perform_commit() {
     fi
     log_trace "No large untracked files found."
   fi
-  # --- END MODIFICATION ---
+
+  # Check for stale index lock from a previous killed process and remove it
+  if [ -f "$GIT_DIR_PATH/index.lock" ]; then
+    log_warn "Found index.lock. Assuming it is stale from a killed commit and removing it."
+    rm -f "$GIT_DIR_PATH/index.lock"
+  fi
 
   # Add changes
   local add_cmd
@@ -1434,7 +1404,6 @@ _perform_commit() {
   log_debug "Running git add command: $add_cmd"
   bash -c "$add_cmd" || { log_error "ERROR: 'git add' failed."; return 1; }
 
-  # *** MODIFIED CHECK: Use git write-tree comparison ***
   # Final check: Only proceed if the staged tree differs from HEAD's tree (meaning content or number of files changed).
   log_debug "Checking for ephemeral changes (comparing staged tree to HEAD)..."
   local staged_tree_hash
@@ -1456,7 +1425,6 @@ _perform_commit() {
   fi
 
   log_debug "Content or significant file changes detected (staged tree hash differs from HEAD). Generating commit message..."
-  # *** END MODIFIED CHECK ***
 
 
   # Generate commit message (reflects staged changes)
@@ -1543,9 +1511,6 @@ _perform_commit() {
 # Wrapper for perform_commit that uses a lock to prevent concurrent runs
 perform_commit() {
   log_trace "Entering function perform_commit"
-  # --- Backoff logic integration ---
-  # This logic is now handled in the main loop *before* perform_commit is called
-  # --- End new logic ---
 
   local commit_status=0
   if [ "$NO_LOCK" -eq 1 ]; then
@@ -1571,7 +1536,6 @@ perform_commit() {
     commit_status=$?
   fi
 
-  # --- Backoff counter logic ---
   if [ $commit_status -ne 0 ]; then
     log_error "Commit logic failed with status $commit_status."
     # Use 'date' which is POSIX compliant
@@ -1589,7 +1553,6 @@ perform_commit() {
       LAST_FAIL_TIME=0
     fi
   fi
-  # --- End backoff logic ---
 
   log_trace "Exiting function perform_commit"
   return $commit_status
@@ -1604,16 +1567,12 @@ fi
 
 # --- Debounce Timer PID File ---
 # Using a file to store the PID of the *active* timer subshell
-# --- MODIFIED: Use the unique lockfile basename for the PID file too ---
 # This ensures timer PIDs are also unique per target
 TIMER_PID_FILE="${TMPDIR:-/tmp}/${LOCKFILE_BASENAME}.timer.pid"
-# --- End modification ---
 
 # --- Health Status File ---
 # Fixed path for Docker HEALTHCHECK to find
-# --- TYPO FIX: TMPDIFR -> TMPDIR ---
 HEALTH_STATUS_FILE="${TMPDIR:-/tmp}/gitwatch.status"
-# --- END TYPO FIX ---
 
 
 # Cleanup PID file on exit
@@ -1637,7 +1596,6 @@ touch "$HEALTH_STATUS_FILE" # Signal healthy on startup
     time_since_fail=$((current_time - LAST_FAIL_TIME))
 
     if [ "$time_since_fail" -lt "$COOL_DOWN_SECONDS" ]; then
-      # FIX for SC2168: Removed 'local' from remaining_wait
       remaining_wait=$((COOL_DOWN_SECONDS - time_since_fail))
       log_info "In cool-down mode. Skipping trigger. ($remaining_wait seconds remaining)"
       rm -f "$HEALTH_STATUS_FILE" # Signal "unhealthy" (in cool-down)
@@ -1664,7 +1622,6 @@ touch "$HEALTH_STATUS_FILE" # Signal healthy on startup
   done
   log_debug "Event drain complete. Starting debounce logic..."
 
-  # --- DEBOUNCE LOGIC REVISION 3 ---
   # Read the PID from the file if it exists
   OLD_TIMER_PID=""
   if [ -f "$TIMER_PID_FILE" ]; then
@@ -1717,7 +1674,6 @@ touch "$HEALTH_STATUS_FILE" # Signal healthy on startup
     fi
     log_trace "Exiting debounce timer subshell (committed)"
   ) &
-  # --- END DEBOUNCE LOGIC REVISION 3 ---
 
 done
 
