@@ -14,7 +14,7 @@ Write-Host "Administrator privileges confirmed." -ForegroundColor Green
 # Define paths
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
-# --- MODIFICATION: Look for gitwatch.sh in parent (dev) or local (standalone) dir ---
+# --- Look for gitwatch.sh in parent (dev) or local (standalone) dir ---
 $GitwatchScriptSourceRoot = Join-Path $ScriptDir "../gitwatch.sh"
 $GitwatchScriptSourceLocal = Join-Path $ScriptDir "gitwatch.sh"
 
@@ -29,7 +29,6 @@ if (Test-Path $GitwatchScriptSourceRoot) {
 } else {
     $GitwatchScriptSource = $GitwatchScriptSourceLocal # Default to local for error message
 }
-# --- END MODIFICATION ---
 
 $GitwatchWrapperSource = Join-Path $ScriptDir "gitwatch.bat"
 $WslScriptPath = "/usr/local/bin/gitwatch"
@@ -74,7 +73,8 @@ try {
     $pkgManager = "zypper"
   }
 
-  $dependencies = "git coreutils util-linux inotify-tools"
+  # --- FIX: Added 'procps' to dependencies for pkill support ---
+  $dependencies = "git coreutils util-linux inotify-tools procps"
 
   if ($pkgManager -eq "apt-get") {
     Write-Host "Debian-based distro detected. Installing dependencies ($dependencies) using apt-get..."

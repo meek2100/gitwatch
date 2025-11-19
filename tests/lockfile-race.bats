@@ -12,13 +12,11 @@ load 'bats-custom/load'
 # teardown only knows about one $GITWATCH_PID
 teardown() {
   verbose_echo "# Manual teardown for lockfile-race"
-  if [ -n "${GITWATCH_PID_A:-}" ] && kill -0 "$GITWATCH_PID_A" &>/dev/null;
-  then
+  if [ -n "${GITWATCH_PID_A:-}" ] && kill -0 "$GITWATCH_PID_A" &>/dev/null; then
     verbose_echo "# Killing PID A: $GITWATCH_PID_A"
     kill -9 "$GITWATCH_PID_A" &>/dev/null || true
   fi
-  if [ -n "${GITWATCH_PID_B:-}" ] && kill -0 "$GITWATCH_PID_B" &>/dev/null;
-  then
+  if [ -n "${GITWATCH_PID_B:-}" ] && kill -0 "$GITWATCH_PID_B" &>/dev/null; then
     verbose_echo "# Killing PID B: $GITWATCH_PID_B"
     kill -9 "$GITWATCH_PID_B" &>/dev/null || true
   fi
@@ -50,17 +48,43 @@ teardown() {
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -n -s "$test_sleep_time" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file_A" 2>&1 &
   # shellcheck disable=SC2034 # Used by manual teardown
   GITWATCH_PID_A=$!
-  sleep 0.5 # Stagger starts slightly
+
+  # --- FIX: Wait for Instance A's lockfile to exist instead of sleeping ---
+  # This ensures A is fully up and holding the lock (even though -n ignores it)
+  # before we start B, making the test deterministic.
+  local lockfile_a_found=0
+  local max_wait_loops=20
+  local i=0
+
+  # We need to know where the lockfile *would* be.
+  # Based on the script logic, it will be in the .git dir.
+  local git_dir="$testdir/local/$TEST_SUBDIR_NAME/.git"
+
+  while [ $i -lt $max_wait_loops ]; do
+    # Check for ANY lockfile in the git dir (simplest check)
+    if ls "$git_dir"/*.lock 1> /dev/null 2>&1; then
+      lockfile_a_found=1
+      break
+    fi
+    sleep 0.1
+    i=$((i + 1))
+  done
+
+  if [ $lockfile_a_found -eq 0 ]; then
+     # Fail gracefully if A didn't start, but don't hard fail to allow teardown
+     echo "# Warning: Instance A lockfile not found after waiting." >&3
+  fi
+  # ---------------------------------------------------------------------
 
   # 2. Start Instance B in the background with -n
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -n -s "$test_sleep_time" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file_B" 2>&1 &
   # shellcheck disable=SC2034 # Used by manual teardown
   GITWATCH_PID_B=$!
+
   # 3. Wait for both instances to initialize
   sleep 1
   cd "$testdir/local/$TEST_SUBDIR_NAME"
-  # <-- Unused initial_hash variable removed here -->
 
   # 4. Trigger Instance A
   echo "Change from A" >> file_a.txt
