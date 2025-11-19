@@ -71,8 +71,8 @@ teardown() {
   done
 
   if [ $lockfile_a_found -eq 0 ]; then
-     # Fail gracefully if A didn't start, but don't hard fail to allow teardown
-     echo "# Warning: Instance A lockfile not found after waiting." >&3
+    # Fail gracefully if A didn't start, but don't hard fail to allow teardown
+    verbose_echo "# Warning: Instance A lockfile not found after waiting."
   fi
   # ---------------------------------------------------------------------
 
