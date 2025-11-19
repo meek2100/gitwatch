@@ -66,8 +66,8 @@ teardown() {
   done
 
   if [ $started_a -eq 0 ]; then
-     # Fail gracefully if A didn't start
-     verbose_echo "# Warning: Instance A did not log start message after waiting."
+    # Fail gracefully if A didn't start
+    verbose_echo "# Warning: Instance A did not log start message after waiting."
   fi
   # ---------------------------------------------------------------------
 
