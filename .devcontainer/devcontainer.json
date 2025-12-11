@@ -1,0 +1,30 @@
+{
+  "name": "gitwatch (Development)",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": ".."
+  },
+  "remoteUser": "appuser",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "EditorConfig.EditorConfig",
+        "timonwong.shellcheck",
+        "foxundermoon.shell-format",
+        "jetmartin.bats",
+        "esbenp.prettier-vscode",
+        "redhat.vscode-yaml",
+        "DavidAnson.vscode-markdownlint",
+        "bittorala.mdformat",
+        "exiasr.hadolint",
+        "brettm12345.nixfmt-vscode",
+        "streetsidesoftware.code-spell-checker"
+      ]
+    }
+  },
+  "remoteEnv": {
+    "BATS_LIB_PATH": "/workspaces/gitwatch/tests"
+  },
+  "overrideCommand": true,
+  "command": "sleep infinity"
+}

@@ -1,0 +1,15 @@
+{
+  "recommendations": [
+    "EditorConfig.EditorConfig",
+    "timonwong.shellcheck",
+    "foxundermoon.shell-format",
+    "jetmartin.bats",
+    "esbenp.prettier-vscode",
+    "redhat.vscode-yaml",
+    "DavidAnson.vscode-markdownlint",
+    "bittorala.mdformat",
+    "exiasr.hadolint",
+    "brettm12345.nixfmt-vscode",
+    "streetsidesoftware.code-spell-checker"
+  ]
+}
