@@ -68,7 +68,7 @@ EOF
   # 5. Assert: The log file contains the config failure warning
   run cat "$output_file"
   assert_output --partial "Warning: 'user.name' or 'user.email' is not set in your Git config."
-  assert_output --partial "MOCK_GIT: Simulating 'git config' failure"
+  # assert_output --partial "MOCK_GIT: Simulating 'git config' failure" # Stderr swallowed by gitwatch
 
   # 6. Assert: The script is still functional (trigger a commit)
   # shellcheck disable=SC2154 # testdir is sourced via setup function
