@@ -35,8 +35,7 @@ load 'bats-custom/load'
   run "${BATS_TEST_DIRNAME}/../gitwatch.sh" "$target_dir"
 
   # 4. Assert exit code 7 and the critical permission error message
-  assert_failure "Gitwatch should exit with non-zero status on critical permission error"
-  assert_exit_code 7 "Gitwatch should exit with code 7 (Critical Permission Error)"
+  assert_failure 7
   assert_output --partial "CRITICAL PERMISSION ERROR: Cannot Access Git Repository Metadata"
   assert_output --partial "permissions on the Git repository's metadata folder"
 
@@ -69,8 +68,7 @@ load 'bats-custom/load'
   run "${BATS_TEST_DIRNAME}/../gitwatch.sh" "$target_dir"
 
   # 4. Assert exit code 7 and the critical permission error message
-  assert_failure "Gitwatch should exit with non-zero status on critical permission error"
-  assert_exit_code 7 "Gitwatch should exit with code 7 (Critical Permission Error)"
+  assert_failure 7
   assert_output --partial "CRITICAL PERMISSION ERROR: Cannot Access Target Directory"
   assert_output --partial "permissions on the target directory itself"
 

@@ -21,7 +21,6 @@ source "$DIR/src/wait_for_git_change.bash"
 source "$DIR/src/wait_for_process_to_die.bash"
 source "$DIR/src/create_failing_watcher_bin.bash"
 source "$DIR/src/write_mock_git_parser.bash"
-source "$DIR/src/assertions.bash"
 
 # 4. Load the setup/teardown logic
 source "$DIR/src/common_setup.bash"

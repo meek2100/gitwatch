@@ -232,8 +232,7 @@ setup() {
   run "${BATS_TEST_DIRNAME}/../gitwatch.sh" "$non_repo_dir"
 
   # 2. Assert exit code 6 and the error message
-  assert_failure "Gitwatch should exit with non-zero status on non-repo"
-  assert_exit_code 6 "Gitwatch should exit with code 6 (Not a git repository)"
+  assert_failure 6
   assert_output --partial "Error: Not a git repository"
 
   # 3. Cleanup
@@ -262,8 +261,7 @@ setup() {
   run "${BATS_TEST_DIRNAME}/../gitwatch.sh" "$target_dir"
 
   # 4. Assert exit code 7 and the critical permission error message
-  assert_failure "Gitwatch should exit with non-zero status on permission error"
-  assert_exit_code 7 "Gitwatch should exit with code 7 (Critical Permission Error)"
+  assert_failure 7
   assert_output --partial "CRITICAL PERMISSION ERROR: Cannot Access Target Directory"
   assert_output --partial "permissions on the target directory itself"
 
