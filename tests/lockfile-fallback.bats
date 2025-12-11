@@ -44,7 +44,7 @@ load 'bats-custom/load'
   # 2. Simulate unwritable .git directory (chmod -w)
   local ORIGINAL_PERMS
   # Use a stat command that works on both Linux and macOS
-  if [ "$RUNNER_OS" == "Linux" ];
+  if [ "$(uname)" = "Linux" ];
   then
     ORIGINAL_PERMS=$(stat -c "%a" "$GIT_DIR_PATH")
   else

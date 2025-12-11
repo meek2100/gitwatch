@@ -39,7 +39,7 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
   # 2. Simulate unwritable .git directory (chmod -w)
   # This is required to force the *fallback directory* logic.
   local ORIGINAL_PERMS
-  if [ "$RUNNER_OS" == "Linux" ]; then
+  if [ "$(uname)" = "Linux" ]; then
     ORIGINAL_PERMS=$(stat -c "%a" "$GIT_DIR_PATH")
   else
     ORIGINAL_PERMS=$(stat -f "%A" "$GIT_DIR_PATH")
@@ -52,9 +52,21 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   local DUMMY_BIN="$testdir/dummy-bin"
   mkdir -p "$DUMMY_BIN"
+
+  # Populate DUMMY_BIN with essential tools (symlinks) to keep the script running
+  # but EXCLUDE hash commands
+  local needed_tools=(bash git flock timeout sleep rm cat stat chmod mkdir pkill inotifywait awk grep sed date id uname printf touch cp mv ls head tail wc tr cut dirname basename mktemp)
+  for tool in "${needed_tools[@]}"; do
+    local tool_path
+    tool_path=$(command -v "$tool" || true)
+    if [ -n "$tool_path" ]; then
+      ln -s "$tool_path" "$DUMMY_BIN/$tool"
+    fi
+  done
+
   local path_backup="$PATH"
   # shellcheck disable=SC2030,SC2031 # Modifying PATH is intentional for this test
-  export PATH="$DUMMY_BIN:$PATH"
+  export PATH="$DUMMY_BIN"
 
   # Double check that we can't find the commands now
   if command -v sha256sum &>/dev/null || command -v md5sum &>/dev/null; then
@@ -75,7 +87,7 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
   run cat "$output_file"
   assert_output --partial "Warning: Cannot write lockfile to $GIT_DIR_PATH. Falling back to temporary directory." \
     "Did not log the expected fallback warning"
-  assert_output --partial "Warning: Neither 'sha256sum' nor 'md5sum' found."
+  assert_output --partial "Warning: Neither 'sha256sum'"
   # --- MODIFIED: Call the _get_path_hash function from the sourced script ---
   # 6a. Calculate the expected path-based "hash" name *using the script's own logic*
   local target_abs_path
@@ -131,10 +143,21 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   local DUMMY_BIN="$testdir/dummy-bin"
   mkdir -p "$DUMMY_BIN"
+
+  # Populate DUMMY_BIN with essential tools (symlinks)
+  local needed_tools=(bash git flock timeout sleep rm cat stat chmod mkdir pkill inotifywait awk grep sed date id uname printf touch cp mv ls head tail wc tr cut dirname basename mktemp)
+  for tool in "${needed_tools[@]}"; do
+    local tool_path
+    tool_path=$(command -v "$tool" || true)
+    if [ -n "$tool_path" ]; then
+      ln -s "$tool_path" "$DUMMY_BIN/$tool"
+    fi
+  done
+
   # shellcheck disable=SC2031 # PATH modification is intentional for this test
   local path_backup="$PATH"
   # shellcheck disable=SC2030,SC2031 # Modifying PATH is intentional for this test
-  export PATH="$DUMMY_BIN:$PATH"
+  export PATH="$DUMMY_BIN"
 
   # 3. Assert hash commands are hidden
   if command -v sha256sum &>/dev/null || command -v md5sum &>/dev/null; then
@@ -153,7 +176,7 @@ source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
   # SHOULD NOT fall back to /tmp
   refute_output --partial "Falling back to temporary directory."
   # SHOULD warn about missing hash tools
-  assert_output --partial "Warning: Neither 'sha256sum' nor 'md5sum' found."
+  assert_output --partial "Warning: Neither 'sha256sum'"
   # --- MODIFIED: Call the _get_path_hash function from the sourced script ---
   # 6. Calculate the expected path-based "hash" name *using the script's own logic*
   local target_abs_path

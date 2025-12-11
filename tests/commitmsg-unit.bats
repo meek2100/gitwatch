@@ -9,49 +9,7 @@ load 'bats-file/load'
 # shellcheck disable=SC1091 # gitwatch.sh is intentionally sourced for unit testing
 source "${BATS_TEST_DIRNAME}/../gitwatch.sh"
 
-# --- Mock Git Command ---
-mock_git() {
-  if [[ "$*" == "diff --staged -U0 --color=always" ]];
-  then
-    # Mock for -l: Returns 3 lines of added content
-    echo "--- a/file.txt"
-    echo "+++ b/file.txt"
-    echo "@@ -1 +1,3 @@"
-    echo "+added line 1"
-    echo "+added line 2"
-    echo "+added line 3"
-  elif [[ "$*" == "diff --staged -U0 " ]];
-  then
-    # Mock for -L: Returns 3 lines of added content (no color)
-    echo "--- a/file.txt"
-    echo "+++ b/file.txt"
-    echo "@@ -1 +1,3 @@"
-    echo "+added line 1 (no color)"
-    echo "+added line 2 (no color)"
-    echo "+added line 3 (no color)"
-  elif [[ "$*" == "diff --staged --stat" ]];
-  then
-    # Mock for truncation summary
-    echo " file.txt | 10 ++++++++++"
-  elif [[ "$*" == "status -s" ]];
-  then
-    # Mock for empty diff
-    echo " M file.txt"
-  elif [[ "$*" == "diff --staged --name-only" ]];
-  then
-    # Mock for -C pipe
-    echo "file_a.txt"
-    echo "file_b.txt"
-  else
-    echo "MOCK_GIT: Unhandled command $*" >&2
-  fi
-}
-export -f mock_git
-export GIT="mock_git"
 export TIMEOUT_CMD="timeout"
-# Note: The real TIMEOUT variable from the sourced script will be used.
-# We can override it locally if needed per test, but the default (60) is fine.
-# export TIMEOUT=60
 
 # --- Test Cases ---
 
@@ -76,16 +34,62 @@ setup() {
     FORMATTED_COMMITMSG="$COMMITMSG"
   fi
 
-  # --- FIX (Logic): Prevent state pollution from other tests ---
-  # Ensure output goes to stderr for assert_stderr to capture
-  # --- FIX (Shellcheck SC2034): Add disable directive for sourced-script variables ---
   # shellcheck disable=SC2034 # Global variable, used by sourced script logic
   USE_SYSLOG=0
   # shellcheck disable=SC2034 # Global variable, used by sourced script logic
   QUIET=0
-  # --- END FIX ---
 
-  # Ensure TIMEOUT has a default value if not set by script (it should be): "${TIMEOUT:=60}"
+  # Create a temp bin dir for our mock
+  MOCK_BIN_DIR="$BATS_TMPDIR/gitwatch_mocks_$$"
+  mkdir -p "$MOCK_BIN_DIR"
+  export PATH="$MOCK_BIN_DIR:$PATH"
+
+  # Write mock_git as a script
+  cat << 'EOF' > "$MOCK_BIN_DIR/mock_git"
+#!/usr/bin/env bash
+if [[ "$*" == "diff --staged -U0 --color=always" ]];
+then
+  # Mock for -l: Returns 3 lines of added content
+  echo "--- a/file.txt"
+  echo "+++ b/file.txt"
+  echo "@@ -1 +1,3 @@"
+  echo "+added line 1"
+  echo "+added line 2"
+  echo "+added line 3"
+elif [[ "$*" == "diff --staged -U0 " ]];
+then
+  # Mock for -L: Returns 3 lines of added content (no color)
+  echo "--- a/file.txt"
+  echo "+++ b/file.txt"
+  echo "@@ -1 +1,3 @@"
+  echo "+added line 1 (no color)"
+  echo "+added line 2 (no color)"
+  echo "+added line 3 (no color)"
+elif [[ "$*" == "diff --staged --stat" ]];
+then
+  # Mock for truncation summary
+  echo " file.txt | 10 ++++++++++"
+elif [[ "$*" == "status -s" ]];
+then
+  # Mock for empty diff
+  echo " M file.txt"
+elif [[ "$*" == "diff --staged --name-only" ]];
+then
+  # Mock for -C pipe
+  echo "file_a.txt"
+  echo "file_b.txt"
+else
+  echo "MOCK_GIT: Unhandled command $*" >&2
+fi
+EOF
+  chmod +x "$MOCK_BIN_DIR/mock_git"
+  export GIT="mock_git"
+}
+
+teardown() {
+  if [ -n "$MOCK_BIN_DIR" ] && [ -d "$MOCK_BIN_DIR" ]; then
+    rm -rf "$MOCK_BIN_DIR"
+  fi
 }
 
 @test "commitmsg_unit_default_message_with_date" {

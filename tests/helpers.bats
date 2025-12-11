@@ -31,7 +31,7 @@ teardown() {
   echo "new_state" > "$MOCK_OUTPUT_FILE"
 
   # Wait for the helper to exit
-  run wait "$wait_pid"
+  run bash -c "wait $wait_pid"
   assert_success "Helper function failed to detect change"
 }
 
@@ -54,7 +54,7 @@ teardown() {
   echo "$target_state" > "$MOCK_OUTPUT_FILE"
 
   # Wait for the helper to exit
-  run wait "$wait_pid"
+  run bash -c "wait $wait_pid"
   assert_success "Helper function failed to detect target match"
 }
 
@@ -68,7 +68,7 @@ teardown() {
   echo "some_other_state" > "$MOCK_OUTPUT_FILE"
 
   # Wait for the helper to exit (it should time out and fail)
-  run wait "$wait_pid"
+  run bash -c "wait $wait_pid"
   assert_failure "Helper function succeeded when it should have timed out"
 }
 
@@ -84,7 +84,7 @@ teardown() {
   echo "new_state" > "$MOCK_OUTPUT_FILE"
 
   # Wait for the helper to exit
-  run wait "$wait_pid"
+  run bash -c "wait $wait_pid"
   assert_success "Helper function failed to detect change after initial error"
 }
 
@@ -102,6 +102,6 @@ teardown() {
   echo "$target_state" > "$MOCK_OUTPUT_FILE"
 
   # Wait for the helper to exit
-  run wait "$wait_pid"
+  run bash -c "wait $wait_pid"
   assert_success "Helper function failed to detect target match after initial error"
 }

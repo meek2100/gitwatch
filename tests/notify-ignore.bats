@@ -57,14 +57,14 @@ load 'bats-custom/load'
   output_file=$(mktemp "$testdir/output.XXXXX")
 
   # Raw Regex (-x): Ignore anything starting with 'old_'
-  local raw_regex='^old_'
+  local raw_regex='.*old_.*'
   # Glob List (-X): Ignore *.log AND the temp/ directory
   local glob_list="*.log,temp/"
   local initial_hash
 
   # 1. Start gitwatch, combining exclusion patterns
   # shellcheck disable=SC2154 # testdir is sourced via setup function
-  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -v -x "$raw_regex" -X "$glob_list" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
+  "${BATS_TEST_DIRNAME}/../gitwatch.sh" "${GITWATCH_TEST_ARGS_ARRAY[@]}" -l 10 -v -x "$raw_regex" -X "$glob_list" "$testdir/local/$TEST_SUBDIR_NAME" > "$output_file" 2>&1 &
   # shellcheck disable=SC2034 # used by teardown
   GITWATCH_PID=$!
   cd "$testdir/local/$TEST_SUBDIR_NAME"
@@ -100,10 +100,12 @@ load 'bats-custom/load'
   assert_output --partial "Converting glob exclude pattern"
   # *** END MODIFICATION ***
 
-  # Should see change detection for ignored files
-  assert_output --partial "temp/file.txt"
-  assert_output --partial "old_config.txt"
-  assert_output --partial "app.log"
+  # Should see change detection for ignored files (Update: if ignored by inotifywait, they won't appear)
+  # We check specifically for "Change detected" lines, as the files WILL be committed (and logged in commit msg)
+  # because 'important.txt' triggered a commit and they are not .gitignored.
+  refute_output --partial "Change detected: .*temp/file.txt"
+  refute_output --partial "Change detected: .*old_config.txt"
+  refute_output --partial "Change detected: .*app.log"
   # Should see the allowed file getting committed
   assert_output --partial "important.txt"
 
