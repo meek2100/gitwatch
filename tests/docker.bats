@@ -133,8 +133,11 @@ create_failing_mock_git() {
   dummy_dir=$(dirname "$dummy_path")
   mkdir -p "$dummy_dir"
 
-  echo "#!/usr/bin/env bash" > "$dummy_path"
-  echo "echo \"# MOCK_GIT: Received command: \$@\" >&2" >> "$dummy_path"
+  # SC2129: Group redirects
+  {
+    echo "#!/usr/bin/env bash"
+    echo "echo \"# MOCK_GIT: Received command: \$@\" >&2"
+  } > "$dummy_path"
 
   # Inject the parser logic
   write_mock_git_parser >> "$dummy_path"

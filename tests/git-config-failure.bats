@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bats
 
 # Load standard helpers
 load 'bats-support/load'
@@ -16,8 +16,11 @@ create_failing_mock_git_config() {
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   mkdir -p "$testdir/bin"
 
-  echo "#!/usr/bin/env bash" > "$dummy_path"
-  echo "echo \"# MOCK_GIT: Received command: \$@\" >&2" >> "$dummy_path"
+  # SC2129: Group redirects
+  {
+    echo "#!/usr/bin/env bash"
+    echo "echo \"# MOCK_GIT: Received command: \$@\" >&2"
+  } > "$dummy_path"
 
   # Inject the parser logic
   write_mock_git_parser >> "$dummy_path"
