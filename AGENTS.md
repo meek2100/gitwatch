@@ -69,7 +69,7 @@ ______________________________________________________________________
 
 ## B. DRY & Single Source of Truth
 
-- **Re-use Helpers:** Use `_log` for all output. Use `is_command` for all
+- **Reuse Helpers:** Use `_log` for all output. Use `is_command` for all
   dependency checks.
 - **Single Source of Truth Priority Order:**
   1. **AGENTS.md (this file)**
@@ -82,7 +82,7 @@ ______________________________________________________________________
 
 ## C. Documentation & Comment Accuracy
 
-- **Explain the WHY:** Bash syntax can be obscure. Comments must explain *why* a
+- **Explain the WHY:** Bash syntax can be obscure. Comments must explain _why_ a
   specific parameter expansion or command flag is used (e.g., "Use `LC_ALL=C`
   for regex consistency").
 - **Update Usage:** If you add a flag, you **MUST** update the `shelp()`
