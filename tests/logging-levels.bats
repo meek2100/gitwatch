@@ -8,34 +8,15 @@ load 'bats-file/load'
 # Load ALL custom config, helpers, and setup/teardown hooks
 load 'bats-custom/load'
 
-# --- NEW setup/teardown for this file ---
-# These are script-global variables, not local, so setup/teardown can share them
-path_backup=""
-DUMMY_BIN=""
-
 setup() {
   # Call the common setup first
   _common_setup 0
-
-  # Set up manual mock for the FATAL test
-  path_backup="$PATH"
-  # shellcheck disable=SC2154 # testdir is sourced
-  DUMMY_BIN="$testdir/dummy-bin"
-  mkdir -p "$DUMMY_BIN"
-  echo "#!/bin/bash" > "$DUMMY_BIN/flock"
-  echo "exit 127" >> "$DUMMY_BIN/flock"
-  chmod +x "$DUMMY_BIN/flock"
-  export PATH="$DUMMY_BIN:$PATH"
 }
 
 teardown() {
-  # Restore the path
-  export PATH="$path_backup"
   # Call the common teardown
   _common_teardown
 }
-# --- END NEW setup/teardown ---
-
 
 # --- HELPER: Create Mock Git ---
 create_mock_git_fail_commit() {
@@ -66,18 +47,27 @@ EOF
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   output_file=$(mktemp "$testdir/output.XXXXX")
 
-  # 1. Mock 'flock' to be missing
-  # (This is now handled by the file's setup() function)
+  # 1. Mock 'flock' to be missing manually for this test
+  local DUMMY_BIN="$testdir/dummy-bin"
+  mkdir -p "$DUMMY_BIN"
+  echo "#!/bin/bash" > "$DUMMY_BIN/flock"
+  echo "exit 127" >> "$DUMMY_BIN/flock"
+  chmod +x "$DUMMY_BIN/flock"
+
+  local path_backup="$PATH"
+  export PATH="$DUMMY_BIN:$PATH"
 
   # 2. Run gitwatch with -o FATAL (or 1)
   # It should fail, and only the FATAL error should be in the log.
   # shellcheck disable=SC2154 # testdir is sourced via setup function
   run "${BATS_TEST_DIRNAME}/../gitwatch.sh" -o FATAL "$testdir/local/$TEST_SUBDIR_NAME"
-  assert_failure
-  assert_exit_code 2
+  assert_failure 2
 
   # 3. Check logs
   assert_output --partial "[FATAL] Error: Required command 'flock' not found"
+
+  # Restore PATH
+  export PATH="$path_backup"
 }
 
 @test "logging_level_error_o_error_shows_error_and_fatal" {

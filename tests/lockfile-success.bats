@@ -49,9 +49,7 @@ teardown() {
   run "${BATS_TEST_DIRNAME}/../gitwatch.sh" "$target_path"
 
   # 4. Assert that the second instance failed to start
-  assert_failure "Second instance should have failed to start due to lock."
-  # MODIFIED: Exit code 69 is the correct code for "already running"
-  assert_exit_code 69 "Second instance should exit with code 69 (already running)."
+  assert_failure 69 # Second instance should exit with code 69 (already running)
   # 5. Assert that the error message confirms the lock was busy
   assert_output --partial "Error: gitwatch is already running on this repository/target"
 
