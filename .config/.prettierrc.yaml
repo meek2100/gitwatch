@@ -1,0 +1,29 @@
+# .prettierrc.yaml
+# Primary configuration file for Prettier.
+
+# Use single quotes instead of double quotes
+singleQuote: false
+
+# Print semicolons at the ends of statements.
+semi: true
+
+# Print trailing commas wherever possible in ES5 (objects, arrays, etc.)
+trailingComma: all
+
+# Specify the line length that Prettier will wrap on.
+# We set this to 90 to match .editorconfig for YAML and Markdown.
+printWidth: 90
+
+# Do not include parentheses around a sole arrow function parameter.
+arrowParens: always
+
+# Use the style defined in .editorconfig (2 spaces)
+tabWidth: 2
+useTabs: false
+
+# Ensure consistency across all files handled by Prettier
+overrides:
+  - files: "*.json"
+    options:
+      # JSON should not have trailing commas
+      trailingComma: none

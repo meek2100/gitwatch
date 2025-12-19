@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.github.gitwatch</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/usr/local/bin/gitwatch.sh</string>
+      <string>-o</string>
+      <string>INFO</string>
+      <string>-s</string>
+      <string>60</string>
+      <string>-m</string>
+      <string>Auto-commit %d</string>
+      <string>/path/to/watch</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>PATH</key>
+      <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+      <key>GW_GIT_BIN</key>
+      <string>/opt/homebrew/bin/git</string>
+      <key>GW_INW_BIN</key>
+      <string>/opt/homebrew/bin/fswatch</string>
+      <key>GW_FLOCK_BIN</key>
+      <string>/opt/homebrew/bin/flock</string>
+      <key>GW_TIMEOUT_BIN</key>
+      <string>/opt/homebrew/bin/gtimeout</string>
+      <key>GW_PKILL_BIN</key>
+      <string>/opt/homebrew/bin/pkill</string>
+    </dict>
+ <!-- remove comment to log output from gitwatch
+    <key>StandardOutPath</key>
+    <string>/tmp/gitwatch.out.txt</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/gitwatch.err.txt</string>
+ -->
+  </dict>
+</plist>

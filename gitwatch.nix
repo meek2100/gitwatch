@@ -6,6 +6,9 @@
   git,
   openssh,
   inotify-tools,
+  flock,
+  coreutils,
+  procps,
 }:
 runCommandNoCC "gitwatch"
   {
@@ -19,11 +22,14 @@ runCommandNoCC "gitwatch"
     patchShebangs $dest
 
     wrapProgram $dest \
-      --prefix PATH ';' ${
+      --prefix PATH ':' ${
         lib.makeBinPath [
           git
           inotify-tools
           openssh
+          flock
+          coreutils
+          procps
         ]
       }
   ''

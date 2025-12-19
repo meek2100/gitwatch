@@ -3,62 +3,159 @@
 # Exit immediately if a command exits with a non-zero status
 set -e
 
-# --- Environment Variable Configuration with Defaults ---
+# --- PUID/PGID Switching for Volume Permissions ---
+# Default user is 'appuser' (UID 1000) created in the Dockerfile.
+# If PUID/PGID are set, change the UID/GID of appuser to match the host user.
+PUID=${PUID:-}
+PGID=${PGID:-}
+CONTAINER_USER="appuser"
 
+# --- Define execution command array ---
+declare -a EXEC_COMMAND
+
+if [ -n "$PUID" ] && [ -n "$PGID" ]; then
+  # Check if PUID/PGID are different from default (1000/1000 in Alpine)
+  if [ "$PUID" != "$(id -u $CONTAINER_USER)" ] || [ "$PGID" != "$(id -g $CONTAINER_USER)" ]; then
+    echo "Starting as UID: $PUID, GID: $PGID"
+    # Change appuser's UID and GID
+    usermod -u "$PUID" "$CONTAINER_USER" 2>/dev/null || echo "Warning: Could not set UID for $CONTAINER_USER" >&2
+    groupmod -g "$PGID" "$CONTAINER_USER" 2>/dev/null || echo "Warning: Could not set GID for $CONTAINER_USER" >&2
+
+    # --- ADDED LINE ---
+    # Take ownership of the home directory to ensure SSH/gitconfig mounts are readable
+    chown -R "$PUID":"$PGID" /home/appuser 2>/dev/null || true
+    # --- END ADDED LINE ---
+
+    # Only chown critical files (like the scripts) and rely on su-exec
+    # to operate as the correct user on the mounted volumes. This avoids
+    # slow recursive chown on large volumes.
+    chown "$PUID":"$PGID" /app/entrypoint.sh /app/gitwatch.sh 2>/dev/null || true
+    chown "$PUID":"$PGID" /app 2>/dev/null || true
+  else
+    echo "Starting as default user ($CONTAINER_USER) with ID: $PUID/$PGID"
+  fi
+  # Run the command as the specified user
+  EXEC_COMMAND=( su-exec "$CONTAINER_USER" )
+else
+  # No PUID/PGID set, run as the default appuser (which is PID 1, but we use 'exec' later)
+  echo "PUID/PGID not set. Running as default container user: $CONTAINER_USER"
+  # Use 'exec' to replace the shell, will run as USER appuser defined in Dockerfile
+  EXEC_COMMAND=( exec )
+fi
+# --------------------------------------------------
+
+
+# --- Environment Variable Configuration with Defaults ---
 # Target directory to watch
 GIT_WATCH_DIR=${GIT_WATCH_DIR:-/app/watched-repo}
-GIT_DIR="${GIT_DIR:-}"
 
 # Git options
 GIT_REMOTE=${GIT_REMOTE:-origin}
 GIT_BRANCH=${GIT_BRANCH:-main}
+GIT_EXTERNAL_DIR=${GIT_EXTERNAL_DIR:-} # Path to the external .git directory (e.g., /app/.git)
+TIMEOUT=${GIT_TIMEOUT:-60} # Git operation timeout
+
+# --- NEW: Logging Configuration ---
+LOG_LEVEL=${LOG_LEVEL:-} # Set logging level (e.g., INFO, DEBUG, WARN)
+# --- End New ---
 
 # Gitwatch behavior
 SLEEP_TIME=${SLEEP_TIME:-2}
-COMMIT_MSG=${COMMIT_MSG:-"Scripted auto-commit on change (%d) by gitwatch.sh"}
+COMMIT_MSG=${COMMIT_MSG:-"Auto-commit: %d"}
 DATE_FMT=${DATE_FMT:-"+%Y-%m-%d %H:%M:%S"}
-# Read the user-friendly pattern
+# Custom command for commit message
+COMMIT_CMD=${COMMIT_CMD:-}
+# Read the user-friendly glob pattern (for -X)
 USER_EXCLUDE_PATTERN=${EXCLUDE_PATTERN:-""}
+# Read the raw regex pattern (for -x)
+RAW_EXCLUDE_REGEX=${RAW_EXCLUDE_REGEX:-""}
 EVENTS=${EVENTS:-""}
+# Log line length (read by gitwatch.sh from env)
+GW_LOG_LINE_LENGTH=${GW_LOG_LINE_LENGTH:-}
+# --- Add support for -l / -L flags ---
+LOG_DIFF_LINES=${LOG_DIFF_LINES:-}
+LOG_DIFF_NO_COLOR=${LOG_DIFF_NO_COLOR:-false}
+# --- END NEW ---
 
 # Boolean flags (set to "true" to enable)
 PULL_BEFORE_PUSH=${PULL_BEFORE_PUSH:-false}
 SKIP_IF_MERGING=${SKIP_IF_MERGING:-false}
 VERBOSE=${VERBOSE:-false}
 COMMIT_ON_START=${COMMIT_ON_START:-false}
+PASS_DIFFS=${PASS_DIFFS:-false} # Pass diffs to custom command (-C)
+USE_SYSLOG=${USE_SYSLOG:-false} # Log to Syslog (-S)
+QUIET=${QUIET:-false} # Quiet mode (-q)
+DISABLE_LOCKING=${DISABLE_LOCKING:-false} # Disable locking (-n)
+
+# --- Pass-through for binary overrides ---
+# These are exported so gitwatch.sh can find them
+export GW_GIT_BIN=${GW_GIT_BIN:-}
+export GW_INW_BIN=${GW_INW_BIN:-}
+export GW_FLOCK_BIN=${GW_FLOCK_BIN:-}
+export GW_TIMEOUT_BIN=${GW_TIMEOUT_BIN:-}
+export GW_PKILL_BIN=${GW_PKILL_BIN:-} # --- ADDED PKILL ---
+# --- End new pass-through ---
+
 
 # --- Command Construction ---
 
 # Use a bash array to safely build the command and its arguments
-cmd=( "/app/gitwatch.sh" )
+# Note: We do *not* include the script path here yet, it is added later with su-exec/exec
+cmd=( )
 
-# Add options with arguments
+# Add options with arguments (remote, branch, sleep time, date format)
 cmd+=( -r "${GIT_REMOTE}" )
 cmd+=( -b "${GIT_BRANCH}" )
 cmd+=( -s "${SLEEP_TIME}" )
-cmd+=( -m "${COMMIT_MSG}" )
+cmd+=( -t "${TIMEOUT}" ) # Timeout flag
 cmd+=( -d "${DATE_FMT}" )
 
-if [ -n "${GIT_DIR}" ]; then
-  cmd+=( -g "${GIT_DIR}" )
+# Add custom commit command (-c) which overrides -m and -d
+if [ -n "${COMMIT_CMD}" ]; then
+  cmd+=( -c "${COMMIT_CMD}" )
+  # If -C is enabled, add it now
+  if [ "${PASS_DIFFS}" = "true" ]; then
+    cmd+=( -C )
+  fi
+else
+  # Only include -m if no custom command is provided
+  cmd+=( -m "${COMMIT_MSG}" )
+
+  # --- Add diff logging flags (-l / -L) ---
+  # This is only added if a custom command is NOT used
+  if [ -n "${LOG_DIFF_LINES}" ]; then
+    if [ "${LOG_DIFF_NO_COLOR}" = "true" ]; then
+      cmd+=( -L "${LOG_DIFF_LINES}" )
+    else
+      cmd+=( -l "${LOG_DIFF_LINES}" )
+    fi
+  fi
+  # --- END NEW ---
 fi
 
-# --- Convert User-Friendly Exclude Pattern to Regex ---
+
+# Add external Git directory if set
+if [ -n "${GIT_EXTERNAL_DIR}" ]; then
+  cmd+=( -g "${GIT_EXTERNAL_DIR}" )
+fi
+
+# --- Logging Flags ---
+# Add log level if set. This is processed first by gitwatch.sh.
+if [ -n "${LOG_LEVEL}" ]; then
+  cmd+=( -o "${LOG_LEVEL}" )
+fi
+# --- End Logging Flags ---
+
+# --- Exclusion Logic: Pass variables to their respective flags ---
+
+# 1. Pass raw regex pattern (for backward compatibility) to -x
+if [ -n "${RAW_EXCLUDE_REGEX}" ]; then
+  cmd+=( -x "${RAW_EXCLUDE_REGEX}" )
+fi
+
+# 2. Pass user-friendly glob pattern to -X (gitwatch.sh handles conversion)
 if [ -n "${USER_EXCLUDE_PATTERN}" ]; then
-  # 1. Replace commas with spaces to treat as separate words.
-  PATTERNS_AS_WORDS=${USER_EXCLUDE_PATTERN//,/ }
-  # 2. Use an array to store and automatically trim whitespace from each pattern.
-  read -r -a PATTERN_ARRAY <<< "$PATTERNS_AS_WORDS"
-  # 3. Join the array elements with the regex OR pipe `|`.
-  PROCESSED_PATTERN=$(IFS=\|; echo "${PATTERN_ARRAY[*]}")
-
-  # 4. Escape periods to treat them as literal dots in regex
-  PROCESSED_PATTERN=${PROCESSED_PATTERN//./\\.}
-
-  # 5. Convert glob stars `*` into the regex equivalent `.*`
-  PROCESSED_PATTERN=${PROCESSED_PATTERN//\*/\.\*}
-
-  cmd+=( -x "${PROCESSED_PATTERN}" )
+  cmd+=( -X "${USER_EXCLUDE_PATTERN}" )
 fi
 
 
@@ -75,24 +172,49 @@ if [ "${SKIP_IF_MERGING}" = "true" ]; then
   cmd+=( -M )
 fi
 
-if [ "${VERBOSE}" = "true" ]; then
+# --- Verbose/Quiet shortcuts (gitwatch.sh handles precedence) ---
+if [ "${QUIET}" = "true" ]; then
+  cmd+=( -q )
+elif [ "${VERBOSE}" = "true" ]; then
+  # Only add verbose if quiet is not set
   cmd+=( -v )
 fi
+# --- End new logic ---
 
 if [ "${COMMIT_ON_START}" = "true" ]; then
   cmd+=( -f )
 fi
 
+if [ "${USE_SYSLOG}" = "true" ]; then
+  cmd+=( -S )
+fi
+
+# Add no-lock flag
+if [ "${DISABLE_LOCKING}" = "true" ]; then
+  cmd+=( -n )
+fi
+
+
 # The final argument is the directory to watch
 cmd+=( "${GIT_WATCH_DIR}" )
 
-# --- Execution ---
+# --- Execution Logic ---
 
 echo "Starting gitwatch with the following arguments:"
-# Use printf with %q to safely quote the arguments for display
-printf "%q " "${cmd[@]}"
+printf "%q " "/app/gitwatch.sh" "${cmd[@]}"
 echo # Add a newline for cleaner logging
 echo "-------------------------------------------------"
 
-# Use exec to replace the current shell process with gitwatch
-exec "${cmd[@]}"
+# Export the log line length variable so gitwatch.sh can read it
+if [ -n "${GW_LOG_LINE_LENGTH}" ]; then
+  export GW_LOG_LINE_LENGTH
+  echo "Exporting GW_LOG_LINE_LENGTH=${GW_LOG_LINE_LENGTH}"
+fi
+
+# Use 'su-exec' or 'exec' to run the command, replacing the entrypoint shell process.
+# This ensures that signals (like TERM) go directly to gitwatch.sh (PID 1 best practice).
+"${EXEC_COMMAND[@]}" "/app/gitwatch.sh" "${cmd[@]}"
+
+# If 'exec' or 'su-exec' fails, the script continues and exits with an error status.
+echo "ERROR: exec/su-exec failed to start gitwatch.sh. Check permissions and path." >&2
+exit 1

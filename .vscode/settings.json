@@ -1,0 +1,66 @@
+{
+  "editor.formatOnSave": true,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.eol": "\n",
+  "files.associations": {
+    "*.bats": "shellscript"
+  },
+  "[shellscript]": {
+    "editor.defaultFormatter": "foxundermoon.shell-format",
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "shell-format.style": "beautysh",
+    "shell-format.beautysh.config": ".config/.beautyshrc"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "bittorala.mdformat",
+    "editor.wordWrap": "on",
+    "editor.rulers": [80]
+  },
+  "[dockerfile]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[nix]": {
+    "editor.defaultFormatter": "brettm12345.nixfmt-vscode"
+  },
+  "shellcheck.enable": true,
+  "shellcheck.customArgs": ["--rcfile", ".config/.shellcheckrc"],
+  "yaml.validate": true,
+  "yaml.lint.enable": true,
+  "yaml.lint.config": ".config/.yamllint.yaml",
+  "hadolint.enable": true,
+  "hadolint.configFile": ".config/.hadolint.yaml",
+  "markdownlint.config": ".config/.markdownlint.yaml",
+  "prettier.configPath": ".config/.prettierrc.yaml",
+  "prettier.ignorePath": ".config/.prettierignore",
+  "cSpell.enabled": true,
+  "cSpell.words": [
+    "Archlinux",
+    "bpkg",
+    "fswatch",
+    "Gitwatch",
+    "hist",
+    "inotifywait",
+    "supervisord",
+    "Syncthing",
+    "thist"
+  ],
+  "cSpell.ignorePaths": ["**/*.lock", "**/*.json"],
+  "bats.testExplorer.paths": [
+    {
+      "pattern": "tests/**/*.bats",
+      "exclude": [
+        "tests/bats-support/**/*",
+        "tests/bats-assert/**/*",
+        "testsF/bats-file/**/*"
+      ]
+    }
+  ]
+}
